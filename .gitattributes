@@ -1,0 +1,10 @@
+* text=auto eol=lf
+
+*.go text diff=golang
+*.md text
+*.yml text
+*.yaml text
+
+*.exe binary
+*.gz binary
+*.zip binary

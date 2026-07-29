@@ -1,0 +1,67 @@
+name: Language request
+description: Propose support for another Tree-sitter language
+title: "[Language]: "
+labels:
+  - language
+  - enhancement
+  - triage
+body:
+  - type: input
+    id: language
+    attributes:
+      label: Language and dialects
+      placeholder: Java 25
+    validations:
+      required: true
+
+  - type: input
+    id: grammar
+    attributes:
+      label: Upstream Tree-sitter grammar
+      description: Link to the maintained grammar repository.
+      placeholder: https://github.com/tree-sitter/tree-sitter-java
+    validations:
+      required: true
+
+  - type: input
+    id: license
+    attributes:
+      label: Upstream license
+      description: Link to the exact license file and identify the license.
+      placeholder: MIT — https://github.com/.../LICENSE
+    validations:
+      required: true
+
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Function-like boundaries
+      description: List likely grammar node kinds with executable bodies.
+      placeholder: method_declaration, lambda_expression
+    validations:
+      required: true
+
+  - type: textarea
+    id: fixtures
+    attributes:
+      label: Representative fixtures
+      description: Provide non-confidential positives, negatives, and syntax edge cases.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: gaps
+    attributes:
+      label: Known grammar or platform gaps
+      description: Include ABI, CGO, syntax-version, scanner, and native-build concerns.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I read the adding-a-language guide.
+          required: true
+        - label: The proposed grammar's license permits redistribution.
+          required: true

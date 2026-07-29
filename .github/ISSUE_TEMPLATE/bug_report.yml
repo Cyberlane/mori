@@ -1,0 +1,92 @@
+name: Bug report
+description: Report incorrect parsing, scoring, output, or CLI behavior
+title: "[Bug]: "
+labels:
+  - bug
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve 森. Use only minimal, non-confidential source examples.
+        Report security issues through the private advisory link instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+      placeholder: A concise description of the observed behavior.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Mori version
+      description: Paste the full output of `mori version`.
+      placeholder: mori 0.1.0 (commit, date, linux/amd64)
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: Operating system, version, and architecture.
+      placeholder: Ubuntu 24.04, amd64
+    validations:
+      required: true
+
+  - type: input
+    id: languages
+    attributes:
+      label: Languages
+      description: Source and comparison languages involved.
+      placeholder: Go and JavaScript
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and options
+      description: Include the exact command, threshold, excludes, and relevant limits.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide the smallest non-proprietary source fixtures that reproduce the issue.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Include an expected score or boundary when relevant.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include sanitized output and warnings.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed credentials, private paths, and proprietary source.
+          required: true
+        - label: I searched existing issues for this behavior.
+          required: true

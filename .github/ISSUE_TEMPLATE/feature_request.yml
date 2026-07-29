@@ -1,0 +1,69 @@
+name: Feature request
+description: Propose a CLI, scoring, output, or performance improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+  - triage
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What review workflow is difficult today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the user-visible behavior, flags, or output.
+    validations:
+      required: true
+
+  - type: input
+    id: languages
+    attributes:
+      label: Affected languages
+      placeholder: All languages, or Go and Rust
+
+  - type: dropdown
+    id: contract
+    attributes:
+      label: Contract area
+      options:
+        - CLI
+        - Source discovery
+        - Fragment boundaries
+        - Normalization
+        - Similarity scoring
+        - Reporting / JSON
+        - Performance
+        - Release packaging
+    validations:
+      required: true
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Representative examples
+      description: Use minimal, non-confidential positives and nearby negatives.
+      render: text
+
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Compatibility and tradeoffs
+      description: Note false positives, performance cost, schema impact, or alternatives.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and documentation.
+          required: true
+        - label: Any sample source is safe to publish under this repository's license.
+          required: true

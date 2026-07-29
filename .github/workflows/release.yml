@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify release tag
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Validate strict SemVer tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: bash scripts/check-version.sh "$TAG"
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Run complete check
+        env:
+          CGO_ENABLED: "1"
+        run: make check
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux AMD64
+            runner: ubuntu-24.04
+            artifact: release-linux-amd64
+          - name: Linux ARM64
+            runner: ubuntu-24.04-arm
+            artifact: release-linux-arm64
+          - name: macOS AMD64
+            runner: macos-15-intel
+            artifact: release-darwin-amd64
+          - name: macOS ARM64
+            runner: macos-15
+            artifact: release-darwin-arm64
+          - name: Windows AMD64
+            runner: windows-2025
+            artifact: release-windows-amd64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Test, build, and package
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+          TAG: ${{ github.ref_name }}
+        run: |
+          go test ./...
+
+          version="${TAG#v}"
+          commit="$(git rev-parse --short=12 HEAD)"
+          timestamp="$(git show -s --format=%cI HEAD)"
+          goos="$(go env GOOS)"
+          goarch="$(go env GOARCH)"
+          binary="dist/mori"
+          if [[ "$goos" == "windows" ]]; then
+            binary="${binary}.exe"
+          fi
+
+          mkdir -p dist
+          go build \
+            -trimpath \
+            -ldflags "-s -w \
+              -X github.com/Cyberlane/mori/internal/buildinfo.Version=$version \
+              -X github.com/Cyberlane/mori/internal/buildinfo.Commit=$commit \
+              -X github.com/Cyberlane/mori/internal/buildinfo.Date=$timestamp" \
+            -o "$binary" \
+            ./cmd/mori
+
+          go run ./internal/cmd/releasepack \
+            -binary "$binary" \
+            -root . \
+            -output dist \
+            -version "$version" \
+            -goos "$goos" \
+            -goarch "$goarch" \
+            -timestamp "$timestamp"
+
+      - name: Upload native archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish complete release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Download native archives
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create checksums
+        run: |
+          cd dist
+          sha256sum ./*.tar.gz ./*.zip > checksums.txt
+
+      - name: Create or update draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          state="$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null || true)"
+          if [[ "$state" == "false" ]]; then
+            echo "Release $TAG is already published; refusing to mutate it." >&2
+            exit 1
+          fi
+          prerelease=false
+          release_options=()
+          version_without_build="${TAG%%+*}"
+          if [[ "$version_without_build" == *-* ]]; then
+            prerelease=true
+            release_options+=(--prerelease --latest=false)
+          fi
+          if [[ -z "$state" ]]; then
+            gh release create "$TAG" \
+              --draft \
+              --verify-tag \
+              --generate-notes \
+              --title "$TAG" \
+              "${release_options[@]}"
+          fi
+          gh release upload "$TAG" dist/* --clobber
+          publish_options=(--draft=false "--prerelease=$prerelease")
+          if [[ "$prerelease" == "true" ]]; then
+            publish_options+=(--latest=false)
+          fi
+          gh release edit "$TAG" "${publish_options[@]}"
