@@ -41,7 +41,9 @@ Default defenses include:
 - a 2 MiB per-file limit;
 - a candidate-pair cap;
 - parse-error warnings and invalid-fragment exclusion;
-- relative report paths when possible; and
+- relative report paths when possible;
+- offline Agent Skill installation from content embedded in the Mori binary,
+  with symlinked destination rejection and recoverable explicit replacement; and
 - release archives built from a tested tag before publication.
 
 Resource-exhaustion findings, parser crashes, path escapes, malformed release

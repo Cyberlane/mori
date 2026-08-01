@@ -132,12 +132,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
       - name: Download native archives
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: release-*
           path: dist
           merge-multiple: true
+
+      - name: Create portable Agent Skill archive
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          timestamp="$(git show -s --format=%cI HEAD)"
+          go run ./internal/cmd/skillpack \
+            -root . \
+            -output dist \
+            -version "$version" \
+            -timestamp "$timestamp"
 
       - name: Create checksums
         run: |
@@ -175,6 +193,46 @@ jobs:
             publish_options+=(--latest=false)
           fi
           gh release edit "$TAG" "${publish_options[@]}"
+
+  verify-skill:
+    name: Verify Agent Skill download
+    needs: publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download and verify Agent Skill
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          archive="mori-review-similarity_${version}.zip"
+          mkdir -p dist/extracted
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$archive" \
+            --pattern checksums.txt \
+            --dir dist
+
+          cd dist
+          expected="$(awk -v name="./$archive" '$2 == name { print $1 }' checksums.txt)"
+          if [[ -z "$expected" ]]; then
+            echo "No checksum found for $archive." >&2
+            exit 1
+          fi
+          actual="$(sha256sum "$archive" | awk '{ print $1 }')"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "Checksum mismatch for $archive." >&2
+            exit 1
+          fi
+          unzip -q "$archive" -d extracted
+          diff -ru \
+            ../skills/mori-review-similarity \
+            extracted/mori-review-similarity
 
   verify-downloads:
     name: Verify download ${{ matrix.name }}

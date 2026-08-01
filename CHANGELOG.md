@@ -7,6 +7,14 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Official `mori-review-similarity` Agent Skill for evidence-led duplicate and
+  refactoring review.
+- Offline `mori skill install` command for project, global, and custom skill
+  directories.
+- Deterministic platform-neutral Agent Skill archive in each release.
+
 ## [0.1.0] - 2026-08-01
 
 ### Added

@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -90,6 +92,140 @@ func TestRunRejectsInvalidThreshold(t *testing.T) {
 	}
 }
 
+func TestRunSkillInstallTarget(t *testing.T) {
+	t.Parallel()
+
+	parent := t.TempDir()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(
+		context.Background(),
+		[]string{"skill", "install", "--target", parent},
+		&stdout,
+		&stderr,
+	)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Installed mori-review-similarity") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(parent, "mori-review-similarity", "SKILL.md")); err != nil {
+		t.Fatalf("Stat(installed SKILL.md): %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(
+		context.Background(),
+		[]string{"skill", "install", "--target", parent},
+		&stdout,
+		&stderr,
+	)
+	if code != exitSuccess || !strings.Contains(stdout.String(), "is current") {
+		t.Fatalf("current exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+
+	skillPath := filepath.Join(parent, "mori-review-similarity", "SKILL.md")
+	if err := os.WriteFile(skillPath, []byte("custom\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(custom): %v", err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(
+		context.Background(),
+		[]string{"skill", "install", "--target", parent},
+		&stdout,
+		&stderr,
+	)
+	if code != exitError || !strings.Contains(stderr.String(), "--replace") {
+		t.Fatalf("different exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(
+		context.Background(),
+		[]string{"skill", "install", "--target", parent, "--replace"},
+		&stdout,
+		&stderr,
+	)
+	if code != exitSuccess || !strings.Contains(stdout.String(), "Previous copy:") {
+		t.Fatalf("replace exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestRunSkillInstallProject(t *testing.T) {
+	t.Parallel()
+
+	project := t.TempDir()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(
+		context.Background(),
+		[]string{"skill", "install", "--project", project},
+		&stdout,
+		&stderr,
+	)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	installed := filepath.Join(
+		project,
+		".agents",
+		"skills",
+		"mori-review-similarity",
+		"SKILL.md",
+	)
+	if _, err := os.Stat(installed); err != nil {
+		t.Fatalf("Stat(project SKILL.md): %v", err)
+	}
+}
+
+func TestRunSkillInstallGlobal(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(
+		context.Background(),
+		[]string{"skill", "install", "--global"},
+		&stdout,
+		&stderr,
+	)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	installed := filepath.Join(
+		home,
+		".agents",
+		"skills",
+		"mori-review-similarity",
+		"SKILL.md",
+	)
+	if _, err := os.Stat(installed); err != nil {
+		t.Fatalf("Stat(global SKILL.md): %v", err)
+	}
+}
+
+func TestRunSkillInstallRequiresOneScope(t *testing.T) {
+	t.Parallel()
+
+	for _, args := range [][]string{
+		{"skill", "install"},
+		{"skill", "install", "--global", "--target", t.TempDir()},
+	} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := Run(context.Background(), args, &stdout, &stderr)
+		if code != exitUsage {
+			t.Errorf("Run(%v) exit = %d, stderr = %q", args, code, stderr.String())
+		}
+	}
+}
+
 func TestReadOnlyCommandsReportWriteFailures(t *testing.T) {
 	t.Parallel()
 
@@ -110,5 +246,13 @@ func TestReadOnlyCommandsReportWriteFailures(t *testing.T) {
 		failingWriter{},
 	); code != exitError {
 		t.Errorf("Run(scan --help) exit = %d, want %d", code, exitError)
+	}
+	if code := Run(
+		context.Background(),
+		[]string{"skill", "install", "--help"},
+		io.Discard,
+		failingWriter{},
+	); code != exitError {
+		t.Errorf("Run(skill install --help) exit = %d, want %d", code, exitError)
 	}
 }
