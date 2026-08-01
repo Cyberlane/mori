@@ -175,3 +175,83 @@ jobs:
             publish_options+=(--latest=false)
           fi
           gh release edit "$TAG" "${publish_options[@]}"
+
+  verify-downloads:
+    name: Verify download ${{ matrix.name }}
+    needs: publish
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux AMD64
+            runner: ubuntu-24.04
+            goos: linux
+            goarch: amd64
+            extension: tar.gz
+          - name: Linux ARM64
+            runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+            extension: tar.gz
+          - name: macOS AMD64
+            runner: macos-15-intel
+            goos: darwin
+            goarch: amd64
+            extension: tar.gz
+          - name: macOS ARM64
+            runner: macos-15
+            goos: darwin
+            goarch: arm64
+            extension: tar.gz
+          - name: Windows AMD64
+            runner: windows-2025
+            goos: windows
+            goarch: amd64
+            extension: zip
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Download, verify, and run archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          TARGET_GOOS: ${{ matrix.goos }}
+          TARGET_GOARCH: ${{ matrix.goarch }}
+          ARCHIVE_EXTENSION: ${{ matrix.extension }}
+        run: |
+          version="${TAG#v}"
+          archive="mori_${version}_${TARGET_GOOS}_${TARGET_GOARCH}.${ARCHIVE_EXTENSION}"
+          directory="mori_${version}_${TARGET_GOOS}_${TARGET_GOARCH}"
+
+          mkdir -p dist
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$archive" \
+            --pattern checksums.txt \
+            --dir dist
+
+          cd dist
+          expected="$(awk -v name="./$archive" '$2 == name { print $1 }' checksums.txt)"
+          if [[ -z "$expected" ]]; then
+            echo "No checksum found for $archive." >&2
+            exit 1
+          fi
+          if command -v sha256sum >/dev/null 2>&1; then
+            actual="$(sha256sum "$archive" | awk '{ print $1 }')"
+          else
+            actual="$(shasum -a 256 "$archive" | awk '{ print $1 }')"
+          fi
+          if [[ "$actual" != "$expected" ]]; then
+            echo "Checksum mismatch for $archive." >&2
+            exit 1
+          fi
+
+          tar -xf "$archive"
+          binary="./$directory/mori"
+          if [[ "$TARGET_GOOS" == "windows" ]]; then
+            binary="${binary}.exe"
+          fi
+          "$binary" version
+          "$binary" languages
