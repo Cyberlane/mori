@@ -318,3 +318,6 @@ jobs:
           fi
           "$binary" version
           "$binary" languages
+          skill_parent="$PWD/installed-skills"
+          "$binary" skill install --target "$skill_parent"
+          test -f "$skill_parent/mori-review-similarity/SKILL.md"

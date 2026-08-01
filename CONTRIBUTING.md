@@ -19,6 +19,10 @@ You need:
 - a working C compiler for CGO; and
 - Git.
 
+Go 1.23 is the minimum supported toolchain. Repository development and
+official releases use the preferred Go 1.26.5 toolchain declared in `go.mod`;
+CI separately verifies the minimum version with automatic switching disabled.
+
 ```sh
 git clone https://github.com/Cyberlane/mori.git
 cd mori

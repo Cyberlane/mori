@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-02
+
 ### Added
 
 - Official `mori-review-similarity` Agent Skill for evidence-led duplicate and
@@ -25,5 +27,6 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Cyberlane/mori/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Cyberlane/mori/releases/tag/v0.1.0

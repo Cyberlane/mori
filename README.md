@@ -29,14 +29,28 @@ Copy-paste detectors catch text. Embedding-based tools can be hard to explain.
 - **CI-ready:** deterministic JSON, bounded comparisons, and an opt-in failure
   exit code.
 
-## Quick start
+## Install
 
-Building from source requires Go 1.23 or newer and a C compiler because the
+Prebuilt archives for Linux, macOS, and Windows are available from the
+[latest release](https://github.com/Cyberlane/mori/releases/latest). Each
+release includes `checksums.txt`; verify the archive before placing `mori` on
+your `PATH`.
+
+Alternatively, install from source with Go 1.23 or newer and a C compiler. The
 bundled Tree-sitter grammars use CGO.
 
 ```sh
 go install github.com/Cyberlane/mori/cmd/mori@latest
-mori scan .
+mori version
+```
+
+## Quick start
+
+Start with a higher threshold and ignore very small functions for a low-noise
+first pass:
+
+```sh
+mori scan --threshold 0.85 --min-tokens 40 .
 ```
 
 Explore only cross-language pairs:
@@ -218,7 +232,7 @@ Architecture and extension guides live in:
 
 ## Releases
 
-Pushing a strict SemVer tag such as `v0.1.0` starts native CGO builds for Linux
+Pushing a strict SemVer tag such as `v0.2.0` starts native CGO builds for Linux
 AMD64/ARM64, macOS AMD64/ARM64, and Windows AMD64. Automation assembles a draft
 GitHub release, attaches the native archives, the portable Agent Skill,
 and `checksums.txt`, then publishes it. This keeps every published release
