@@ -1,11 +1,12 @@
-# 森
+# 森 (mori)
 
 [![CI](https://github.com/Cyberlane/mori/actions/workflows/ci.yml/badge.svg)](https://github.com/Cyberlane/mori/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**森** (*mori*, “forest”) finds structurally similar functions across programming
-languages. It parses real syntax trees, removes language-specific noise, and
-ranks function pairs with weighted Jaccard similarity.
+**森** is read *mori* (Japanese for “forest”). It finds structurally similar
+functions across programming languages, parses real syntax trees, removes
+language-specific noise, and ranks function pairs with weighted Jaccard
+similarity.
 
 The result is an explainable shortlist for review—not a claim that two
 functions behave identically.

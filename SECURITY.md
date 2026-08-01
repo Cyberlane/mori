@@ -2,14 +2,13 @@
 
 ## Supported versions
 
-森 is currently pre-release. Until the first tagged release, security fixes are
-made on the default branch. After releases begin, this table will identify
-supported lines explicitly.
+森 (*mori*) is pre-release software. Security fixes are provided for the latest
+pre-release line and the default branch.
 
 | Version | Supported |
 | --- | --- |
 | Default branch | Yes |
-| Tagged releases | Not yet available |
+| 0.1.x | Yes |
 
 ## Reporting a vulnerability
 

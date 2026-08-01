@@ -8,7 +8,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for helping improve 森. Use only minimal, non-confidential source examples.
+        Thank you for helping improve 森 (mori). Use only minimal, non-confidential source examples.
         Report security issues through the private advisory link instead.
 
   - type: textarea

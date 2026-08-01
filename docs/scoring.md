@@ -1,8 +1,8 @@
 # Scoring contract
 
-森 compares normalized AST feature **multisets**. Counts matter: a function with
-four branches is different from a function with one branch even when both sets
-contain the token `flow:if`.
+森 (*mori*) compares normalized AST feature **multisets**. Counts matter: a
+function with four branches is different from a function with one branch even
+when both sets contain the token `flow:if`.
 
 ## Feature construction
 

@@ -1,4 +1,4 @@
-# Contributing to 森
+# Contributing to 森 (mori)
 
 Thank you for helping make cross-language similarity more useful and honest.
 

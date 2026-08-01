@@ -1,6 +1,6 @@
 # Architecture
 
-森 is a local CLI with a deliberately narrow pipeline:
+森 (*mori*) is a local CLI with a deliberately narrow pipeline:
 
 ```mermaid
 flowchart LR

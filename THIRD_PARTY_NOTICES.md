@@ -1,6 +1,6 @@
 # Third-party notices
 
-森 statically links or incorporates the following runtime components:
+森 (*mori*) statically links or incorporates the following runtime components:
 
 | Component | Version | Copyright | License |
 | --- | --- | --- | --- |
