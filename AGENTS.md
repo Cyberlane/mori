@@ -12,6 +12,7 @@ Never describe a score as proof of semantic or behavioral equivalence.
 
 - `cmd/mori`: process entrypoint.
 - `internal/cli`: commands, validation, output selection, and exit codes.
+- `internal/agentskill`: safe installation of Mori's embedded Agent Skill.
 - `internal/diagnostic`: path-safe errors for public reports.
 - `internal/source`: bounded, deterministic source discovery.
 - `internal/language`: grammar registry and function boundaries.
@@ -21,6 +22,7 @@ Never describe a score as proof of semantic or behavioral equivalence.
 - `internal/analyzer`: concurrent parsing, size pruning, pair limits, and sorting.
 - `internal/report`: stable text and schema-versioned JSON.
 - `internal/release`: deterministic native archive assembly.
+- `skills/mori-review-similarity`: canonical portable Agent Skill source.
 
 Language grammars use CGO. Do not claim a target works until it builds and tests
 on that target or its native CI runner.

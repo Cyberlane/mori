@@ -40,6 +40,8 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 		return runScan(ctx, args[1:], stdout, stderr)
 	case "languages":
 		return runLanguages(args[1:], stdout, stderr)
+	case "skill":
+		return runSkill(args[1:], stdout, stderr)
 	case "version":
 		return runVersion(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
@@ -212,6 +214,7 @@ func writeRootUsage(writer io.Writer) error {
 		"\nUsage:\n",
 		"  mori scan [options] [path ...]\n",
 		"  mori languages\n",
+		"  mori skill install (--project <path> | --global | --target <path>)\n",
 		"  mori version\n",
 		"  mori help\n",
 	)

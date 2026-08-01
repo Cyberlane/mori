@@ -64,6 +64,42 @@ mori scan --threshold 0.85 --fail-on-match .
 Exit status `3` means matches were found with `--fail-on-match`; `1` means an
 operational error, and `2` means invalid CLI usage.
 
+## Agent integration
+
+森 ships an official `mori-review-similarity` Agent Skill that teaches
+compatible coding agents when to scan, how to validate the JSON report, and
+how to investigate candidates without treating a score as behavioral proof.
+
+Install it into a project and commit the reviewed copy for the team:
+
+```sh
+mori skill install --project .
+git add .agents/skills/mori-review-similarity
+```
+
+Install it as a personal default across projects:
+
+```sh
+mori skill install --global
+```
+
+Or select a client-specific skills directory explicitly:
+
+```sh
+mori skill install --target ~/.codex/skills
+```
+
+Project and global installs use the interoperable `.agents/skills` convention.
+The `--target` form works for clients with another discovery directory. The
+installer is offline: the skill is embedded in the Mori binary. Identical
+installs are idempotent, different copies are preserved by default, and an
+explicit `--replace` moves the previous copy to a sibling backup.
+
+The canonical source lives in
+[`skills/mori-review-similarity`](skills/mori-review-similarity). Releases also
+attach a platform-neutral skill ZIP for manual extraction or upload into a
+compatible agent product.
+
 ## Example
 
 The repository contains equivalent-looking email checks written in four
@@ -184,8 +220,9 @@ Architecture and extension guides live in:
 
 Pushing a strict SemVer tag such as `v0.1.0` starts native CGO builds for Linux
 AMD64/ARM64, macOS AMD64/ARM64, and Windows AMD64. Automation assembles a draft
-GitHub release, attaches archives and `checksums.txt`, then publishes it. This
-keeps every published release complete and compatible with immutable releases.
+GitHub release, attaches the native archives, the portable Agent Skill,
+and `checksums.txt`, then publishes it. This keeps every published release
+complete and compatible with immutable releases.
 
 ## Inspiration
 
