@@ -7,6 +7,15 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Upgraded the Tree-sitter Go binding to 0.25.0 and compatible ABI-15 grammar
+  releases for Go, JavaScript, Python, and Rust.
+- Kept grammar-only Go statement-list wrappers out of fingerprints so parser
+  generator changes do not distort structural scores.
+- Grouped future Tree-sitter Dependabot updates so binding and grammar ABI
+  changes are reviewed together.
+
 ## [0.2.0] - 2026-08-02
 
 ### Added

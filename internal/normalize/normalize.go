@@ -149,6 +149,13 @@ func enterNode(
 }
 
 func canonicalNamed(kind string) string {
+	// Grammar-only containers are transparent. In particular, Go grammar
+	// ABI 15 wraps block children in statement_list without changing the
+	// source structure that Mori intends to compare.
+	if kind == "statement_list" {
+		return ""
+	}
+
 	if value, ok := canonicalKinds[kind]; ok {
 		return value
 	}
