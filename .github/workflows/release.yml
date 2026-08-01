@@ -248,7 +248,12 @@ jobs:
             exit 1
           fi
 
-          tar -xf "$archive"
+          if [[ "$TARGET_GOOS" == "windows" ]]; then
+            powershell -NoProfile -NonInteractive -Command \
+              "Expand-Archive -LiteralPath '$archive' -DestinationPath '.'"
+          else
+            tar -xf "$archive"
+          fi
           binary="./$directory/mori"
           if [[ "$TARGET_GOOS" == "windows" ]]; then
             binary="${binary}.exe"

@@ -1,0 +1,109 @@
+name: Verify published release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published SemVer tag to verify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux AMD64
+            runner: ubuntu-24.04
+            goos: linux
+            goarch: amd64
+            extension: tar.gz
+          - name: Linux ARM64
+            runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+            extension: tar.gz
+          - name: macOS AMD64
+            runner: macos-15-intel
+            goos: darwin
+            goarch: amd64
+            extension: tar.gz
+          - name: macOS ARM64
+            runner: macos-15
+            goos: darwin
+            goarch: arm64
+            extension: tar.gz
+          - name: Windows AMD64
+            runner: windows-2025
+            goos: windows
+            goarch: amd64
+            extension: zip
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out verification scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download, verify, and run archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          TARGET_GOOS: ${{ matrix.goos }}
+          TARGET_GOARCH: ${{ matrix.goarch }}
+          ARCHIVE_EXTENSION: ${{ matrix.extension }}
+        run: |
+          bash scripts/check-version.sh "$TAG"
+
+          version="${TAG#v}"
+          archive="mori_${version}_${TARGET_GOOS}_${TARGET_GOARCH}.${ARCHIVE_EXTENSION}"
+          directory="mori_${version}_${TARGET_GOOS}_${TARGET_GOARCH}"
+
+          mkdir -p dist
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$archive" \
+            --pattern checksums.txt \
+            --dir dist
+
+          cd dist
+          expected="$(awk -v name="./$archive" '$2 == name { print $1 }' checksums.txt)"
+          if [[ -z "$expected" ]]; then
+            echo "No checksum found for $archive." >&2
+            exit 1
+          fi
+          if command -v sha256sum >/dev/null 2>&1; then
+            actual="$(sha256sum "$archive" | awk '{ print $1 }')"
+          else
+            actual="$(shasum -a 256 "$archive" | awk '{ print $1 }')"
+          fi
+          if [[ "$actual" != "$expected" ]]; then
+            echo "Checksum mismatch for $archive." >&2
+            exit 1
+          fi
+
+          if [[ "$TARGET_GOOS" == "windows" ]]; then
+            powershell -NoProfile -NonInteractive -Command \
+              "Expand-Archive -LiteralPath '$archive' -DestinationPath '.'"
+          else
+            tar -xf "$archive"
+          fi
+          binary="./$directory/mori"
+          if [[ "$TARGET_GOOS" == "windows" ]]; then
+            binary="${binary}.exe"
+          fi
+          version_output="$("$binary" version)"
+          printf '%s\n' "$version_output"
+          if [[ "$version_output" != "mori $version ("* ]]; then
+            echo "Unexpected version output from $archive." >&2
+            exit 1
+          fi
+          "$binary" languages
