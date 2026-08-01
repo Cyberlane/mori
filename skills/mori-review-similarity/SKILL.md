@@ -20,6 +20,7 @@ with:
 
 - `0.85` for focused same-language review;
 - `0.65` for cross-language exploration;
+- `--min-tokens 40` for a low-noise same-language first pass;
 - at most 25 reported matches; and
 - Mori's default file-size and candidate-pair limits.
 
@@ -44,12 +45,15 @@ For a focused review, run:
 mori scan \
   --format json \
   --threshold 0.85 \
+  --min-tokens 40 \
   --max-matches 25 \
   .
 ```
 
-For intentional cross-language discovery, add
-`--cross-language-only --threshold 0.65`.
+For intentional cross-language discovery, use
+`--cross-language-only --threshold 0.65 --min-tokens 12` so short ports remain
+eligible. Raise `--min-tokens` when trivial wrappers or boilerplate dominate
+the report.
 
 Add repeated `--exclude` flags for generated or project-specific irrelevant
 paths. Do not use `--max-matches 0`, `--max-pairs 0`, or

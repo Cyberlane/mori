@@ -8,7 +8,8 @@ pre-release line and the default branch.
 | Version | Supported |
 | --- | --- |
 | Default branch | Yes |
-| 0.1.x | Yes |
+| 0.2.x | Yes |
+| 0.1.x | No |
 
 ## Reporting a vulnerability
 
