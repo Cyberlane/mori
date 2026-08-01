@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-02
+
 ### Changed
 
 - Upgraded the Tree-sitter Go binding to 0.25.0 and compatible ABI-15 grammar
@@ -36,6 +38,7 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Cyberlane/mori/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Cyberlane/mori/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Cyberlane/mori/releases/tag/v0.1.0
