@@ -9,6 +9,10 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      tree-sitter:
+        patterns:
+          - "github.com/tree-sitter/*"
 
   - package-ecosystem: github-actions
     directory: /

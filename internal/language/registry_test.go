@@ -9,14 +9,37 @@ import (
 func TestEveryGrammarHasCompatibleABI(t *testing.T) {
 	t.Parallel()
 
+	expectedABI := map[string]uint32{
+		"go":         15,
+		"javascript": 15,
+		"python":     15,
+		"rust":       15,
+		"tsx":        14,
+		"typescript": 14,
+	}
+
 	for _, spec := range All() {
 		spec := spec
 		t.Run(spec.ID, func(t *testing.T) {
 			t.Parallel()
 
+			language := spec.NewLanguage()
+			if got, want := language.AbiVersion(), expectedABI[spec.ID]; got != want {
+				t.Fatalf("%s ABI = %d, want %d", spec.ID, got, want)
+			}
+			if got := language.AbiVersion(); got < tree_sitter.MIN_COMPATIBLE_LANGUAGE_VERSION ||
+				got > tree_sitter.LANGUAGE_VERSION {
+				t.Fatalf(
+					"%s ABI = %d, supported range is %d-%d",
+					spec.ID,
+					got,
+					tree_sitter.MIN_COMPATIBLE_LANGUAGE_VERSION,
+					tree_sitter.LANGUAGE_VERSION,
+				)
+			}
 			parser := tree_sitter.NewParser()
 			defer parser.Close()
-			if err := parser.SetLanguage(spec.NewLanguage()); err != nil {
+			if err := parser.SetLanguage(language); err != nil {
 				t.Fatalf("SetLanguage(%s): %v", spec.ID, err)
 			}
 		})

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Cyberlane/mori/internal/language"
@@ -73,6 +74,47 @@ function total(values) {
 	)
 	if unrelatedScore >= 0.60 {
 		t.Fatalf("unrelated score = %.3f, want below 0.60", unrelatedScore)
+	}
+}
+
+func TestGoStatementListWrapperIsTransparent(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "statements.go")
+	content := `package sample
+
+func normalize(value string) string {
+	cleaned := value
+	return cleaned
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.Detect(path)
+	if !ok {
+		t.Fatal("Go grammar not detected")
+	}
+	fragments, warnings := parser.File(context.Background(), source.File{
+		Path:        path,
+		DisplayPath: "statements.go",
+		Language:    spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 1 {
+		t.Fatalf("warnings/fragments = %#v/%d, want none/1", warnings, len(fragments))
+	}
+
+	features := fragments[0].Features
+	for feature := range features {
+		if strings.Contains(feature, "statement_list") {
+			t.Fatalf("grammar-only statement list leaked into feature %q", feature)
+		}
+	}
+	if got := features["edge:block>binding"]; got != 1 {
+		t.Errorf("edge:block>binding count = %d, want 1", got)
+	}
+	if got := features["edge:block>flow:return"]; got != 1 {
+		t.Errorf("edge:block>flow:return count = %d, want 1", got)
 	}
 }
 

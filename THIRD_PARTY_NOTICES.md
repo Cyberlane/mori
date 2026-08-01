@@ -7,13 +7,13 @@
 | Go runtime and standard library | release toolchain 1.26.5 | Copyright 2009 The Go Authors | BSD 3-Clause |
 | `github.com/bmatcuk/doublestar/v4` | 4.10.0 | Copyright (c) 2014 Bob Matcuk | MIT |
 | `github.com/mattn/go-pointer` | 0.0.1 | Copyright (c) 2019 Yasuhiro Matsumoto | MIT |
-| `github.com/tree-sitter/go-tree-sitter` | 0.24.0 | Copyright (c) 2024 Amaan Qureshi | MIT |
+| `github.com/tree-sitter/go-tree-sitter` | 0.25.0 | Copyright (c) 2024 Amaan Qureshi | MIT |
 | Tree-sitter core | bundled by the Go binding | Copyright (c) 2018 Max Brunsfeld | MIT |
-| Tree-sitter Go grammar | 0.23.4 | Copyright (c) 2014 Max Brunsfeld | MIT |
-| Tree-sitter JavaScript grammar | 0.23.1 | Copyright (c) 2014 Max Brunsfeld | MIT |
+| Tree-sitter Go grammar | 0.25.0 | Copyright (c) 2014 Max Brunsfeld | MIT |
+| Tree-sitter JavaScript grammar | 0.25.0 | Copyright (c) 2014 Max Brunsfeld | MIT |
 | Tree-sitter TypeScript/TSX grammars | 0.23.2 | Copyright (c) 2017 Max Brunsfeld | MIT |
-| Tree-sitter Python grammar | 0.23.6 | Copyright (c) 2016 Max Brunsfeld | MIT |
-| Tree-sitter Rust grammar | 0.23.3 | Copyright (c) 2017 Maxim Sokolov | MIT |
+| Tree-sitter Python grammar | 0.25.0 | Copyright (c) 2016 Max Brunsfeld | MIT |
+| Tree-sitter Rust grammar | 0.24.2 | Copyright (c) 2017 Maxim Sokolov | MIT |
 
 ## MIT license text
 
