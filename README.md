@@ -232,7 +232,7 @@ Architecture and extension guides live in:
 
 ## Releases
 
-Pushing a strict SemVer tag such as `v0.2.0` starts native CGO builds for Linux
+Pushing a strict SemVer tag such as `v0.2.1` starts native CGO builds for Linux
 AMD64/ARM64, macOS AMD64/ARM64, and Windows AMD64. Automation assembles a draft
 GitHub release, attaches the native archives, the portable Agent Skill,
 and `checksums.txt`, then publishes it. This keeps every published release

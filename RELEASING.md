@@ -9,15 +9,15 @@ public.
 2. Confirm every intended change is committed.
 3. Run `make check`.
 4. Confirm the default branch CI is green.
-5. Choose a strict Semantic Versioning tag such as `v0.2.0`.
+5. Choose a strict Semantic Versioning tag such as `v0.2.1`.
 
 ## Publish
 
 Create and push a signed tag:
 
 ```sh
-git tag -s v0.2.0 -m "v0.2.0"
-git push origin v0.2.0
+git tag -s v0.2.1 -m "v0.2.1"
+git push origin v0.2.1
 ```
 
 The release workflow:
@@ -33,7 +33,7 @@ The release workflow:
 9. verifies the downloaded Agent Skill against the tagged source; and
 10. verifies checksums and runs every downloaded native binary.
 
-A tag with a prerelease component, such as `v0.2.0-rc.1`, is published as a
+A tag with a prerelease component, such as `v0.2.1-rc.1`, is published as a
 GitHub prerelease and is never marked Latest.
 
 Do not publish an empty release manually before pushing the tag. The workflow
