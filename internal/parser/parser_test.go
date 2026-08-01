@@ -115,11 +115,22 @@ func TestFileRejectsIdentityChangeAfterDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Stat: %v", err)
 	}
+	replacementPath := filepath.Join(filepath.Dir(path), "replacement.go")
+	if err := os.WriteFile(replacementPath, []byte("package sample\nfunc Second() {}\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile(replacement): %v", err)
+	}
+	replacementInfo, err := os.Stat(replacementPath)
+	if err != nil {
+		t.Fatalf("Stat(replacement): %v", err)
+	}
+	if os.SameFile(originalInfo, replacementInfo) {
+		t.Fatal("simultaneous fixture files unexpectedly share an identity")
+	}
 	if err := os.Remove(path); err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
-	if err := os.WriteFile(path, []byte("package sample\nfunc Second() {}\n"), 0o600); err != nil {
-		t.Fatalf("WriteFile(second): %v", err)
+	if err := os.Rename(replacementPath, path); err != nil {
+		t.Fatalf("Rename(replacement): %v", err)
 	}
 	spec, ok := language.Detect(path)
 	if !ok {
