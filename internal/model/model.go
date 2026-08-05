@@ -1,6 +1,9 @@
 // Package model defines the analyzer's stable internal and output models.
 package model
 
+// SchemaVersion is the current machine-readable report contract.
+const SchemaVersion = 2
+
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
 
@@ -18,6 +21,7 @@ type Fragment struct {
 	Location     Location   `json:"location"`
 	TokenCount   int        `json:"token_count"`
 	FeatureCount int        `json:"feature_count"`
+	Fingerprint  string     `json:"fingerprint"`
 	Features     FeatureBag `json:"-"`
 }
 
@@ -26,6 +30,7 @@ type FragmentSummary struct {
 	Location     Location `json:"location"`
 	TokenCount   int      `json:"token_count"`
 	FeatureCount int      `json:"feature_count"`
+	Fingerprint  string   `json:"fingerprint"`
 }
 
 // Summary returns the serializable portion of a fragment.
@@ -34,6 +39,7 @@ func (f Fragment) Summary() FragmentSummary {
 		Location:     f.Location,
 		TokenCount:   f.TokenCount,
 		FeatureCount: f.FeatureCount,
+		Fingerprint:  f.Fingerprint,
 	}
 }
 
@@ -45,6 +51,7 @@ type SharedFeature struct {
 
 // Match is one pair at or above the configured similarity threshold.
 type Match struct {
+	ID             string          `json:"id"`
 	Similarity     float64         `json:"similarity"`
 	Left           FragmentSummary `json:"left"`
 	Right          FragmentSummary `json:"right"`

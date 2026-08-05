@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Cyberlane/mori/internal/diagnostic"
+	"github.com/Cyberlane/mori/internal/fingerprint"
 	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/normalize"
 	"github.com/Cyberlane/mori/internal/source"
@@ -91,7 +92,7 @@ func collect(
 		}
 		current := cursor.Node()
 		if file.Language.IsFunction(current.Kind()) && !current.HasError() {
-			fingerprint, err := normalize.Build(
+			profile, err := normalize.Build(
 				ctx,
 				current,
 				content,
@@ -100,7 +101,7 @@ func collect(
 			if err != nil {
 				return err
 			}
-			if fingerprint.TokenCount >= minTokens {
+			if profile.TokenCount >= minTokens {
 				start := current.StartPosition()
 				end := current.EndPosition()
 				endLine := int(end.Row) + 1
@@ -116,9 +117,10 @@ func collect(
 						StartLine: int(start.Row) + 1,
 						EndLine:   endLine,
 					},
-					TokenCount:   fingerprint.TokenCount,
-					FeatureCount: featureCount(fingerprint.Features),
-					Features:     fingerprint.Features,
+					TokenCount:   profile.TokenCount,
+					FeatureCount: featureCount(profile.Features),
+					Fingerprint:  fingerprint.Bag(profile.Features),
+					Features:     profile.Features,
 				})
 			}
 		}

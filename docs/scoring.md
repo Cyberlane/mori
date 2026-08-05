@@ -20,6 +20,10 @@ Semantic hints currently cover membership, pattern matching, length, trimming,
 case conversion, filtering, mapping, and reduction. They have weight two.
 Everything else has weight one.
 
+The normalizer has a version constant for persisted review artifacts. Any
+change to the feature vocabulary, weights, canonical mappings, or
+semantic-hint list increments that version.
+
 These hints only say that a call *looks like* a familiar operation based on its
 callee name. User-defined `contains` or `map` methods can mean something else.
 
@@ -107,13 +111,22 @@ An explanation helps answer “why did this pair score highly?” It is not a
 complete decomposition of the numerator or a proof that the pair should be
 refactored.
 
+Every fragment report includes a stable content fingerprint derived from its
+normalized feature bag. Feature names are sorted before SHA-256 hashing and
+the result is truncated to 16 hexadecimal characters. Formatting, comments,
+literal values, most identifiers, line numbers, and file position do not
+affect this identity. A match ID joins its two fragment fingerprints in
+lexical order, so pair order does not affect the ID. This is useful for
+review workflows, but it also means an identical accepted fragment in a new
+location has the same identity.
+
 ## JSON schema
 
 The top-level shape is:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "threshold": 0.7,
   "files": 4,
   "fragments": 4,
@@ -124,6 +137,11 @@ The top-level shape is:
   "warnings": []
 }
 ```
+
+Match objects also include `id`, and each `left` and `right` fragment includes
+`fingerprint`. The report schema version changes when these machine-readable
+fields are introduced; consumers should reject or explicitly handle unknown
+schema versions.
 
 Paths are relative to the current working directory when possible. Lines are
 one-based and inclusive. A future breaking shape change must increment

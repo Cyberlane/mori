@@ -11,8 +11,14 @@ import (
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-// Fingerprint is a normalized, language-neutral view of one syntax fragment.
-type Fingerprint struct {
+// Version identifies the normalization contract used to build feature bags.
+// Bump it whenever the feature vocabulary, weights, canonical mappings, or
+// semantic-hint list changes.
+const Version = 1
+
+// Profile is a normalized, language-neutral view of one syntax fragment.
+// It is not the stable content identity exposed in reports.
+type Profile struct {
 	Features   model.FeatureBag
 	TokenCount int
 }
@@ -24,10 +30,10 @@ func Build(
 	root *tree_sitter.Node,
 	source []byte,
 	isFunction func(string) bool,
-) (Fingerprint, error) {
-	fingerprint := Fingerprint{Features: make(model.FeatureBag)}
+) (Profile, error) {
+	profile := Profile{Features: make(model.FeatureBag)}
 	if root == nil {
-		return fingerprint, nil
+		return profile, nil
 	}
 
 	type frame struct {
@@ -43,7 +49,7 @@ func Build(
 
 	for len(stack) > 0 {
 		if err := ctx.Err(); err != nil {
-			return Fingerprint{}, err
+			return Profile{}, err
 		}
 
 		current := &stack[len(stack)-1]
@@ -55,7 +61,7 @@ func Build(
 				current.field,
 				source,
 				isFunction,
-				&fingerprint,
+				&profile,
 			)
 			if !descend {
 				stack = stack[:len(stack)-1]
@@ -82,7 +88,7 @@ func Build(
 		})
 	}
 
-	return fingerprint, nil
+	return profile, nil
 }
 
 func enterNode(
@@ -92,7 +98,7 @@ func enterNode(
 	field string,
 	source []byte,
 	isFunction func(string) bool,
-	fingerprint *Fingerprint,
+	profile *Profile,
 ) (string, bool) {
 	if node == nil || node.IsError() || node.IsMissing() || node.IsExtra() {
 		return parentCanonical, false
@@ -100,11 +106,11 @@ func enterNode(
 
 	kind := node.Kind()
 	if node.Id() != rootID && isFunction(kind) {
-		addFeature(fingerprint.Features, "node:function:nested", 1)
+		addFeature(profile.Features, "node:function:nested", 1)
 		if parentCanonical != "" {
-			addFeature(fingerprint.Features, "edge:"+parentCanonical+">function:nested", 1)
+			addFeature(profile.Features, "edge:"+parentCanonical+">function:nested", 1)
 		}
-		fingerprint.TokenCount++
+		profile.TokenCount++
 		return parentCanonical, false
 	}
 
@@ -121,16 +127,16 @@ func enterNode(
 
 	nextParent := parentCanonical
 	if canonical != "" {
-		addFeature(fingerprint.Features, "node:"+canonical, 1)
+		addFeature(profile.Features, "node:"+canonical, 1)
 		if class := coarseClass(canonical); class != "" {
-			addFeature(fingerprint.Features, "class:"+class, 1)
+			addFeature(profile.Features, "class:"+class, 1)
 		}
-		fingerprint.TokenCount++
+		profile.TokenCount++
 		if parentCanonical != "" {
-			addFeature(fingerprint.Features, "edge:"+parentCanonical+">"+canonical, 1)
+			addFeature(profile.Features, "edge:"+parentCanonical+">"+canonical, 1)
 		}
 		if role := canonicalRole(field); role != "" {
-			addFeature(fingerprint.Features, "role:"+role+">"+canonical, 1)
+			addFeature(profile.Features, "role:"+role+">"+canonical, 1)
 		}
 		nextParent = canonical
 	}
@@ -139,10 +145,10 @@ func enterNode(
 		// Semantic operation families are deliberate hints, not claims of
 		// behavioral equivalence. A weight of two keeps them useful without
 		// overpowering the surrounding tree structure.
-		addFeature(fingerprint.Features, "semantic:"+operation, 2)
+		addFeature(profile.Features, "semantic:"+operation, 2)
 	}
 	if !node.IsNamed() && canonical == "operator:membership" {
-		addFeature(fingerprint.Features, "semantic:membership", 2)
+		addFeature(profile.Features, "semantic:membership", 2)
 	}
 
 	return nextParent, true
