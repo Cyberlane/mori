@@ -7,6 +7,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Stable fragment and match identities for review workflows.
+- Versioned baseline update, scan suppression, and stale-entry pruning.
+
 ## [0.2.1] - 2026-08-02
 
 ### Changed

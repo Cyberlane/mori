@@ -113,6 +113,27 @@ func TestWriteRejectsTruncatedReport(t *testing.T) {
 	}
 }
 
+func TestPruneKeepsCurrentEntriesWithoutAddingNewOnes(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "baseline.json")
+	set := Set{entries: map[string]Entry{
+		"keep": {ID: "keep", Note: "reviewed"},
+		"drop": {ID: "drop"},
+	}}
+	report := model.Report{Threshold: 0.8, Matches: []model.Match{{ID: "keep"}, {ID: "new"}}}
+	if err := Prune(path, set, report); err != nil {
+		t.Fatalf("Prune: %v", err)
+	}
+	pruned, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load pruned baseline: %v", err)
+	}
+	if !pruned.Has("keep") || pruned.Has("drop") || pruned.Has("new") {
+		t.Fatal("prune did not retain exactly the current accepted entry")
+	}
+}
+
 func TestStaleSortsEntriesNotInReport(t *testing.T) {
 	t.Parallel()
 

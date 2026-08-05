@@ -96,6 +96,19 @@ mori scan --threshold 0.85 --fail-on-match .
 
 With `--fail-on-match`, Mori exits with status `3` when it finds a match.
 
+To record intentional candidates and use Mori as a stable CI gate:
+
+```sh
+mori baseline update --baseline mori-baseline.json --threshold 0.85 .
+mori scan --baseline mori-baseline.json --threshold 0.85 --fail-on-match .
+mori baseline prune --baseline mori-baseline.json --check .
+```
+
+`baseline update` accepts every candidate in the current untruncated scan, so
+review its file diff before committing it. Baselines are opt-in, and a
+suppressed candidate is reported in the scan summary. The conventional file
+name is `mori-baseline.json`; pass it explicitly with `--baseline`.
+
 ## Supported Languages
 
 | Language | File types |

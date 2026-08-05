@@ -149,3 +149,27 @@ Paths are relative to the current working directory when possible. Lines are
 one-based and inclusive. A future breaking shape change must increment
 `schema_version`; adding an optional field still requires documentation and
 consumer review.
+
+## Baselines
+
+Use `--baseline <path>` to suppress candidates that maintainers have reviewed
+and accepted as intentional structural similarity. This records review
+acceptance, not semantic or behavioral equivalence. Missing or incompatible
+baseline files are errors; Mori never treats a failed load as an empty set.
+
+Create or replace a baseline with an untruncated scan:
+
+```sh
+mori baseline update --baseline mori-baseline.json .
+```
+
+The file records its schema, Mori version, normalization version, threshold,
+stable match IDs, and human-readable locations. The normalization version
+must match the running binary; after a normalization change, run `baseline
+update` deliberately and review the resulting diff.
+
+`baseline prune` removes entries whose IDs no longer occur, while
+`baseline prune --check` reports stale entries and exits with status `3`
+without modifying the file. Both commands scan without suppression and use an
+unlimited report internally so bounded display retention cannot make the
+baseline incomplete.

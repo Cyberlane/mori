@@ -108,6 +108,20 @@ the exact total match count is maintained. Shared-feature explanations are
 computed after selection. `--max-matches 0` explicitly opts into unbounded
 result retention.
 
+When a baseline is supplied, accepted match IDs are filtered after scoring but
+before total-match accounting and bounded retention. This keeps suppressed
+candidates from consuming the report budget and makes `--fail-on-match` a
+usable regression gate. Baseline creation and pruning force unbounded
+retention so the review file cannot omit candidates past the display limit.
+
+### `internal/baseline`
+
+Baseline files are versioned JSON review artifacts. They store stable match
+IDs, the normalization version, the writing Mori version, the scan threshold,
+and locations for human context. Loading fails closed on a missing file,
+unsupported schema, or normalization-version mismatch. Writes are sorted and
+atomic; pruning removes stale entries without accepting newly discovered ones.
+
 ### `internal/similarity`
 
 The scorer computes multiset Jaccard using minimum counts for the intersection
@@ -118,6 +132,9 @@ features, sorted by count and feature name.
 
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
+
+Reports expose stable match IDs, fragment fingerprints, and the number of
+baseline-suppressed candidates.
 
 Match ordering is:
 
