@@ -25,6 +25,7 @@ type Options struct {
 	MaxPairs          int
 	Workers           int
 	CrossLanguageOnly bool
+	Suppress          func(id string) bool
 }
 
 type parseJob struct {
@@ -315,9 +316,13 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 		return nil
 	}
 
-	collector.report.TotalMatches++
 	candidate := matchCandidate{similarity: score, left: left, right: right}
 	candidate.id = fingerprint.Pair(left.Fingerprint, right.Fingerprint)
+	if collector.options.Suppress != nil && collector.options.Suppress(candidate.id) {
+		collector.report.Suppressed++
+		return nil
+	}
+	collector.report.TotalMatches++
 	if collector.options.MaxMatches == 0 {
 		collector.unbounded = append(collector.unbounded, candidate)
 		return nil

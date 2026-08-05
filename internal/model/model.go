@@ -72,6 +72,7 @@ type Report struct {
 	Fragments      int       `json:"fragments"`
 	CandidatePairs int       `json:"candidate_pairs"`
 	TotalMatches   int       `json:"total_matches"`
+	Suppressed     int       `json:"suppressed"`
 	Truncated      bool      `json:"truncated"`
 	Matches        []Match   `json:"matches"`
 	Warnings       []Warning `json:"warnings"`

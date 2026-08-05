@@ -47,6 +47,15 @@ func Text(writer io.Writer, report model.Report) error {
 	); err != nil {
 		return err
 	}
+	if report.Suppressed > 0 {
+		if _, err := fmt.Fprintf(
+			writer,
+			"%d match(es) suppressed by baseline\n",
+			report.Suppressed,
+		); err != nil {
+			return err
+		}
+	}
 
 	for index, match := range report.Matches {
 		if _, err := fmt.Fprintf(

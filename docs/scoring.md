@@ -132,6 +132,7 @@ The top-level shape is:
   "fragments": 4,
   "candidate_pairs": 6,
   "total_matches": 0,
+  "suppressed": 0,
   "truncated": false,
   "matches": [],
   "warnings": []
@@ -139,9 +140,10 @@ The top-level shape is:
 ```
 
 Match objects also include `id`, and each `left` and `right` fragment includes
-`fingerprint`. The report schema version changes when these machine-readable
-fields are introduced; consumers should reject or explicitly handle unknown
-schema versions.
+`fingerprint`. `suppressed` counts accepted candidates removed by an explicit
+baseline; it is not a count of compared pairs. The report schema version
+changes when these machine-readable fields are introduced; consumers should
+reject or explicitly handle unknown schema versions.
 
 Paths are relative to the current working directory when possible. Lines are
 one-based and inclusive. A future breaking shape change must increment
