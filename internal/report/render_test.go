@@ -13,7 +13,7 @@ func TestTextEscapesTerminalControlCharacters(t *testing.T) {
 
 	var output bytes.Buffer
 	err := Text(&output, model.Report{
-		SchemaVersion: 1,
+		SchemaVersion: model.SchemaVersion,
 		Threshold:     0.7,
 		Files:         2,
 		Fragments:     2,

@@ -10,6 +10,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/Cyberlane/mori/internal/fingerprint"
 	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/parser"
 	"github.com/Cyberlane/mori/internal/similarity"
@@ -39,6 +40,7 @@ type parseResult struct {
 
 type matchCandidate struct {
 	similarity float64
+	id         string
 	left       model.Fragment
 	right      model.Fragment
 }
@@ -84,7 +86,7 @@ func Analyze(
 	options Options,
 ) (model.Report, error) {
 	report := model.Report{
-		SchemaVersion: 1,
+		SchemaVersion: model.SchemaVersion,
 		Threshold:     options.Threshold,
 		Files:         len(files),
 		Matches:       make([]model.Match, 0),
@@ -315,6 +317,7 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 
 	collector.report.TotalMatches++
 	candidate := matchCandidate{similarity: score, left: left, right: right}
+	candidate.id = fingerprint.Pair(left.Fingerprint, right.Fingerprint)
 	if collector.options.MaxMatches == 0 {
 		collector.unbounded = append(collector.unbounded, candidate)
 		return nil
@@ -342,6 +345,7 @@ func (collector *matchCollector) finish() {
 	collector.report.Matches = make([]model.Match, 0, len(candidates))
 	for _, candidate := range candidates {
 		collector.report.Matches = append(collector.report.Matches, model.Match{
+			ID:             candidate.id,
 			Similarity:     candidate.similarity,
 			Left:           candidate.left.Summary(),
 			Right:          candidate.right.Summary(),

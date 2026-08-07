@@ -53,6 +53,14 @@ func TestAnalyzeCrossLanguageExamples(t *testing.T) {
 	if top.Similarity < options.Threshold {
 		t.Fatalf("top score = %f, below threshold", top.Similarity)
 	}
+	for _, match := range first.Matches {
+		if match.ID == "" {
+			t.Fatal("match has no stable ID")
+		}
+		if match.Left.Fingerprint == "" || match.Right.Fingerprint == "" {
+			t.Fatalf("match has incomplete fragment identities: %#v", match)
+		}
+	}
 }
 
 func TestAnalyzeBoundsReportedMatches(t *testing.T) {
