@@ -7,10 +7,18 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-08
+
 ### Added
 
 - Stable fragment and match identities for review workflows.
 - Versioned baseline update, scan suppression, and stale-entry pruning.
+
+### Changed
+
+- Machine-readable reports now use schema version 2 and include stable
+  fragment/match identities and baseline suppression counts.
+- Updated the CodeQL workflow actions to v4.37.4.
 
 ## [0.2.1] - 2026-08-02
 
@@ -43,7 +51,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Cyberlane/mori/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Cyberlane/mori/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Cyberlane/mori/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Cyberlane/mori/releases/tag/v0.1.0
