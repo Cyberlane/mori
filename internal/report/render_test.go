@@ -56,3 +56,19 @@ func TestTextEscapesTerminalControlCharacters(t *testing.T) {
 		}
 	}
 }
+
+func TestTextDisclosesSuppressedMatches(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	if err := Text(&output, model.Report{
+		SchemaVersion: model.SchemaVersion,
+		Threshold:     0.7,
+		Suppressed:    2,
+	}); err != nil {
+		t.Fatalf("Text: %v", err)
+	}
+	if !strings.Contains(output.String(), "2 match(es) suppressed by baseline") {
+		t.Fatalf("output does not disclose suppression:\n%s", output.String())
+	}
+}

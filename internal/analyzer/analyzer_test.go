@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/source"
 )
 
@@ -109,5 +110,73 @@ func TestAnalyzeHonorsPairLimit(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("Analyze returned nil after exceeding pair limit")
+	}
+}
+
+func TestCollectorSuppressesBeforeRetention(t *testing.T) {
+	t.Parallel()
+
+	report := model.Report{}
+	collector := matchCollector{
+		ctx: context.Background(),
+		options: Options{
+			Threshold:  0.5,
+			MaxMatches: 1,
+			MaxPairs:   10,
+			Suppress: func(id string) bool {
+				return id == "left:right"
+			},
+		},
+		report: &report,
+	}
+	left := model.Fragment{
+		Fingerprint:  "left",
+		FeatureCount: 1,
+		Features:     model.FeatureBag{"node:return": 1},
+	}
+	right := model.Fragment{
+		Fingerprint:  "right",
+		FeatureCount: 1,
+		Features:     model.FeatureBag{"node:return": 1},
+	}
+	if err := collector.score(left, right); err != nil {
+		t.Fatalf("score suppressed: %v", err)
+	}
+	if report.Suppressed != 1 || report.TotalMatches != 0 || len(collector.bounded) != 0 {
+		t.Fatalf("suppressed state = %+v, bounded = %d", report, len(collector.bounded))
+	}
+
+	right.Fingerprint = "other"
+	if err := collector.score(left, right); err != nil {
+		t.Fatalf("score accepted: %v", err)
+	}
+	if report.Suppressed != 1 || report.TotalMatches != 1 || len(collector.bounded) != 1 {
+		t.Fatalf("accepted state = %+v, bounded = %d", report, len(collector.bounded))
+	}
+}
+
+func TestCollectorSuppressesOnUnboundedPath(t *testing.T) {
+	t.Parallel()
+
+	report := model.Report{}
+	collector := matchCollector{
+		ctx: context.Background(),
+		options: Options{
+			Threshold: 0.5,
+			MaxPairs:  10,
+			Suppress:  func(string) bool { return true },
+		},
+		report: &report,
+	}
+	fragment := model.Fragment{
+		Fingerprint:  "same",
+		FeatureCount: 1,
+		Features:     model.FeatureBag{"node:return": 1},
+	}
+	if err := collector.score(fragment, fragment); err != nil {
+		t.Fatalf("score: %v", err)
+	}
+	if report.Suppressed != 1 || report.TotalMatches != 0 || len(collector.unbounded) != 0 {
+		t.Fatalf("state = %+v, unbounded = %d", report, len(collector.unbounded))
 	}
 }
