@@ -66,6 +66,123 @@ func TestRunScanJSONAndFailOnMatch(t *testing.T) {
 	}
 }
 
+func TestBaselineUpdateAndScanSuppression(t *testing.T) {
+	t.Parallel()
+
+	baselinePath := filepath.Join(t.TempDir(), "mori-baseline.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"baseline", "update",
+		"--baseline", baselinePath,
+		"--threshold", "0.70",
+		"--cross-language-only",
+		"../../examples/email-validation",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("baseline update exit = %d, stderr = %q", code, stderr.String())
+	}
+	if _, err := os.Stat(baselinePath); err != nil {
+		t.Fatalf("baseline was not written: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"scan",
+		"--baseline", baselinePath,
+		"--threshold", "0.70",
+		"--cross-language-only",
+		"--fail-on-match",
+		"--format", "json",
+		"../../examples/email-validation",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("suppressed scan exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode suppressed JSON: %v\n%s", err, stdout.String())
+	}
+	if result.TotalMatches != 0 || result.Suppressed == 0 || result.Truncated {
+		t.Fatalf("suppressed report = %+v, want no findings and visible suppression", result)
+	}
+}
+
+func TestBaselinePruneCheckReportsStaleEntries(t *testing.T) {
+	t.Parallel()
+
+	baselinePath := filepath.Join(t.TempDir(), "mori-baseline.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	updateArgs := []string{
+		"baseline", "update",
+		"--baseline", baselinePath,
+		"--threshold", "0.70",
+		"--cross-language-only",
+		"../../examples/email-validation",
+	}
+	if code := Run(context.Background(), updateArgs, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("baseline update exit = %d, stderr = %q", code, stderr.String())
+	}
+	before, err := os.ReadFile(baselinePath)
+	if err != nil {
+		t.Fatalf("ReadFile before prune check: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code := Run(context.Background(), []string{
+		"baseline", "prune", "--baseline", baselinePath, "--check",
+		"--threshold", "0.70", "--cross-language-only",
+		"../../examples/email-validation/validator.js",
+	}, &stdout, &stderr)
+	if code != exitFindings || !strings.Contains(stdout.String(), "stale") {
+		t.Fatalf("prune check exit/output = %d/%q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+	after, err := os.ReadFile(baselinePath)
+	if err != nil {
+		t.Fatalf("ReadFile after prune check: %v", err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("prune --check modified the baseline")
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"baseline", "prune", "--baseline", baselinePath,
+		"--threshold", "0.70", "--cross-language-only",
+		"../../examples/email-validation/validator.js",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("prune exit = %d, stderr = %q", code, stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"baseline", "prune", "--baseline", baselinePath, "--check",
+		"--threshold", "0.70", "--cross-language-only",
+		"../../examples/email-validation/validator.js",
+	}, &stdout, &stderr)
+	if code != exitSuccess || !strings.Contains(stdout.String(), "baseline is current") {
+		t.Fatalf("post-prune check exit/output = %d/%q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestScanRejectsMissingBaseline(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--baseline", filepath.Join(t.TempDir(), "missing.json"), ".",
+	}, &stdout, &stderr)
+	if code != exitError || !strings.Contains(stderr.String(), "load baseline") {
+		t.Fatalf("missing baseline exit/stderr = %d/%q", code, stderr.String())
+	}
+}
+
 func TestRunRejectsInvalidThreshold(t *testing.T) {
 	t.Parallel()
 
@@ -246,6 +363,14 @@ func TestReadOnlyCommandsReportWriteFailures(t *testing.T) {
 		failingWriter{},
 	); code != exitError {
 		t.Errorf("Run(scan --help) exit = %d, want %d", code, exitError)
+	}
+	if code := Run(
+		context.Background(),
+		[]string{"baseline", "update", "--help"},
+		io.Discard,
+		failingWriter{},
+	); code != exitError {
+		t.Errorf("Run(baseline update --help) exit = %d, want %d", code, exitError)
 	}
 	if code := Run(
 		context.Background(),

@@ -108,22 +108,40 @@ func Write(path string, report model.Report) error {
 			Right:      match.Right.Location,
 		}
 	}
-
-	ids := make([]string, 0, len(byID))
-	for id := range byID {
-		ids = append(ids, id)
+	entries := make([]Entry, 0, len(byID))
+	for _, entry := range byID {
+		entries = append(entries, entry)
 	}
-	sort.Strings(ids)
-	entries := make([]Entry, 0, len(ids))
-	for _, id := range ids {
-		entries = append(entries, byID[id])
+	return writeEntries(path, entries, report.Threshold)
+}
+
+// Prune removes baseline entries that are absent from the current untruncated
+// report without adding newly discovered candidates.
+func Prune(path string, set Set, report model.Report) error {
+	if report.Truncated {
+		return errors.New("cannot prune a baseline from a truncated report")
+	}
+	current := make(map[string]struct{}, len(report.Matches))
+	for _, match := range report.Matches {
+		current[match.ID] = struct{}{}
 	}
 
+	entries := make([]Entry, 0, len(set.entries))
+	for id, entry := range set.entries {
+		if _, exists := current[id]; exists {
+			entries = append(entries, entry)
+		}
+	}
+	return writeEntries(path, entries, report.Threshold)
+}
+
+func writeEntries(path string, entries []Entry, threshold float64) error {
+	sort.Slice(entries, func(i, j int) bool { return entries[i].ID < entries[j].ID })
 	stored := document{
 		SchemaVersion:        SchemaVersion,
 		MoriVersion:          buildinfo.Version,
 		NormalizationVersion: normalize.Version,
-		Threshold:            report.Threshold,
+		Threshold:            threshold,
 		Entries:              entries,
 	}
 	content, err := json.MarshalIndent(stored, "", "  ")

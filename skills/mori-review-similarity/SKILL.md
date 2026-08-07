@@ -63,12 +63,14 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `1`. Record the Mori version and scan
+Require `schema_version` to equal `2`. Record the Mori version and scan
 options. Inspect:
 
 - `warnings`: disclose every incomplete or failed input;
 - `truncated`: state when the report omits lower-ranked matches;
 - `total_matches`: distinguish all qualifying matches from the retained list;
+- `suppressed`: disclose candidates accepted by an explicit baseline;
+- `id`: use the stable pair identity when comparing reports across scans;
 - `similarity`: report it as structural similarity only; and
 - `shared_features`: use them to explain why a candidate ranked highly.
 
@@ -79,6 +81,20 @@ tool crash.
 When reviewing a change, prioritize matches where either `left.location.path`
 or `right.location.path` is changed. Still retain the full bounded scan as the
 evidence source.
+
+For a repository with reviewed intentional candidates, use the explicit
+baseline workflow:
+
+```sh
+mori baseline update --baseline mori-baseline.json .
+mori scan --baseline mori-baseline.json --fail-on-match .
+mori baseline prune --baseline mori-baseline.json --check .
+```
+
+Review the baseline diff before committing an update. `baseline update` and
+`baseline prune` scan untruncated internally; ordinary exploratory scans
+should still use a bounded `--max-matches` value. A missing or incompatible
+baseline is an operational failure, not an empty baseline.
 
 ## Inspect before concluding
 
