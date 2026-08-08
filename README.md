@@ -41,6 +41,11 @@ go install github.com/Cyberlane/mori/cmd/mori@latest
 mori version
 ```
 
+Source-built installations can report the module version while leaving the
+source revision and date as `unknown` when Go does not embed VCS settings. They
+remain suitable for exploratory local review, but use an official release
+binary when a report needs complete, independently verifiable provenance.
+
 ## Start Here
 
 Run this from the root of a project:

@@ -7,6 +7,14 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-09
+
+### Fixed
+
+- Clarified that version-pinned source builds can lack revision and source-date
+  metadata, and limited provenance-incomplete reports to explicitly disclosed
+  exploratory review.
+
 ## [0.6.0] - 2026-08-09
 
 ### Added
