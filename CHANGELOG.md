@@ -7,6 +7,19 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Top-level SQL query similarity for `.sql` files, including SQLC display
+  names, query-specific structural normalization, and visible parse recovery.
+
+### Changed
+
+- Machine-readable reports now use schema version 5 with explicit comparison
+  domains and fragment kinds; normalization version 2 adds SQL features while
+  preserving established code fingerprints and scores.
+- The bundled review skill now provides a separate SQL scan profile and query
+  review safety guidance.
+
 ## [0.5.0] - 2026-08-09
 
 ### Added

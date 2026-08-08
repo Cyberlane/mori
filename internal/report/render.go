@@ -185,7 +185,7 @@ func Text(writer io.Writer, report model.Report) error {
 			if warning.SkippedFragments > 0 {
 				if _, err := fmt.Fprintf(
 					writer,
-					"      %d invalid function fragment(s) skipped\n",
+					"      %d invalid source fragment(s) skipped\n",
 					warning.SkippedFragments,
 				); err != nil {
 					return err

@@ -14,7 +14,7 @@ import (
 // Version identifies the normalization contract used to build feature bags.
 // Bump it whenever the feature vocabulary, weights, canonical mappings, or
 // semantic-hint list changes.
-const Version = 1
+const Version = 2
 
 // Profile is a normalized, language-neutral view of one syntax fragment.
 // It is not the stable content identity exposed in reports.
@@ -29,7 +29,8 @@ func Build(
 	ctx context.Context,
 	root *tree_sitter.Node,
 	source []byte,
-	isFunction func(string) bool,
+	isBoundary func(string) bool,
+	excludeNestedBoundaries bool,
 ) (Profile, error) {
 	profile := Profile{Features: make(model.FeatureBag)}
 	if root == nil {
@@ -60,7 +61,8 @@ func Build(
 				current.parentCanonical,
 				current.field,
 				source,
-				isFunction,
+				isBoundary,
+				excludeNestedBoundaries,
 				&profile,
 			)
 			if !descend {
@@ -97,7 +99,8 @@ func enterNode(
 	parentCanonical string,
 	field string,
 	source []byte,
-	isFunction func(string) bool,
+	isBoundary func(string) bool,
+	excludeNestedBoundaries bool,
 	profile *Profile,
 ) (string, bool) {
 	if node == nil || node.IsError() || node.IsMissing() || node.IsExtra() {
@@ -105,7 +108,7 @@ func enterNode(
 	}
 
 	kind := node.Kind()
-	if node.Id() != rootID && isFunction(kind) {
+	if excludeNestedBoundaries && node.Id() != rootID && isBoundary(kind) {
 		addFeature(profile.Features, "node:function:nested", 1)
 		if parentCanonical != "" {
 			addFeature(profile.Features, "edge:"+parentCanonical+">function:nested", 1)
@@ -120,7 +123,7 @@ func enterNode(
 
 	canonical := ""
 	if node.IsNamed() {
-		canonical = canonicalNamed(kind)
+		canonical = canonicalNamed(node, source)
 	} else {
 		canonical = canonicalOperator(kind)
 	}
@@ -147,14 +150,15 @@ func enterNode(
 		// overpowering the surrounding tree structure.
 		addFeature(profile.Features, "semantic:"+operation, 2)
 	}
-	if !node.IsNamed() && canonical == "operator:membership" {
+	if canonical == "operator:membership" && (!node.IsNamed() || kind == "keyword_in") {
 		addFeature(profile.Features, "semantic:membership", 2)
 	}
 
 	return nextParent, true
 }
 
-func canonicalNamed(kind string) string {
+func canonicalNamed(node *tree_sitter.Node, source []byte) string {
+	kind := node.Kind()
 	// Grammar-only containers are transparent. In particular, Go grammar
 	// ABI 15 wraps block children in statement_list without changing the
 	// source structure that Mori intends to compare.
@@ -164,6 +168,12 @@ func canonicalNamed(kind string) string {
 
 	if value, ok := canonicalKinds[kind]; ok {
 		return value
+	}
+	if kind == "literal" {
+		return sqlLiteralKind(node.Utf8Text(source))
+	}
+	if strings.HasPrefix(kind, "keyword_") {
+		return ""
 	}
 
 	switch {
@@ -193,6 +203,74 @@ var canonicalKinds = map[string]string{
 	"generator_function_declaration": "function",
 	"method_declaration":             "function",
 	"method_definition":              "function",
+
+	// SQL query boundaries and structure.
+	"statement":            "query",
+	"select":               "query:select",
+	"insert":               "query:insert",
+	"update":               "query:update",
+	"delete":               "query:delete",
+	"cte":                  "query:cte",
+	"select_expression":    "query:projection",
+	"term":                 "query:projection-item",
+	"from":                 "query:source",
+	"relation":             "query:relation",
+	"join":                 "query:join",
+	"cross_join":           "query:join:cross",
+	"lateral_join":         "query:join:lateral",
+	"lateral_cross_join":   "query:join:lateral-cross",
+	"where":                "query:where",
+	"group_by":             "query:group",
+	"order_by":             "query:order",
+	"order_target":         "query:order-target",
+	"limit":                "query:limit",
+	"offset":               "query:offset",
+	"returning":            "query:returning",
+	"set_operation":        "query:set-operation",
+	"subquery":             "query:subquery",
+	"values":               "query:values",
+	"assignment_list":      "query:assignments",
+	"all_fields":           "query:wildcard",
+	"window_clause":        "query:window",
+	"window_specification": "query:window-specification",
+	"window_frame":         "query:window-frame",
+	"partition_by":         "query:partition",
+
+	// SQL expressions and operands.
+	"between_expression": "expression:between",
+	"case":               "expression:case",
+	"when_clause":        "expression:case-branch",
+	"cast":               "expression:cast",
+	"exists":             "expression:exists",
+	"filter_expression":  "expression:filter",
+	"invocation":         "expression:call",
+	"window_function":    "expression:window-call",
+	"field":              "symbol",
+	"object_reference":   "symbol",
+	"column":             "symbol",
+
+	// SQL keyword nodes that carry structure not already represented by a
+	// named clause node. Other keyword_* nodes are transparent.
+	"keyword_with":      "query:with",
+	"keyword_having":    "query:having",
+	"keyword_distinct":  "query:distinct",
+	"keyword_conflict":  "query:conflict",
+	"keyword_duplicate": "query:conflict",
+	"keyword_union":     "query:set:union",
+	"keyword_except":    "query:set:except",
+	"keyword_intersect": "query:set:intersect",
+	"keyword_left":      "query:join-kind:left",
+	"keyword_right":     "query:join-kind:right",
+	"keyword_inner":     "query:join-kind:inner",
+	"keyword_full":      "query:join-kind:full",
+	"keyword_cross":     "query:join-kind:cross",
+	"keyword_lateral":   "query:join-kind:lateral",
+	"keyword_and":       "operator:and",
+	"keyword_or":        "operator:or",
+	"keyword_not":       "operator:not",
+	"keyword_in":        "operator:membership",
+	"keyword_is":        "operator:is",
+	"keyword_like":      "operator:pattern-match",
 
 	// Parameters, blocks, and bindings.
 	"block":                 "block",
@@ -317,7 +395,7 @@ func canonicalOperator(kind string) string {
 		return "operator:equal"
 	case "!=", "!==":
 		return "operator:not-equal"
-	case "<", "<=", ">", ">=":
+	case "<", "<=", ">", ">=", "<>":
 		return "operator:ordered"
 	case "in":
 		return "operator:membership"
@@ -393,6 +471,8 @@ func coarseClass(canonical string) string {
 		return "operation"
 	case strings.HasPrefix(canonical, "operator:"):
 		return "operator"
+	case canonical == "query" || strings.HasPrefix(canonical, "query:"):
+		return "query"
 	default:
 		return ""
 	}
@@ -400,7 +480,7 @@ func coarseClass(canonical string) string {
 
 func semanticOperation(node *tree_sitter.Node, source []byte) string {
 	kind := node.Kind()
-	if kind != "call" && kind != "call_expression" {
+	if kind != "call" && kind != "call_expression" && kind != "invocation" {
 		return ""
 	}
 
@@ -409,11 +489,20 @@ func semanticOperation(node *tree_sitter.Node, source []byte) string {
 		callee = node.ChildByFieldName("callee")
 	}
 	if callee == nil {
-		return ""
+		if kind == "invocation" && node.NamedChildCount() > 0 {
+			callee = node.NamedChild(0)
+		}
+		if callee == nil {
+			return ""
+		}
 	}
 
 	name := strings.ToLower(rightmostWord(callee.Utf8Text(source)))
 	switch name {
+	case "avg", "count", "group_concat", "groupconcat", "max", "min", "sum", "total":
+		return "aggregate"
+	case "arg", "narg", "slice":
+		return "parameter"
 	case "contains", "containskey", "containsvalue", "has", "haskey", "includes", "indexof":
 		return "membership"
 	case "match", "matches", "matchstring", "search", "test":
@@ -480,6 +569,30 @@ func shouldSkipSubtree(kind string) bool {
 	default:
 		return false
 	}
+}
+
+func sqlLiteralKind(value string) string {
+	value = strings.TrimSpace(value)
+	lower := strings.ToLower(value)
+	switch lower {
+	case "true", "false":
+		return "literal:boolean"
+	case "null":
+		return "literal:null"
+	}
+	if value == "" {
+		return "literal:scalar"
+	}
+	first := value[0]
+	if first == '\'' || first == '"' ||
+		((first == 'e' || first == 'E' || first == 'u' || first == 'U') && strings.Contains(value, "'")) ||
+		(first == '$' && strings.Count(value, "$") >= 2) {
+		return "literal:string"
+	}
+	if (first >= '0' && first <= '9') || first == '+' || first == '-' || first == '.' {
+		return "literal:number"
+	}
+	return "literal:scalar"
 }
 
 func addFeature(bag model.FeatureBag, feature string, count int) {

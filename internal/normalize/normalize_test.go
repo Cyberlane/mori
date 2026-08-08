@@ -180,3 +180,144 @@ func TestSemanticOperationFamiliesAndNearbyNames(t *testing.T) {
 		})
 	}
 }
+
+func TestSQLQueryPositivesOutrankNearbyNegatives(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		positive string
+		renamed  string
+		nearby   string
+		feature  string
+	}{
+		{
+			name: "select",
+			positive: `SELECT u.id, COUNT(o.id) FROM users u LEFT JOIN orders o ON o.user_id = u.id
+WHERE u.tenant_id = $1 GROUP BY u.id HAVING COUNT(o.id) > 0 ORDER BY u.id LIMIT 10`,
+			renamed: `SELECT a.key, COUNT(b.key) FROM accounts a LEFT JOIN purchases b ON b.account_key = a.key
+WHERE a.organization_key = $9 GROUP BY a.key HAVING COUNT(b.key) > 7 ORDER BY a.key LIMIT 25`,
+			nearby: `SELECT u.id, COUNT(o.id) FROM users u INNER JOIN orders o ON o.user_id = u.id
+GROUP BY u.id HAVING COUNT(o.id) > 0 ORDER BY u.id LIMIT 10`,
+			feature: "node:query:select",
+		},
+		{
+			name:     "cte",
+			positive: `WITH visible AS (SELECT id FROM folders WHERE tenant_id = $1) SELECT id FROM visible`,
+			renamed:  `WITH allowed AS (SELECT key FROM directories WHERE organization_id = $7) SELECT key FROM allowed`,
+			nearby:   `SELECT id FROM folders WHERE tenant_id = $1`,
+			feature:  "node:query:cte",
+		},
+		{
+			name:     "insert",
+			positive: `INSERT INTO users (tenant_id, email) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING id`,
+			renamed:  `INSERT INTO members (organization_id, address) VALUES ($8, $9) ON CONFLICT DO NOTHING RETURNING key`,
+			nearby:   `INSERT INTO users (tenant_id, email) VALUES ($1, $2) RETURNING id`,
+			feature:  "node:query:insert",
+		},
+		{
+			name:     "update",
+			positive: `UPDATE users SET email = $1 WHERE id = $2 AND tenant_id = $3 RETURNING id`,
+			renamed:  `UPDATE members SET address = $9 WHERE key = $8 AND organization_id = $7 RETURNING key`,
+			nearby:   `UPDATE users SET email = $1 WHERE id = $2 RETURNING id`,
+			feature:  "node:query:update",
+		},
+		{
+			name:     "delete",
+			positive: `DELETE FROM users WHERE id = $1 AND tenant_id = $2 RETURNING id`,
+			renamed:  `DELETE FROM members WHERE key = $8 AND organization_id = $9 RETURNING key`,
+			nearby:   `UPDATE users SET deleted_at = $3 WHERE id = $1 AND tenant_id = $2 RETURNING id`,
+			feature:  "node:query:delete",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			fragments := parseSQL(t, test.positive+";\n"+test.renamed+";\n"+test.nearby+";\n")
+			if len(fragments) != 3 {
+				t.Fatalf("fragments = %d, want 3", len(fragments))
+			}
+			if fragments[0].Features[test.feature] == 0 {
+				t.Fatalf("positive query missing %s: %#v", test.feature, fragments[0].Features)
+			}
+			positiveScore, _, _ := similarity.WeightedJaccard(fragments[0].Features, fragments[1].Features)
+			nearbyScore, _, _ := similarity.WeightedJaccard(fragments[0].Features, fragments[2].Features)
+			if positiveScore <= nearbyScore {
+				t.Fatalf("positive %.3f did not outrank nearby negative %.3f", positiveScore, nearbyScore)
+			}
+			if fragments[0].Fingerprint != fragments[1].Fingerprint {
+				t.Fatalf("identifier/literal renaming changed fingerprint: %s != %s", fragments[0].Fingerprint, fragments[1].Fingerprint)
+			}
+		})
+	}
+}
+
+func TestSQLSemanticHintsHaveNearbyNegatives(t *testing.T) {
+	t.Parallel()
+
+	fragments := parseSQL(t, `SELECT COUNT(id), sqlc.arg(tenant_id) FROM users WHERE tenant_id IN ($1, $2);
+	SELECT LOWER(id), custom.argOther(tenant_id) FROM users WHERE tenant_id = $1;
+`)
+	if len(fragments) != 2 {
+		t.Fatalf("fragments = %d, want 2", len(fragments))
+	}
+	for feature, want := range map[string]int{
+		"semantic:aggregate":  2,
+		"semantic:membership": 2,
+		"semantic:parameter":  2,
+	} {
+		if got := fragments[0].Features[feature]; got != want {
+			t.Errorf("positive %s = %d, want %d", feature, got, want)
+		}
+		if got := fragments[1].Features[feature]; got != 0 {
+			t.Errorf("nearby %s = %d, want 0", feature, got)
+		}
+	}
+}
+
+func TestSQLKeywordsAndValuesDoNotLeakIntoFeatures(t *testing.T) {
+	t.Parallel()
+
+	fragments := parseSQL(t, `SELECT customer_name FROM customers WHERE tenant_id = $17 AND active = true LIMIT 42;`)
+	if len(fragments) != 1 {
+		t.Fatalf("fragments = %d, want 1", len(fragments))
+	}
+	for feature := range fragments[0].Features {
+		if strings.Contains(feature, "customer") || strings.Contains(feature, "tenant_id") ||
+			strings.Contains(feature, "$17") || strings.Contains(feature, "42") ||
+			strings.Contains(feature, "keyword_") {
+			t.Fatalf("source spelling leaked into feature %q", feature)
+		}
+	}
+	for _, feature := range []string{
+		"node:literal:boolean", "node:literal:number", "node:parameter", "semantic:membership",
+	} {
+		if feature == "semantic:membership" {
+			continue
+		}
+		if fragments[0].Features[feature] == 0 {
+			t.Errorf("normalized query missing %s: %#v", feature, fragments[0].Features)
+		}
+	}
+}
+
+func parseSQL(t *testing.T, content string) []model.Fragment {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "queries.sql")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.Detect(path)
+	if !ok {
+		t.Fatal("SQL grammar not detected")
+	}
+	fragments, warnings := parser.File(context.Background(), source.File{
+		Path: path, DisplayPath: "queries.sql", Language: spec,
+	}, 1)
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %#v", warnings)
+	}
+	return fragments
+}

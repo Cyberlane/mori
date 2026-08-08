@@ -3,18 +3,19 @@
 [![CI](https://github.com/Cyberlane/mori/actions/workflows/ci.yml/badge.svg)](https://github.com/Cyberlane/mori/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Mori finds functions that look alike, even when they are written in different
-programming languages.
+Mori finds source fragments that look alike, including functions written in
+different programming languages and top-level SQL queries.
 
 Use it to find possible duplicate logic before you copy, refactor, or review
 code. Mori gives you a shortlist to inspect. It cannot prove that two functions
-do the same thing.
+or queries do the same thing.
 
 ## What It Does
 
-Mori reads your source code locally and compares individual functions. It
-ignores details such as formatting, comments, most variable names, and literal
-values so it can focus on the shape of the code.
+Mori reads your source code locally and compares individual functions or SQL
+queries within compatible comparison domains. It ignores details such as
+formatting, comments, most variable names, and literal values so it can focus
+on structural shape.
 
 For example, it can flag a JavaScript function and a Go function that both:
 
@@ -82,8 +83,22 @@ Example output:
       shared shape: 3 calls, 1 return, 1 binding
 ```
 
-Read both functions before acting on a match. Mori does not understand runtime
-values, external calls, side effects, or all language-specific behavior.
+Read both fragments before acting on a match. Mori does not understand runtime
+values, external calls, side effects, query plans, schemas, or all
+language-specific behavior.
+
+To review structurally similar SQL queries:
+
+```sh
+mori scan --threshold 0.70 --min-tokens 12 examples/sql-queries
+```
+
+SQL queries are compared only with SQL queries, never with code functions.
+Mori extracts top-level `SELECT` and set-operation queries plus `INSERT`,
+`UPDATE`, and `DELETE` statements. It uses exact, immediately adjacent SQLC
+`-- name: Name :mode` comments for display names and otherwise reports
+`query@<line>`. DDL and nested queries are not independent comparison units;
+nested query structure remains part of its top-level query.
 
 ## Common Uses
 
@@ -117,9 +132,9 @@ Write results as JSON for a script or CI system:
 mori scan --format json .
 ```
 
-Schema-4 reports embed deterministic `tool` build provenance and exact focus
-metadata. They do not include a scan timestamp, hostname, username, source
-body, diff, or Git remote.
+Schema-5 reports embed deterministic `tool` build provenance, comparison
+domain and fragment-kind metadata, and exact focus metadata. They do not
+include a scan timestamp, hostname, username, source body, diff, or Git remote.
 
 Fail a CI job when Mori finds a match at your threshold:
 
@@ -161,16 +176,26 @@ copy in a new file must appear for review. The conventional file name is
 
 ## Supported Languages
 
-| Parser language | Review family | File types |
-| --- | --- | --- |
-| Go | Go | `.go` |
-| JavaScript and JSX | JavaScript | `.js`, `.jsx`, `.mjs`, `.cjs` |
-| TypeScript | TypeScript | `.ts`, `.mts`, `.cts` |
-| TSX | TypeScript | `.tsx` |
-| Python | Python | `.py`, `.pyi` |
-| Rust | Rust | `.rs` |
+| Parser language | Review family | Comparison domain | File types |
+| --- | --- | --- | --- |
+| Go | Go | code | `.go` |
+| JavaScript and JSX | JavaScript | code | `.js`, `.jsx`, `.mjs`, `.cjs` |
+| TypeScript | TypeScript | code | `.ts`, `.mts`, `.cts` |
+| TSX | TypeScript | code | `.tsx` |
+| Python | Python | code | `.py`, `.pyi` |
+| Rust | Rust | code | `.rs` |
+| SQL queries | SQL | sql-query | `.sql` |
 
 Run `mori languages` to see the languages in your installed version.
+
+## Known Parser Limits
+
+Tree-sitter recovery is visible in report warnings, and any comparison fragment
+containing a parse error is skipped. SQL dialect extensions outside Mori's
+pinned grammar may therefore produce diagnostics or incomplete coverage.
+Separately, an [upstream TypeScript/TSX grammar issue](https://github.com/tree-sitter/tree-sitter-javascript/issues/366)
+causes some raw ampersands in JSX text to be reported as parse errors; inspect
+the reported range before deciding whether the application source is invalid.
 
 ## For AI Coding Tools
 
@@ -191,7 +216,7 @@ mori skill install --global
 
 ## More Detail
 
-- [How Mori scores functions](docs/scoring.md)
+- [How Mori scores fragments](docs/scoring.md)
 - [Project configuration](docs/configuration.md)
 - [Architecture](docs/architecture.md)
 - [Add a language](docs/adding-a-language.md)

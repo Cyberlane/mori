@@ -2,11 +2,12 @@
 
 森 (*mori*) compares normalized AST feature **multisets**. Counts matter: a
 function with four branches is different from a function with one branch even
-when both sets contain the token `flow:if`.
+when both sets contain the token `flow:if`. SQL queries use the same scoring
+formula in a separate comparison domain.
 
 ## Feature construction
 
-For each function-like fragment, the normalizer may emit:
+For each comparison fragment, the normalizer may emit:
 
 | Feature prefix | Meaning | Example |
 | --- | --- | --- |
@@ -19,6 +20,13 @@ For each function-like fragment, the normalizer may emit:
 Semantic hints currently cover membership, pattern matching, length, trimming,
 case conversion, filtering, mapping, and reduction. They have weight two.
 Everything else has weight one.
+
+SQL query normalization adds canonical structure for projections, sources,
+joins, predicates, grouping, ordering, CTEs, set operations, values, conflict
+handling, returning clauses, and `SELECT`/`INSERT`/`UPDATE`/`DELETE` operations.
+It also maps parameters and broad literal kinds without preserving names or
+values. These features describe syntax, not query equivalence or database
+behavior.
 
 The normalizer has a version constant for persisted review artifacts. Any
 change to the feature vocabulary, weights, canonical mappings, or
@@ -49,7 +57,10 @@ Empty feature bags score zero and are not emitted by normal parsing.
 - literal values, except their broad kinds;
 - comments and formatting;
 - selected type-only syntax; and
-- nested function bodies, which are separate fragments.
+- nested function bodies, which are separate code fragments.
+
+Nested SQL queries are not separate fragments. Their normalized structure is
+retained inside the enclosing top-level query.
 
 The score does **not** model:
 
@@ -61,6 +72,10 @@ The score does **not** model:
 - aliasing;
 - input/output behavior; or
 - runtime values.
+
+For SQL this also excludes schema resolution, constraints, indexes, triggers,
+query plans, transaction context, permissions, and dialect-specific runtime
+semantics.
 
 Consequently, the words “duplicate” and “semantic” should be treated as review
 hypotheses, not conclusions.
@@ -137,7 +152,18 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 5,
+  "tool": {
+    "name": "mori",
+    "version": "0.6.0",
+    "revision": "<full source revision>",
+    "source_date": "<UTC commit time>",
+    "modified": false,
+    "go_version": "<Go version>",
+    "goos": "<target OS>",
+    "goarch": "<target architecture>",
+    "normalization_version": 2
+  },
   "threshold": 0.7,
   "files": 4,
   "fragments": 4,
@@ -166,11 +192,13 @@ The top-level shape is:
 
 Group objects include `content_pair_id`, `location_pairs`, one or two content
 profiles, occurrence counts and locations, a shape summary, and raw shared
-features. Fragment occurrences expose language family, nesting depth, parent
-identity, and the number of excluded nested functions. Warnings can include
-bounded parser node ranges and skipped-fragment counts. Suppression fields
-separate affected source pairs from content identities. Consumers should reject
-or explicitly handle unknown schema versions.
+features. Fragment occurrences expose language family, `comparison_domain`,
+`fragment_kind`, nesting depth, parent identity, and the number of excluded
+nested functions. The current domains are `code` with `function` fragments and
+`sql-query` with `query` fragments. Cross-domain pairs are never candidates.
+Warnings can include bounded parser node ranges and skipped-fragment counts.
+Suppression fields separate affected source pairs from content identities.
+Consumers should reject or explicitly handle unknown schema versions.
 
 Paths are relative to the current working directory when possible. Lines are
 one-based and inclusive. A future breaking shape change must increment

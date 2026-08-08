@@ -722,6 +722,17 @@ func expandLanguagePairs(values []string) ([]analyzer.LanguagePair, error) {
 		}
 		for _, leftID := range leftIDs {
 			for _, rightID := range rightIDs {
+				leftSpec, _ := language.Lookup(leftID)
+				rightSpec, _ := language.Lookup(rightID)
+				if leftSpec.ComparisonDomain != rightSpec.ComparisonDomain {
+					return nil, fmt.Errorf(
+						"incompatible comparison domains for --language-pair %s,%s: %s and %s",
+						leftID,
+						rightID,
+						leftSpec.ComparisonDomain,
+						rightSpec.ComparisonDomain,
+					)
+				}
 				result = append(result, analyzer.LanguagePair{Left: leftID, Right: rightID})
 			}
 		}
@@ -733,7 +744,7 @@ func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) != 0 {
 		return usageError(stderr, "languages does not accept arguments")
 	}
-	if _, err := fmt.Fprintln(stdout, "LANGUAGE\tFAMILY\tEXTENSIONS"); err != nil {
+	if _, err := fmt.Fprintln(stdout, "LANGUAGE\tFAMILY\tDOMAIN\tEXTENSIONS"); err != nil {
 		return exitError
 	}
 	for _, spec := range language.All() {
@@ -741,9 +752,10 @@ func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
 		sort.Strings(extensions)
 		if _, err := fmt.Fprintf(
 			stdout,
-			"%s\t%s\t%s\n",
+			"%s\t%s\t%s\t%s\n",
 			spec.DisplayName,
 			spec.Family,
+			spec.ComparisonDomain,
 			strings.Join(extensions, ", "),
 		); err != nil {
 			return exitError

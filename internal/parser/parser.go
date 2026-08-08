@@ -18,7 +18,7 @@ import (
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-// File parses one file and returns every function-like fragment that meets the
+// File parses one file and returns every source fragment that meets the
 // minimum normalized token count.
 func File(
 	ctx context.Context,
@@ -107,14 +107,15 @@ func collect(
 			return err
 		}
 		current := cursor.Node()
-		if file.Language.IsFunction(current.Kind()) && current.HasError() {
+		if file.Language.AcceptsFragmentBoundary(current) && current.HasError() {
 			(*skippedFragments)++
-		} else if file.Language.IsFunction(current.Kind()) {
+		} else if file.Language.AcceptsFragmentBoundary(current) {
 			profile, err := normalize.Build(
 				ctx,
 				current,
 				content,
-				file.Language.IsFunction,
+				file.Language.IsFragmentBoundary,
+				file.Language.ExcludesNestedBoundaries(),
 			)
 			if err != nil {
 				return err
@@ -129,12 +130,14 @@ func collect(
 
 				*fragments = append(*fragments, model.Fragment{
 					Location: model.Location{
-						Path:           file.DisplayPath,
-						Language:       file.Language.ID,
-						LanguageFamily: file.Language.Family,
-						Name:           fragmentName(current, content),
-						StartLine:      int(start.Row) + 1,
-						EndLine:        endLine,
+						Path:             file.DisplayPath,
+						Language:         file.Language.ID,
+						LanguageFamily:   file.Language.Family,
+						ComparisonDomain: file.Language.ComparisonDomain,
+						FragmentKind:     file.Language.FragmentKind,
+						Name:             fragmentName(current, content, file.Language.FragmentKind),
+						StartLine:        int(start.Row) + 1,
+						EndLine:          endLine,
 					},
 					StartByte:    current.StartByte(),
 					EndByte:      current.EndByte(),
@@ -167,11 +170,28 @@ func parseDiagnostics(root *tree_sitter.Node, limit int) ([]model.ParseDiagnosti
 	}
 	diagnostics := make([]model.ParseDiagnostic, 0, limit)
 	total := 0
+	var narrowestErrored *model.ParseDiagnostic
+	narrowestSpan := uint(math.MaxUint)
 	cursor := root.Walk()
 	defer cursor.Close()
 
 	for {
 		current := cursor.Node()
+		if current.HasError() {
+			span := current.EndByte() - current.StartByte()
+			if span < narrowestSpan {
+				start := current.StartPosition()
+				end := current.EndPosition()
+				narrowestSpan = span
+				narrowestErrored = &model.ParseDiagnostic{
+					NodeKind:    current.Kind(),
+					StartLine:   int(start.Row) + 1,
+					StartColumn: int(start.Column) + 1,
+					EndLine:     int(end.Row) + 1,
+					EndColumn:   int(end.Column) + 1,
+				}
+			}
+		}
 		if current.IsError() || current.IsMissing() {
 			total++
 			if len(diagnostics) < limit {
@@ -195,6 +215,9 @@ func parseDiagnostics(root *tree_sitter.Node, limit int) ([]model.ParseDiagnosti
 				break
 			}
 			if !cursor.GotoParent() {
+				if total == 0 && narrowestErrored != nil {
+					return []model.ParseDiagnostic{*narrowestErrored}, 1
+				}
 				return diagnostics, total
 			}
 		}
@@ -250,7 +273,13 @@ func annotateNesting(fragments []model.Fragment) {
 	}
 }
 
-func fragmentName(node *tree_sitter.Node, content []byte) string {
+func fragmentName(node *tree_sitter.Node, content []byte, fragmentKind string) string {
+	if fragmentKind == "query" {
+		if name := sqlcQueryName(node, content); name != "" {
+			return name
+		}
+		return fmt.Sprintf("query@%d", node.StartPosition().Row+1)
+	}
 	if name := node.ChildByFieldName("name"); name != nil {
 		if value := cleanName(name.Utf8Text(content)); value != "" {
 			return value
@@ -271,6 +300,52 @@ func fragmentName(node *tree_sitter.Node, content []byte) string {
 	}
 
 	return fmt.Sprintf("anonymous@%d", node.StartPosition().Row+1)
+}
+
+func sqlcQueryName(node *tree_sitter.Node, content []byte) string {
+	if node == nil || node.StartByte() > uint(len(content)) {
+		return ""
+	}
+	prefix := strings.TrimRight(string(content[:node.StartByte()]), " \t")
+	switch {
+	case strings.HasSuffix(prefix, "\r\n"):
+		prefix = strings.TrimSuffix(prefix, "\r\n")
+	case strings.HasSuffix(prefix, "\n"):
+		prefix = strings.TrimSuffix(prefix, "\n")
+	default:
+		return ""
+	}
+	lineStart := strings.LastIndexByte(prefix, '\n') + 1
+	line := strings.TrimSuffix(prefix[lineStart:], "\r")
+	const marker = "-- name: "
+	if !strings.HasPrefix(line, marker) {
+		return ""
+	}
+	parts := strings.Split(line[len(marker):], " ")
+	if len(parts) != 2 || !validSQLCIdentifier(parts[0]) ||
+		len(parts[1]) < 2 || parts[1][0] != ':' || !validSQLCIdentifier(parts[1][1:]) {
+		return ""
+	}
+	return parts[0]
+}
+
+func validSQLCIdentifier(value string) bool {
+	if value == "" || !isASCIIIdentifierStart(value[0]) {
+		return false
+	}
+	for index := 1; index < len(value); index++ {
+		character := value[index]
+		if !isASCIIIdentifierStart(character) && (character < '0' || character > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func isASCIIIdentifierStart(character byte) bool {
+	return (character >= 'A' && character <= 'Z') ||
+		(character >= 'a' && character <= 'z') ||
+		character == '_'
 }
 
 func cleanName(value string) string {

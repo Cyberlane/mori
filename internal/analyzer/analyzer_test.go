@@ -154,6 +154,31 @@ func TestAnalyzeHonorsPairLimit(t *testing.T) {
 	}
 }
 
+func TestCompatibleDomainsNeverCompareSQLWithCode(t *testing.T) {
+	t.Parallel()
+
+	report := model.Report{}
+	collector := matchCollector{
+		ctx:              context.Background(),
+		options:          Options{Threshold: 1, MaxPairs: 10},
+		report:           &report,
+		groups:           make(map[string]*groupCandidate),
+		suppressedGroups: make(map[string]struct{}),
+	}
+	code := groupingFragment("code.go", 1)
+	code.Location.ComparisonDomain = "code"
+	sql := groupingFragment("query.sql", 1)
+	sql.Location.Language = "sql"
+	sql.Location.LanguageFamily = "sql"
+	sql.Location.ComparisonDomain = "sql-query"
+	if err := compareCompatibleDomains([]model.Fragment{code, sql}, &collector); err != nil {
+		t.Fatalf("compareCompatibleDomains: %v", err)
+	}
+	if report.CandidatePairs != 0 || len(collector.groups) != 0 {
+		t.Fatalf("cross-domain comparison state = %+v/%d groups", report, len(collector.groups))
+	}
+}
+
 func TestCollectorSuppressesBeforeRetention(t *testing.T) {
 	t.Parallel()
 
