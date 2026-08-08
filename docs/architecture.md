@@ -127,6 +127,12 @@ Groups sort by score, shared evidence mass, represented location-pair count,
 and stable identity. Shared shape and raw feature explanations are computed
 after aggregation.
 
+When focus is active, groups with at least one exact focused occurrence sort
+before other groups, while the comparator within both buckets is unchanged.
+Focus never restricts discovery or pair comparison and never changes scores,
+fingerprints, or baseline identities. Exact focused totals are computed before
+occurrence sampling and group retention.
+
 When a baseline is supplied, accepted identities are filtered after scoring but
 before group and location-pair accounting. This keeps suppressed candidates
 from consuming the report budget and makes `--fail-on-match` a usable
@@ -144,6 +150,14 @@ missing file, unsupported schema, or normalization-version mismatch. Writes
 are sorted and atomic; pruning removes stale entries without accepting newly
 discovered ones.
 
+### `internal/vcs`
+
+Git focus invokes the local `git` executable directly with context timeouts,
+bounded NUL-delimited output, and no shell or network access. It resolves the
+requested commit, HEAD, and merge base, then combines tracked working-tree
+changes with untracked non-ignored paths. Renames use their destination;
+deletions remain report evidence but cannot create focused occurrences.
+
 ### `internal/similarity`
 
 The scorer computes multiset Jaccard using minimum counts for the intersection
@@ -155,12 +169,14 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-3 reports expose grouped content-pair identities, fragment fingerprints,
+Schema-4 reports expose deterministic binary provenance, optional exact focus
+metadata, grouped content-pair identities, fragment fingerprints,
 occurrence samples and exact counts, nesting metadata, structured parser
 diagnostics, effective configuration, ignore sources, and separate baseline
 suppression counts for identities and source-location pairs.
 
-Group ordering is:
+When focus is active, focused groups form the first bucket. Within each bucket,
+and for every scan without focus, group ordering is:
 
 1. descending score;
 2. descending minimum feature count;
