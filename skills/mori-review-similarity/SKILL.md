@@ -27,12 +27,27 @@ with:
 
 ## Verify the tool
 
-Run:
+Use `mori` when it is on `PATH`. When the user or project supplies an explicit
+binary path, use that path consistently instead; do not reject a usable binary
+only because `command -v mori` fails. Record the exact binary path and version,
+and do not silently substitute an unverified executable from a project's
+`bin/` or `dist/` directory.
+
+For a `PATH` installation, run:
 
 ```sh
 command -v mori
 mori version
 mori languages
+```
+
+For an explicit binary, run:
+
+```sh
+MORI_BIN=/absolute/path/to/mori
+test -x "$MORI_BIN"
+"$MORI_BIN" version
+"$MORI_BIN" languages
 ```
 
 If Mori is unavailable, stop and give the user an installation command. Do not
@@ -57,11 +72,13 @@ by default. Inspect `configuration` in the JSON report to verify the effective
 config, ignore files, exclusions, and pair filters. Use `--no-ignore` or
 `--no-config` only when the review scope requires it.
 
-For intentional cross-language discovery, use `--cross-language-only
---threshold 0.65 --min-tokens 12`; this compares different language families,
-so TypeScript and TSX do not count as cross-language. Prefer an explicit pair
-such as `--language-pair go,typescript` when only one family pairing matters.
-Raise `--min-tokens` when trivial wrappers or boilerplate dominate the report.
+For intentional cross-language discovery, choose exactly one filtering mode:
+use `--cross-language-only --threshold 0.65 --min-tokens 12` to compare every
+different language family, or use an explicit pair such as `--language-pair
+go,typescript` when only one family pairing matters. Never combine
+`--cross-language-only` with `--language-pair`. TypeScript and TSX belong to one
+family and do not count as cross-language. Raise `--min-tokens` when trivial
+wrappers or boilerplate dominate the report.
 
 Add repeated `--exclude` flags for project-specific irrelevant paths not
 covered by ignore files. If `truncated` is true, review the retained identity
@@ -99,8 +116,14 @@ When reviewing a change, prioritize groups where any retained occurrence is in
 a changed file. Review at most 25 distinct identities deeply, not the first 25
 raw location pairs. Still retain the full bounded scan as the evidence source.
 
-For a repository with reviewed intentional candidates, use the explicit
-baseline workflow:
+Before baselining a noisy repository, first establish repeatable project scope
+with `.mori.json`, `.moriignore`, or existing repository ignore files. Use
+configuration and ignores for generated artifacts, design previews, vendored
+code, or intentionally separate test profiles; do not use a baseline merely to
+hide out-of-scope noise.
+
+For a configured repository with reviewed intentional candidates, use the
+explicit baseline workflow:
 
 ```sh
 mori baseline update --baseline mori-baseline.json .
