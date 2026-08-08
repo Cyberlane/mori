@@ -130,8 +130,15 @@ requires it.
 ## Validate the report
 
 Require `schema_version` to equal `5`. Validate the mandatory `tool` object,
-including the full source revision, modified flag, platform, Go version, and
-normalization version. Inspect:
+including version, revision, source date, modified flag, platform, Go version,
+and normalization version. Official release binaries provide a full revision
+and source date. A version-pinned source build can report its version while
+leaving `revision` or `source_date` as `unknown` because Go did not embed VCS
+settings. Explicitly label that report provenance-incomplete. Continue with it
+only for exploratory local review, disclose the limitation in the verdict, and
+do not use it for a provenance-sensitive audit or CI gate. Recommend an
+official release binary when complete provenance is required; never infer a
+revision or date from the version string. Inspect:
 
 - `warnings`: disclose every incomplete or failed input;
 - structured parse diagnostics: inspect the grammar, source range, node kind,

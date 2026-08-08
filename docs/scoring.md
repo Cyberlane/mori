@@ -200,6 +200,14 @@ Warnings can include bounded parser node ranges and skipped-fragment counts.
 Suppression fields separate affected source pairs from content identities.
 Consumers should reject or explicitly handle unknown schema versions.
 
+Official release binaries populate the full `revision` and `source_date`.
+Source-built commands such as `go install ...@version` or `go run
+...@version` can populate `version` while leaving either provenance field as
+`unknown` because the Go module build does not always contain VCS settings.
+Treat such a report as provenance-incomplete: it can support an explicitly
+disclosed exploratory local review, but not a provenance-sensitive audit or CI
+gate. Do not infer a revision or source date from the version string.
+
 Paths are relative to the current working directory when possible. Lines are
 one-based and inclusive. A future breaking shape change must increment
 `schema_version`; adding an optional field still requires documentation and
