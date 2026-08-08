@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-09
+
 ### Added
 
 - Deterministic tool provenance in schema-4 JSON reports, including full source
@@ -95,7 +97,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Cyberlane/mori/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/Cyberlane/mori/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Cyberlane/mori/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Cyberlane/mori/compare/v0.2.1...v0.3.0
