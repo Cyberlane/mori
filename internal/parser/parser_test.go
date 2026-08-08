@@ -151,6 +151,58 @@ UPDATE folders SET name = $1 WHERE id = $2 AND tenant_id = $3;
 			t.Fatalf("SQL query was treated as nested: %#v", fragment)
 		}
 	}
+	if fragments[0].Location.Name != "ListVisible" || fragments[1].Location.Name != "query@9" {
+		t.Fatalf("SQL names = %q/%q", fragments[0].Location.Name, fragments[1].Location.Name)
+	}
+}
+
+func TestSQLCNameMustBeExactAndImmediatelyPrecedeQuery(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "names.sql")
+	content := `-- name: ExactName :many
+SELECT id FROM users;
+-- name: Separated :one
+
+SELECT id FROM members;
+-- name: invalid-name :one
+SELECT id FROM guests;
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "names.sql", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 3 {
+		t.Fatalf("fragments/warnings = %#v/%#v", fragments, warnings)
+	}
+	if fragments[0].Location.Name != "ExactName" || fragments[1].Location.Name != "query@5" ||
+		fragments[2].Location.Name != "query@7" {
+		t.Fatalf("names = %q/%q/%q", fragments[0].Location.Name, fragments[1].Location.Name, fragments[2].Location.Name)
+	}
+}
+
+func TestSQLParseErrorDoesNotHideSeparateValidQuery(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "partial.sql")
+	content := "SELECT id FROM broken WHERE tenant_id = @@@;\nSELECT id FROM valid WHERE tenant_id = $1;\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "partial.sql", Language: spec,
+	}, 1)
+	if len(fragments) != 1 || fragments[0].Location.StartLine != 2 {
+		t.Fatalf("fragments = %#v, want only second query", fragments)
+	}
+	if len(warnings) != 1 || warnings[0].Kind != "parse" || warnings[0].TotalDiagnostics == 0 ||
+		warnings[0].SkippedFragments == 0 {
+		t.Fatalf("warnings = %#v, want visible skipped invalid query", warnings)
+	}
 }
 
 func TestFileEnforcesReadLimit(t *testing.T) {
