@@ -48,3 +48,23 @@ func TestSharedIsDeterministic(t *testing.T) {
 		t.Fatalf("Shared() = %#v, want %#v", got, want)
 	}
 }
+
+func TestShapeSummarizesCanonicalStructureWithoutNames(t *testing.T) {
+	t.Parallel()
+
+	left := model.FeatureBag{
+		"node:expression:call": 3,
+		"node:flow:if":         2,
+		"node:flow:return":     1,
+	}
+	right := model.FeatureBag{
+		"node:expression:call": 4,
+		"node:flow:if":         1,
+		"node:flow:return":     1,
+	}
+	shape := Shape(left, right)
+	want := []string{"3 calls", "1 conditional branch", "1 return"}
+	if !reflect.DeepEqual(shape, want) {
+		t.Fatalf("Shape = %#v, want %#v", shape, want)
+	}
+}

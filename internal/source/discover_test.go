@@ -150,6 +150,77 @@ func TestValidatePatterns(t *testing.T) {
 	}
 }
 
+func TestDiscoverHonorsNestedGitAndMoriIgnoreRules(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFixture(t, filepath.Join(root, ".gitignore"), "generated/\n!generated/keep.go\n")
+	writeFixture(t, filepath.Join(root, ".moriignore"), "private.go\n")
+	writeFixture(t, filepath.Join(root, "generated", "ignored.go"), "package ignored\n")
+	writeFixture(t, filepath.Join(root, "generated", "keep.go"), "package keep\n")
+	writeFixture(t, filepath.Join(root, "private.go"), "package private\n")
+	writeFixture(t, filepath.Join(root, "src", ".gitignore"), "*.go\n!keep.go\n")
+	writeFixture(t, filepath.Join(root, "src", "ignored.go"), "package ignored\n")
+	writeFixture(t, filepath.Join(root, "src", "keep.go"), "package keep\n")
+
+	result, err := DiscoverContext(
+		context.Background(),
+		[]string{root},
+		Options{IgnoreFiles: true},
+	)
+	if err != nil {
+		t.Fatalf("DiscoverContext: %v", err)
+	}
+	if len(result.Files) != 2 {
+		t.Fatalf("files = %#v, want two re-included files", result.Files)
+	}
+	for _, file := range result.Files {
+		if !strings.HasSuffix(file.DisplayPath, "keep.go") {
+			t.Fatalf("unexpected discovered file %q", file.DisplayPath)
+		}
+	}
+	if len(result.IgnoreFiles) != 3 {
+		t.Fatalf("ignore files = %#v, want root git/mori and nested git", result.IgnoreFiles)
+	}
+}
+
+func TestDiscoverIgnoreRulesDoNotHideExplicitFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	ignored := filepath.Join(root, "ignored.go")
+	writeFixture(t, filepath.Join(root, ".gitignore"), "ignored.go\n")
+	writeFixture(t, ignored, "package ignored\n")
+
+	result, err := DiscoverContext(
+		context.Background(),
+		[]string{ignored},
+		Options{IgnoreFiles: true},
+	)
+	if err != nil {
+		t.Fatalf("DiscoverContext: %v", err)
+	}
+	if len(result.Files) != 1 || result.Files[0].Path != ignored {
+		t.Fatalf("explicit ignored file result = %#v", result)
+	}
+}
+
+func TestDiscoverRejectsInvalidIgnorePattern(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFixture(t, filepath.Join(root, ".moriignore"), "[\n")
+	writeFixture(t, filepath.Join(root, "main.go"), "package main\n")
+	_, err := DiscoverContext(
+		context.Background(),
+		[]string{root},
+		Options{IgnoreFiles: true},
+	)
+	if err == nil || !strings.Contains(err.Error(), "invalid ignore pattern") {
+		t.Fatalf("DiscoverContext error = %v, want invalid ignore pattern", err)
+	}
+}
+
 func writeFixture(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

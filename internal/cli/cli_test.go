@@ -58,8 +58,8 @@ func TestRunScanJSONAndFailOnMatch(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("decode JSON: %v\n%s", err, stdout.String())
 	}
-	if len(result.Matches) == 0 {
-		t.Fatal("JSON report contains no matches")
+	if len(result.Groups) == 0 {
+		t.Fatal("JSON report contains no groups")
 	}
 	if result.Warnings == nil {
 		t.Fatal("warnings must encode as an empty array, not null")
@@ -104,7 +104,7 @@ func TestBaselineUpdateAndScanSuppression(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("decode suppressed JSON: %v\n%s", err, stdout.String())
 	}
-	if result.TotalMatches != 0 || result.Suppressed == 0 || result.Truncated {
+	if result.TotalMatchGroups != 0 || result.SuppressedLocationPairs == 0 || result.Truncated {
 		t.Fatalf("suppressed report = %+v, want no findings and visible suppression", result)
 	}
 }
@@ -206,6 +206,97 @@ func TestRunRejectsInvalidThreshold(t *testing.T) {
 				t.Fatalf("stderr = %q, want threshold explanation", stderr.String())
 			}
 		})
+	}
+}
+
+func TestConfigLoadsBeforeCLIOverridesAndLanguagePairsExpand(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	configPath := filepath.Join(root, ".mori.json")
+	if err := os.WriteFile(configPath, []byte(`{
+  "threshold": 0.5,
+  "max_groups": 250,
+  "language_pairs": ["go,typescript"],
+  "exclude": ["generated/**"],
+  "respect_ignore": true,
+  "baseline": "accepted.json"
+}`), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	var stderr bytes.Buffer
+	options, _, code, ok := parseScanOptions("scan", []string{
+		"--config", configPath,
+		"--threshold", "0.9",
+		"--no-ignore",
+	}, &stderr, false)
+	if !ok || code != exitSuccess {
+		t.Fatalf("parse = %t/%d, stderr = %q", ok, code, stderr.String())
+	}
+	if options.threshold != 0.9 || options.maxGroups != 250 || options.respectIgnore ||
+		len(options.languagePairs) != 1 || len(options.excludes) != 1 ||
+		options.baselinePath != filepath.Join(root, "accepted.json") {
+		t.Fatalf("options = %#v", options)
+	}
+	pairs, err := expandLanguagePairs(options.languagePairs)
+	if err != nil {
+		t.Fatalf("expandLanguagePairs: %v", err)
+	}
+	if len(pairs) != 2 {
+		t.Fatalf("expanded pairs = %#v, want Go paired with TS and TSX", pairs)
+	}
+}
+
+func TestRunRejectsUnknownConfigField(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), ".mori.json")
+	if err := os.WriteFile(path, []byte(`{"future":true}`), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{"scan", "--config", path, "."}, &stdout, &stderr)
+	if code != exitError || !strings.Contains(stderr.String(), "unknown field") {
+		t.Fatalf("exit/stderr = %d/%q", code, stderr.String())
+	}
+}
+
+func TestRunAppliesConfigAndIgnoreFilesEndToEnd(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		".mori.json":                            `{"threshold":1,"min_tokens":1,"max_groups":10}`,
+		".gitignore":                            "generated/\n",
+		"left.go":                               "package sample\nfunc Left(value string) string { if value == \"\" { return \"\" }; return value }\n",
+		"right.go":                              "package sample\nfunc Right(input string) string { if input == \"\" { return \"\" }; return input }\n",
+		filepath.Join("generated", "broken.ts"): "export function broken(: {\n",
+	} {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--config", filepath.Join(root, ".mori.json"), "--format", "json", root,
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if result.Files != 2 || result.TotalMatchGroups != 1 || len(result.Warnings) != 0 ||
+		len(result.Configuration.IgnoreFiles) != 1 || result.Configuration.ConfigPath == "" {
+		t.Fatalf("report = %+v", result)
 	}
 }
 

@@ -2,6 +2,8 @@ package analyzer
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -23,7 +25,8 @@ func TestAnalyzeCrossLanguageExamples(t *testing.T) {
 	options := Options{
 		Threshold:         0.70,
 		MinTokens:         12,
-		MaxMatches:        100,
+		MaxGroups:         100,
+		MaxOccurrences:    20,
 		MaxPairs:          100,
 		Workers:           2,
 		CrossLanguageOnly: true,
@@ -40,27 +43,64 @@ func TestAnalyzeCrossLanguageExamples(t *testing.T) {
 	if first.Files != 4 || first.Fragments != 4 {
 		t.Fatalf("files/fragments = %d/%d, want 4/4", first.Files, first.Fragments)
 	}
-	if len(first.Matches) < 2 {
-		t.Fatalf("matches = %d, want at least 2", len(first.Matches))
+	if len(first.Groups) < 2 {
+		t.Fatalf("groups = %d, want at least 2", len(first.Groups))
 	}
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("analysis is not deterministic across identical runs")
 	}
 
-	top := first.Matches[0]
-	if top.Left.Location.Language == top.Right.Location.Language {
-		t.Fatalf("top match is not cross-language: %#v", top)
+	top := first.Groups[0]
+	if len(top.Profiles) == 0 || len(top.Profiles[0].Occurrences) == 0 {
+		t.Fatalf("top group has no occurrences: %#v", top)
 	}
 	if top.Similarity < options.Threshold {
 		t.Fatalf("top score = %f, below threshold", top.Similarity)
 	}
-	for _, match := range first.Matches {
-		if match.ID == "" {
-			t.Fatal("match has no stable ID")
+	for _, group := range first.Groups {
+		if group.ID == "" {
+			t.Fatal("group has no stable ID")
 		}
-		if match.Left.Fingerprint == "" || match.Right.Fingerprint == "" {
-			t.Fatalf("match has incomplete fragment identities: %#v", match)
+		for _, profile := range group.Profiles {
+			if profile.Fingerprint == "" {
+				t.Fatalf("group has incomplete fragment identities: %#v", group)
+			}
 		}
+	}
+}
+
+func TestCrossLanguageUsesFamiliesAndExplicitPairsUseGrammarIDs(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	for _, name := range []string{"left.ts", "right.tsx"} {
+		content := "export const check = (value: string) => { return value.trim(); };\n"
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+	discovered := source.Discover([]string{root}, source.Options{})
+	crossFamily, err := Analyze(context.Background(), discovered.Files, nil, Options{
+		Threshold: 1, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10,
+		MaxPairs: 10, Workers: 1, CrossLanguageOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("Analyze cross-family: %v", err)
+	}
+	if crossFamily.CandidatePairs != 0 || crossFamily.TotalMatchGroups != 0 {
+		t.Fatalf("TS/TSX appeared cross-family: %+v", crossFamily)
+	}
+
+	explicit, err := Analyze(context.Background(), discovered.Files, nil, Options{
+		Threshold: 1, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10,
+		MaxPairs: 10, Workers: 1,
+		LanguagePairs: []LanguagePair{{Left: "typescript", Right: "tsx"}},
+	})
+	if err != nil {
+		t.Fatalf("Analyze explicit pair: %v", err)
+	}
+	if explicit.TotalMatchGroups != 1 || explicit.TotalLocationPairs != 1 {
+		t.Fatalf("explicit TS/TSX result = %+v", explicit)
 	}
 }
 
@@ -74,7 +114,8 @@ func TestAnalyzeBoundsReportedMatches(t *testing.T) {
 	result, err := Analyze(context.Background(), discovered.Files, nil, Options{
 		Threshold:         0.70,
 		MinTokens:         12,
-		MaxMatches:        1,
+		MaxGroups:         1,
+		MaxOccurrences:    20,
 		MaxPairs:          100,
 		Workers:           2,
 		CrossLanguageOnly: true,
@@ -82,13 +123,13 @@ func TestAnalyzeBoundsReportedMatches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Analyze: %v", err)
 	}
-	if result.TotalMatches < 2 {
-		t.Fatalf("total matches = %d, want at least 2", result.TotalMatches)
+	if result.TotalMatchGroups < 2 {
+		t.Fatalf("total groups = %d, want at least 2", result.TotalMatchGroups)
 	}
-	if len(result.Matches) != 1 || !result.Truncated {
+	if len(result.Groups) != 1 || !result.Truncated {
 		t.Fatalf(
 			"reported matches/truncated = %d/%t, want 1/true",
-			len(result.Matches),
+			len(result.Groups),
 			result.Truncated,
 		)
 	}
@@ -102,11 +143,11 @@ func TestAnalyzeHonorsPairLimit(t *testing.T) {
 		source.Options{MaxFileBytes: 1024 * 1024},
 	)
 	_, err := Analyze(context.Background(), discovered.Files, nil, Options{
-		Threshold:  0.10,
-		MinTokens:  1,
-		MaxMatches: 100,
-		MaxPairs:   1,
-		Workers:    1,
+		Threshold: 0.10,
+		MinTokens: 1,
+		MaxGroups: 100,
+		MaxPairs:  1,
+		Workers:   1,
 	})
 	if err == nil {
 		t.Fatal("Analyze returned nil after exceeding pair limit")
@@ -120,14 +161,16 @@ func TestCollectorSuppressesBeforeRetention(t *testing.T) {
 	collector := matchCollector{
 		ctx: context.Background(),
 		options: Options{
-			Threshold:  0.5,
-			MaxMatches: 1,
-			MaxPairs:   10,
-			Suppress: func(id string) bool {
+			Threshold: 0.5,
+			MaxGroups: 1,
+			MaxPairs:  10,
+			Suppress: func(id string, _ model.Location, _ model.Location) bool {
 				return id == "left:right"
 			},
 		},
-		report: &report,
+		report:           &report,
+		groups:           make(map[string]*groupCandidate),
+		suppressedGroups: make(map[string]struct{}),
 	}
 	left := model.Fragment{
 		Fingerprint:  "left",
@@ -142,16 +185,16 @@ func TestCollectorSuppressesBeforeRetention(t *testing.T) {
 	if err := collector.score(left, right); err != nil {
 		t.Fatalf("score suppressed: %v", err)
 	}
-	if report.Suppressed != 1 || report.TotalMatches != 0 || len(collector.bounded) != 0 {
-		t.Fatalf("suppressed state = %+v, bounded = %d", report, len(collector.bounded))
+	if report.SuppressedLocationPairs != 1 || report.TotalLocationPairs != 0 || len(collector.groups) != 0 {
+		t.Fatalf("suppressed state = %+v, groups = %d", report, len(collector.groups))
 	}
 
 	right.Fingerprint = "other"
 	if err := collector.score(left, right); err != nil {
 		t.Fatalf("score accepted: %v", err)
 	}
-	if report.Suppressed != 1 || report.TotalMatches != 1 || len(collector.bounded) != 1 {
-		t.Fatalf("accepted state = %+v, bounded = %d", report, len(collector.bounded))
+	if report.SuppressedLocationPairs != 1 || report.TotalLocationPairs != 1 || len(collector.groups) != 1 {
+		t.Fatalf("accepted state = %+v, groups = %d", report, len(collector.groups))
 	}
 }
 
@@ -164,9 +207,13 @@ func TestCollectorSuppressesOnUnboundedPath(t *testing.T) {
 		options: Options{
 			Threshold: 0.5,
 			MaxPairs:  10,
-			Suppress:  func(string) bool { return true },
+			Suppress: func(string, model.Location, model.Location) bool {
+				return true
+			},
 		},
-		report: &report,
+		report:           &report,
+		groups:           make(map[string]*groupCandidate),
+		suppressedGroups: make(map[string]struct{}),
 	}
 	fragment := model.Fragment{
 		Fingerprint:  "same",
@@ -176,7 +223,54 @@ func TestCollectorSuppressesOnUnboundedPath(t *testing.T) {
 	if err := collector.score(fragment, fragment); err != nil {
 		t.Fatalf("score: %v", err)
 	}
-	if report.Suppressed != 1 || report.TotalMatches != 0 || len(collector.unbounded) != 0 {
-		t.Fatalf("state = %+v, unbounded = %d", report, len(collector.unbounded))
+	if report.SuppressedLocationPairs != 1 || report.TotalLocationPairs != 0 || len(collector.groups) != 0 {
+		t.Fatalf("state = %+v, groups = %d", report, len(collector.groups))
+	}
+}
+
+func TestCollectorGroupsEquivalentLocationPairs(t *testing.T) {
+	t.Parallel()
+
+	report := model.Report{}
+	collector := matchCollector{
+		ctx: context.Background(),
+		options: Options{
+			Threshold: 0.5, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10,
+		},
+		report:           &report,
+		groups:           make(map[string]*groupCandidate),
+		suppressedGroups: make(map[string]struct{}),
+	}
+	fragments := []model.Fragment{
+		groupingFragment("a.go", 1),
+		groupingFragment("b.go", 10),
+		groupingFragment("c.go", 20),
+	}
+	for left := 0; left < len(fragments); left++ {
+		for right := left + 1; right < len(fragments); right++ {
+			if err := collector.score(fragments[left], fragments[right]); err != nil {
+				t.Fatalf("score: %v", err)
+			}
+		}
+	}
+	collector.finish()
+	if report.TotalLocationPairs != 3 || report.TotalMatchGroups != 1 || len(report.Groups) != 1 {
+		t.Fatalf("grouped report = %+v", report)
+	}
+	group := report.Groups[0]
+	if group.LocationPairs != 3 || len(group.Profiles) != 1 ||
+		group.Profiles[0].OccurrenceCount != 3 || len(group.Profiles[0].Occurrences) != 3 {
+		t.Fatalf("group = %+v", group)
+	}
+}
+
+func groupingFragment(path string, line int) model.Fragment {
+	return model.Fragment{
+		Location: model.Location{
+			Path: path, Language: "go", LanguageFamily: "go", Name: "same",
+			StartLine: line, EndLine: line + 1,
+		},
+		TokenCount: 1, FeatureCount: 1, Fingerprint: "same",
+		Features: model.FeatureBag{"node:flow:return": 1},
 	}
 }

@@ -30,12 +30,14 @@ type File struct {
 type Options struct {
 	Excludes     []string
 	MaxFileBytes int64
+	IgnoreFiles  bool
 }
 
 // Result contains deterministic discovery output and recoverable warnings.
 type Result struct {
-	Files    []File
-	Warnings []model.Warning
+	Files       []File
+	Warnings    []model.Warning
+	IgnoreFiles []string
 }
 
 var defaultExcludedDirectories = map[string]struct{}{
@@ -75,6 +77,7 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 		Warnings: make([]model.Warning, 0),
 	}
 	seen := make(map[string]struct{})
+	ignores := newIgnoreMatcher(cwd)
 
 	for _, requestedPath := range paths {
 		if err := ctx.Err(); err != nil {
@@ -128,6 +131,15 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 		}
 
 		root := absolutePath
+		if options.IgnoreFiles {
+			boundary := root
+			if pathWithin(cwd, root) {
+				boundary = cwd
+			}
+			if err := ignores.loadAncestors(boundary, root); err != nil {
+				return result, err
+			}
+		}
 		walkErr := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -140,11 +152,23 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 				return nil
 			}
 
+			if entry.IsDir() && options.IgnoreFiles {
+				if err := ignores.loadDirectory(path); err != nil {
+					return ignoreLoadError{err: err}
+				}
+			}
+
 			if path != root && entry.IsDir() {
 				if _, excluded := defaultExcludedDirectories[strings.ToLower(entry.Name())]; excluded {
 					return fs.SkipDir
 				}
 				if matchesAny(relativeSlash(root, path), displayPath(cwd, path), options.Excludes) {
+					return fs.SkipDir
+				}
+				if options.IgnoreFiles && ignores.ignored(path, true) {
+					if ignores.mayReinclude(path) {
+						return nil
+					}
 					return fs.SkipDir
 				}
 				return nil
@@ -156,6 +180,9 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 			if matchesAny(relativeSlash(root, path), displayPath(cwd, path), options.Excludes) {
 				return nil
 			}
+			if options.IgnoreFiles && ignores.ignored(path, false) {
+				return nil
+			}
 			addFile(&result, seen, cwd, path, false, options)
 			return nil
 		})
@@ -164,9 +191,14 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 				errors.Is(walkErr, context.DeadlineExceeded) {
 				return result, walkErr
 			}
+			var ignoreErr ignoreLoadError
+			if errors.As(walkErr, &ignoreErr) {
+				return result, ignoreErr.err
+			}
 			result.Warnings = append(result.Warnings, warning(displayPath(cwd, root), walkErr))
 		}
 	}
+	result.IgnoreFiles = ignores.paths()
 
 	sort.Slice(result.Files, func(i, j int) bool {
 		return result.Files[i].DisplayPath < result.Files[j].DisplayPath

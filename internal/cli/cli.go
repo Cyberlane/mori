@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -15,6 +17,8 @@ import (
 	"github.com/Cyberlane/mori/internal/analyzer"
 	"github.com/Cyberlane/mori/internal/baseline"
 	"github.com/Cyberlane/mori/internal/buildinfo"
+	"github.com/Cyberlane/mori/internal/config"
+	"github.com/Cyberlane/mori/internal/diagnostic"
 	"github.com/Cyberlane/mori/internal/language"
 	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/report"
@@ -66,9 +70,11 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 
 type scanOptions struct {
 	excludes          stringList
+	languagePairs     stringList
 	threshold         float64
 	minTokens         int
-	maxMatches        int
+	maxGroups         int
+	maxOccurrences    int
 	maxPairs          int
 	maxFileBytes      int64
 	workers           int
@@ -76,25 +82,36 @@ type scanOptions struct {
 	crossLanguageOnly bool
 	failOnMatch       bool
 	baselinePath      string
+	baselineScope     string
+	respectIgnore     bool
+	noIgnore          bool
+	requestedConfig   string
+	configPath        string
+	noConfig          bool
 	check             bool
 }
 
 func defaultScanOptions() scanOptions {
 	return scanOptions{
-		threshold:    0.70,
-		minTokens:    12,
-		maxMatches:   100,
-		maxPairs:     5_000_000,
-		maxFileBytes: 2 * 1024 * 1024,
-		workers:      runtime.GOMAXPROCS(0),
-		format:       "text",
+		threshold:      0.70,
+		minTokens:      12,
+		maxGroups:      100,
+		maxOccurrences: 20,
+		maxPairs:       5_000_000,
+		maxFileBytes:   2 * 1024 * 1024,
+		workers:        runtime.GOMAXPROCS(0),
+		format:         "text",
+		baselineScope:  string(baseline.ScopeContent),
+		respectIgnore:  true,
 	}
 }
 
 func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 	flags.Float64Var(&options.threshold, "threshold", options.threshold, "minimum weighted Jaccard score, from 0 to 1")
 	flags.IntVar(&options.minTokens, "min-tokens", options.minTokens, "minimum normalized AST tokens per fragment")
-	flags.IntVar(&options.maxMatches, "max-matches", options.maxMatches, "maximum reported matches; 0 is unlimited")
+	flags.IntVar(&options.maxGroups, "max-groups", options.maxGroups, "maximum reported content-pair groups; 0 is unlimited")
+	flags.IntVar(&options.maxGroups, "max-matches", options.maxGroups, "deprecated alias for --max-groups")
+	flags.IntVar(&options.maxOccurrences, "max-occurrences", options.maxOccurrences, "maximum locations retained per fingerprint; 0 is unlimited")
 	flags.IntVar(&options.maxPairs, "max-pairs", options.maxPairs, "comparison safety limit; 0 is unlimited")
 	flags.Int64Var(&options.maxFileBytes, "max-file-bytes", options.maxFileBytes, "maximum source file size; 0 is unlimited")
 	flags.IntVar(&options.workers, "workers", options.workers, "parallel parser workers")
@@ -102,22 +119,31 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 	flags.BoolVar(
 		&options.crossLanguageOnly,
 		"cross-language-only",
-		false,
-		"compare fragments only when their language IDs differ",
+		options.crossLanguageOnly,
+		"compare fragments only when their language families differ",
+	)
+	flags.Var(
+		&options.languagePairs,
+		"language-pair",
+		"compare one language ID or family pair, such as go,typescript; repeatable",
 	)
 	flags.BoolVar(
 		&options.failOnMatch,
 		"fail-on-match",
-		false,
-		"exit with status 3 when one or more matches are found",
+		options.failOnMatch,
+		"exit with status 3 when one or more match groups are found",
 	)
+	flags.StringVar(&options.baselinePath, "baseline", options.baselinePath, "baseline file to load or write")
 	flags.StringVar(
-		&options.baselinePath,
-		"baseline",
-		"",
-		"baseline file to load or write",
+		&options.baselineScope,
+		"baseline-scope",
+		options.baselineScope,
+		"baseline identity scope for update: content or path",
 	)
 	flags.Var(&options.excludes, "exclude", "exclude path glob; repeat for multiple patterns")
+	flags.BoolVar(&options.noIgnore, "no-ignore", !options.respectIgnore, "do not read .gitignore or .moriignore files")
+	flags.StringVar(&options.requestedConfig, "config", options.requestedConfig, "explicit .mori.json configuration path")
+	flags.BoolVar(&options.noConfig, "no-config", options.noConfig, "do not discover or load project configuration")
 	if includeCheck {
 		flags.BoolVar(&options.check, "check", false, "report stale entries without rewriting the baseline")
 	}
@@ -129,10 +155,16 @@ func parseScanOptions(
 	stderr io.Writer,
 	includeCheck bool,
 ) (scanOptions, []string, int, bool) {
+	options, err := configuredScanOptions(args)
+	if err != nil {
+		if _, writeErr := fmt.Fprintf(stderr, "mori: load config: %s\n", diagnostic.Message(err)); writeErr != nil {
+			return scanOptions{}, nil, exitError, false
+		}
+		return scanOptions{}, nil, exitError, false
+	}
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	trackedStderr := &errorTrackingWriter{writer: stderr}
 	flags.SetOutput(trackedStderr)
-	options := defaultScanOptions()
 	options.bindFlags(flags, includeCheck)
 	flags.Usage = func() {
 		fmt.Fprintf(trackedStderr, "Usage: mori %s [options] [path ...]\n", command)
@@ -154,10 +186,129 @@ func parseScanOptions(
 		}
 		return scanOptions{}, nil, exitUsage, false
 	}
+	options.respectIgnore = !options.noIgnore
 	if err := validateScanOptions(options); err != nil {
 		return scanOptions{}, nil, usageError(stderr, err.Error()), false
 	}
 	return options, flags.Args(), exitSuccess, true
+}
+
+func configuredScanOptions(args []string) (scanOptions, error) {
+	request, err := findConfigRequest(args)
+	if err != nil {
+		return scanOptions{}, err
+	}
+	options := defaultScanOptions()
+	options.noConfig = request.disabled
+	options.requestedConfig = request.path
+	if request.disabled {
+		return options, nil
+	}
+
+	path := request.path
+	if path == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return scanOptions{}, err
+		}
+		foundPath, found, err := config.Discover(cwd)
+		if err != nil {
+			return scanOptions{}, err
+		}
+		if !found {
+			return options, nil
+		}
+		path = foundPath
+	}
+	settings, err := config.Load(path)
+	if err != nil {
+		return scanOptions{}, err
+	}
+	applyConfig(&options, settings, filepath.Dir(path))
+	options.configPath = displayCLIPath(path)
+	return options, nil
+}
+
+type configRequest struct {
+	path     string
+	disabled bool
+}
+
+func findConfigRequest(args []string) (configRequest, error) {
+	request := configRequest{}
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		switch {
+		case argument == "--no-config" || argument == "--no-config=true":
+			request.disabled = true
+		case argument == "--no-config=false":
+			request.disabled = false
+		case argument == "--config":
+			if index+1 >= len(args) {
+				return configRequest{}, errors.New("--config requires a path")
+			}
+			index++
+			request.path = args[index]
+		case strings.HasPrefix(argument, "--config="):
+			request.path = strings.TrimPrefix(argument, "--config=")
+		}
+	}
+	if request.disabled && request.path != "" {
+		return configRequest{}, errors.New("--config and --no-config cannot be used together")
+	}
+	return request, nil
+}
+
+func applyConfig(options *scanOptions, settings config.Settings, base string) {
+	if settings.Threshold != nil {
+		options.threshold = *settings.Threshold
+	}
+	if settings.MinTokens != nil {
+		options.minTokens = *settings.MinTokens
+	}
+	if settings.MaxGroups != nil {
+		options.maxGroups = *settings.MaxGroups
+	}
+	if settings.MaxOccurrences != nil {
+		options.maxOccurrences = *settings.MaxOccurrences
+	}
+	if settings.MaxPairs != nil {
+		options.maxPairs = *settings.MaxPairs
+	}
+	if settings.MaxFileBytes != nil {
+		options.maxFileBytes = *settings.MaxFileBytes
+	}
+	if settings.Workers != nil {
+		options.workers = *settings.Workers
+	}
+	if settings.Format != nil {
+		options.format = *settings.Format
+	}
+	if settings.CrossLanguageOnly != nil {
+		options.crossLanguageOnly = *settings.CrossLanguageOnly
+	}
+	if settings.FailOnMatch != nil {
+		options.failOnMatch = *settings.FailOnMatch
+	}
+	if settings.RespectIgnore != nil {
+		options.respectIgnore = *settings.RespectIgnore
+	}
+	options.noIgnore = !options.respectIgnore
+	options.excludes = append(options.excludes, settings.Excludes...)
+	options.languagePairs = append(options.languagePairs, settings.LanguagePairs...)
+	if settings.Baseline != "" {
+		options.baselinePath = resolveConfigPath(base, settings.Baseline)
+	}
+	if settings.BaselineScope != "" {
+		options.baselineScope = settings.BaselineScope
+	}
+}
+
+func resolveConfigPath(base string, path string) string {
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path)
+	}
+	return filepath.Join(base, path)
 }
 
 func validateScanOptions(options scanOptions) error {
@@ -168,7 +319,8 @@ func validateScanOptions(options scanOptions) error {
 	if options.minTokens < 1 {
 		return errors.New("--min-tokens must be at least 1")
 	}
-	if options.maxMatches < 0 || options.maxPairs < 0 || options.maxFileBytes < 0 {
+	if options.maxGroups < 0 || options.maxOccurrences < 0 || options.maxPairs < 0 ||
+		options.maxFileBytes < 0 {
 		return errors.New("maximum values cannot be negative")
 	}
 	if options.workers < 1 {
@@ -176,6 +328,15 @@ func validateScanOptions(options scanOptions) error {
 	}
 	if options.format != "text" && options.format != "json" {
 		return errors.New("--format must be text or json")
+	}
+	if options.crossLanguageOnly && len(options.languagePairs) > 0 {
+		return errors.New("--cross-language-only and --language-pair cannot be used together")
+	}
+	if _, err := expandLanguagePairs(options.languagePairs); err != nil {
+		return err
+	}
+	if err := baseline.ValidateScope(baseline.Scope(options.baselineScope)); err != nil {
+		return err
 	}
 	return source.ValidatePatterns(options.excludes)
 }
@@ -205,7 +366,7 @@ func runScan(ctx context.Context, args []string, stdout io.Writer, stderr io.Wri
 		fmt.Fprintf(stderr, "mori: write report: %v\n", err)
 		return exitError
 	}
-	if options.failOnMatch && result.TotalMatches > 0 {
+	if options.failOnMatch && result.TotalMatchGroups > 0 {
 		return exitFindings
 	}
 	return exitSuccess
@@ -238,21 +399,25 @@ func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, std
 	if options.baselinePath == "" {
 		return usageError(stderr, "--baseline is required for baseline update")
 	}
-	options.maxMatches = 0
+	options.maxGroups = 0
+	options.maxOccurrences = 0
 	result, err := executeScan(ctx, paths, options, nil)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: %v\n", err)
 		return exitError
 	}
-	if err := baseline.Write(options.baselinePath, result); err != nil {
+	scope := baseline.Scope(options.baselineScope)
+	if err := baseline.Write(options.baselinePath, result, scope); err != nil {
 		fmt.Fprintf(stderr, "mori: write baseline: %v\n", err)
 		return exitError
 	}
 	if _, err := fmt.Fprintf(
 		stdout,
-		"baseline updated: %q (%s, %s)\n",
+		"baseline updated: %q (%s scope, %s covering %s, %s)\n",
 		options.baselinePath,
-		countLabel(len(result.Matches), "candidate", "candidates"),
+		scope,
+		countLabel(result.TotalMatchGroups, "identity", "identities"),
+		countLabel(result.TotalLocationPairs, "location pair", "location pairs"),
 		countLabel(len(result.Warnings), "warning", "warnings"),
 	); err != nil {
 		return exitError
@@ -273,7 +438,8 @@ func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stde
 		fmt.Fprintf(stderr, "mori: load baseline: %v\n", err)
 		return exitError
 	}
-	options.maxMatches = 0
+	options.maxGroups = 0
+	options.maxOccurrences = 0
 	result, err := executeScan(ctx, paths, options, nil)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: %v\n", err)
@@ -303,8 +469,9 @@ func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stde
 	}
 	if _, err := fmt.Fprintf(
 		stdout,
-		"baseline pruned: %q (%s removed, %s)\n",
+		"baseline pruned: %q (%s scope, %s removed, %s)\n",
 		options.baselinePath,
+		set.Scope(),
 		countLabel(len(stale), "stale entry", "stale entries"),
 		countLabel(len(result.Warnings), "warning", "warnings"),
 	); err != nil {
@@ -320,7 +487,9 @@ func countLabel(count int, singular string, plural string) string {
 	return fmt.Sprintf("%d %s", count, plural)
 }
 
-func loadSuppression(path string) (func(string) bool, error) {
+func loadSuppression(
+	path string,
+) (func(string, model.Location, model.Location) bool, error) {
 	if path == "" {
 		return nil, nil
 	}
@@ -328,38 +497,89 @@ func loadSuppression(path string) (func(string) bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return set.Has, nil
+	return set.Match, nil
 }
 
 func executeScan(
 	ctx context.Context,
 	paths []string,
 	options scanOptions,
-	suppress func(string) bool,
+	suppress func(string, model.Location, model.Location) bool,
 ) (model.Report, error) {
 	discovered, err := source.DiscoverContext(ctx, paths, source.Options{
 		Excludes:     options.excludes,
 		MaxFileBytes: options.maxFileBytes,
+		IgnoreFiles:  options.respectIgnore,
 	})
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
 	}
-	return analyzer.Analyze(ctx, discovered.Files, discovered.Warnings, analyzer.Options{
+	pairs, err := expandLanguagePairs(options.languagePairs)
+	if err != nil {
+		return model.Report{}, err
+	}
+	result, err := analyzer.Analyze(ctx, discovered.Files, discovered.Warnings, analyzer.Options{
 		Threshold:         options.threshold,
 		MinTokens:         options.minTokens,
-		MaxMatches:        options.maxMatches,
+		MaxGroups:         options.maxGroups,
+		MaxOccurrences:    options.maxOccurrences,
 		MaxPairs:          options.maxPairs,
 		Workers:           options.workers,
 		CrossLanguageOnly: options.crossLanguageOnly,
+		LanguagePairs:     pairs,
 		Suppress:          suppress,
 	})
+	if err != nil {
+		return result, err
+	}
+	result.Configuration = model.EffectiveConfig{
+		ConfigPath:        options.configPath,
+		IgnoreFiles:       discovered.IgnoreFiles,
+		RespectIgnore:     options.respectIgnore,
+		Excludes:          append([]string{}, options.excludes...),
+		MinTokens:         options.minTokens,
+		MaxGroups:         options.maxGroups,
+		MaxOccurrences:    options.maxOccurrences,
+		MaxPairs:          options.maxPairs,
+		MaxFileBytes:      options.maxFileBytes,
+		CrossLanguageOnly: options.crossLanguageOnly,
+		LanguagePairs:     append([]string{}, options.languagePairs...),
+		BaselinePath:      displayOptionalPath(options.baselinePath),
+	}
+	sort.Strings(result.Configuration.Excludes)
+	sort.Strings(result.Configuration.LanguagePairs)
+	return result, nil
+}
+
+func expandLanguagePairs(values []string) ([]analyzer.LanguagePair, error) {
+	result := make([]analyzer.LanguagePair, 0)
+	for _, value := range values {
+		parts := strings.Split(value, ",")
+		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+			return nil, fmt.Errorf("invalid --language-pair %q; expected left,right", value)
+		}
+		leftIDs, ok := language.ResolveSelector(parts[0])
+		if !ok {
+			return nil, fmt.Errorf("unknown language ID or family %q", strings.TrimSpace(parts[0]))
+		}
+		rightIDs, ok := language.ResolveSelector(parts[1])
+		if !ok {
+			return nil, fmt.Errorf("unknown language ID or family %q", strings.TrimSpace(parts[1]))
+		}
+		for _, leftID := range leftIDs {
+			for _, rightID := range rightIDs {
+				result = append(result, analyzer.LanguagePair{Left: leftID, Right: rightID})
+			}
+		}
+	}
+	return result, nil
 }
 
 func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) != 0 {
 		return usageError(stderr, "languages does not accept arguments")
 	}
-	if _, err := fmt.Fprintln(stdout, "LANGUAGE\tEXTENSIONS"); err != nil {
+	if _, err := fmt.Fprintln(stdout, "LANGUAGE\tFAMILY\tEXTENSIONS"); err != nil {
 		return exitError
 	}
 	for _, spec := range language.All() {
@@ -367,8 +587,9 @@ func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
 		sort.Strings(extensions)
 		if _, err := fmt.Fprintf(
 			stdout,
-			"%s\t%s\n",
+			"%s\t%s\t%s\n",
 			spec.DisplayName,
+			spec.Family,
 			strings.Join(extensions, ", "),
 		); err != nil {
 			return exitError
@@ -428,6 +649,28 @@ func writeBaselineUsage(writer io.Writer) error {
 	return err
 }
 
+func displayCLIPath(path string) string {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return filepath.ToSlash(path)
+	}
+	cwd, err := os.Getwd()
+	if err == nil {
+		relative, relErr := filepath.Rel(cwd, absolute)
+		if relErr == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return filepath.ToSlash(relative)
+		}
+	}
+	return filepath.ToSlash(absolute)
+}
+
+func displayOptionalPath(path string) string {
+	if path == "" {
+		return ""
+	}
+	return displayCLIPath(path)
+}
+
 type stringList []string
 
 type errorTrackingWriter struct {
@@ -451,10 +694,6 @@ func (values *stringList) String() string {
 }
 
 func (values *stringList) Set(value string) error {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return errors.New("exclude pattern cannot be empty")
-	}
 	*values = append(*values, value)
 	return nil
 }

@@ -17,6 +17,7 @@ import (
 // Spec describes a parser grammar and the nodes that form comparison units.
 type Spec struct {
 	ID            string
+	Family        string
 	DisplayName   string
 	Extensions    []string
 	newLanguage   func() *tree_sitter.Language
@@ -46,6 +47,7 @@ var javascriptFunctions = kinds(
 var specs = []Spec{
 	{
 		ID:          "go",
+		Family:      "go",
 		DisplayName: "Go",
 		Extensions:  []string{".go"},
 		newLanguage: func() *tree_sitter.Language {
@@ -55,6 +57,7 @@ var specs = []Spec{
 	},
 	{
 		ID:          "javascript",
+		Family:      "javascript",
 		DisplayName: "JavaScript / JSX",
 		Extensions:  []string{".cjs", ".js", ".jsx", ".mjs"},
 		newLanguage: func() *tree_sitter.Language {
@@ -64,6 +67,7 @@ var specs = []Spec{
 	},
 	{
 		ID:          "typescript",
+		Family:      "typescript",
 		DisplayName: "TypeScript",
 		Extensions:  []string{".cts", ".mts", ".ts"},
 		newLanguage: func() *tree_sitter.Language {
@@ -73,6 +77,7 @@ var specs = []Spec{
 	},
 	{
 		ID:          "tsx",
+		Family:      "typescript",
 		DisplayName: "TypeScript / TSX",
 		Extensions:  []string{".tsx"},
 		newLanguage: func() *tree_sitter.Language {
@@ -82,6 +87,7 @@ var specs = []Spec{
 	},
 	{
 		ID:          "python",
+		Family:      "python",
 		DisplayName: "Python",
 		Extensions:  []string{".py", ".pyi"},
 		newLanguage: func() *tree_sitter.Language {
@@ -91,6 +97,7 @@ var specs = []Spec{
 	},
 	{
 		ID:          "rust",
+		Family:      "rust",
 		DisplayName: "Rust",
 		Extensions:  []string{".rs"},
 		newLanguage: func() *tree_sitter.Language {
@@ -98,6 +105,23 @@ var specs = []Spec{
 		},
 		functionKinds: kinds("closure_expression", "function_item"),
 	},
+}
+
+// ResolveSelector expands one language ID or family into concrete grammar
+// IDs in deterministic order.
+func ResolveSelector(selector string) ([]string, bool) {
+	selector = strings.ToLower(strings.TrimSpace(selector))
+	resolved := make([]string, 0)
+	for _, spec := range specs {
+		if spec.ID == selector || spec.Family == selector {
+			resolved = append(resolved, spec.ID)
+		}
+	}
+	if len(resolved) == 0 {
+		return nil, false
+	}
+	sort.Strings(resolved)
+	return resolved, true
 }
 
 // Detect returns the grammar associated with a file extension.

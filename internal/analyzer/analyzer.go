@@ -2,7 +2,6 @@
 package analyzer
 
 import (
-	"container/heap"
 	"context"
 	"errors"
 	"fmt"
@@ -21,11 +20,19 @@ import (
 type Options struct {
 	Threshold         float64
 	MinTokens         int
-	MaxMatches        int
+	MaxGroups         int
+	MaxOccurrences    int
 	MaxPairs          int
 	Workers           int
 	CrossLanguageOnly bool
-	Suppress          func(id string) bool
+	LanguagePairs     []LanguagePair
+	Suppress          func(id string, left model.Location, right model.Location) bool
+}
+
+// LanguagePair selects one concrete grammar-ID pair for comparison.
+type LanguagePair struct {
+	Left  string
+	Right string
 }
 
 type parseJob struct {
@@ -39,47 +46,33 @@ type parseResult struct {
 	warnings  []model.Warning
 }
 
-type matchCandidate struct {
-	similarity float64
-	id         string
-	left       model.Fragment
-	right      model.Fragment
+type profileAggregate struct {
+	fingerprint  string
+	tokenCount   int
+	featureCount int
+	occurrences  map[string]model.FragmentSummary
 }
 
-type candidateHeap []matchCandidate
-
-func (h candidateHeap) Len() int { return len(h) }
-
-func (h candidateHeap) Less(i int, j int) bool {
-	return candidateBetter(h[j], h[i])
-}
-
-func (h candidateHeap) Swap(i int, j int) {
-	h[i], h[j] = h[j], h[i]
-}
-
-func (h *candidateHeap) Push(value any) {
-	*h = append(*h, value.(matchCandidate))
-}
-
-func (h *candidateHeap) Pop() any {
-	old := *h
-	last := len(old) - 1
-	value := old[last]
-	old[last] = matchCandidate{}
-	*h = old[:last]
-	return value
+type groupCandidate struct {
+	similarity    float64
+	id            string
+	left          model.Fragment
+	right         model.Fragment
+	locationPairs int
+	profiles      map[string]*profileAggregate
+	pathPairs     map[string]model.LocationPair
 }
 
 type matchCollector struct {
-	ctx       context.Context
-	options   Options
-	report    *model.Report
-	bounded   candidateHeap
-	unbounded []matchCandidate
+	ctx              context.Context
+	options          Options
+	report           *model.Report
+	groups           map[string]*groupCandidate
+	suppressedGroups map[string]struct{}
 }
 
-// Analyze parses files and returns every pair at or above the threshold.
+// Analyze parses files and returns content-grouped pairs at or above the
+// threshold.
 func Analyze(
 	ctx context.Context,
 	files []source.File,
@@ -90,8 +83,13 @@ func Analyze(
 		SchemaVersion: model.SchemaVersion,
 		Threshold:     options.Threshold,
 		Files:         len(files),
-		Matches:       make([]model.Match, 0),
+		Groups:        make([]model.MatchGroup, 0),
 		Warnings:      append(make([]model.Warning, 0, len(initialWarnings)), initialWarnings...),
+		Configuration: model.EffectiveConfig{
+			IgnoreFiles:   make([]string, 0),
+			Excludes:      make([]string, 0),
+			LanguagePairs: make([]string, 0),
+		},
 	}
 	if err := validateOptions(options); err != nil {
 		return report, err
@@ -172,13 +170,17 @@ func Analyze(
 	})
 
 	collector := matchCollector{
-		ctx:     ctx,
-		options: options,
-		report:  &report,
+		ctx:              ctx,
+		options:          options,
+		report:           &report,
+		groups:           make(map[string]*groupCandidate),
+		suppressedGroups: make(map[string]struct{}),
 	}
 	var compareErr error
-	if options.CrossLanguageOnly {
-		compareErr = compareAcrossLanguages(ordered, &collector)
+	if len(options.LanguagePairs) > 0 {
+		compareErr = compareSelectedLanguagePairs(ordered, options.LanguagePairs, &collector)
+	} else if options.CrossLanguageOnly {
+		compareErr = compareAcrossFamilies(ordered, &collector)
 	} else {
 		compareErr = compareAll(ordered, &collector)
 	}
@@ -198,7 +200,7 @@ func validateOptions(options Options) error {
 	if options.MinTokens < 1 {
 		return errors.New("minimum token count must be at least 1")
 	}
-	if options.MaxMatches < 0 || options.MaxPairs < 0 {
+	if options.MaxGroups < 0 || options.MaxOccurrences < 0 || options.MaxPairs < 0 {
 		return errors.New("maximum values cannot be negative")
 	}
 	return nil
@@ -229,7 +231,39 @@ func compareAll(fragments []model.Fragment, collector *matchCollector) error {
 	return nil
 }
 
-func compareAcrossLanguages(fragments []model.Fragment, collector *matchCollector) error {
+func compareAcrossFamilies(fragments []model.Fragment, collector *matchCollector) error {
+	byFamily := make(map[string][]model.Fragment)
+	for _, fragment := range fragments {
+		byFamily[fragment.Location.LanguageFamily] = append(
+			byFamily[fragment.Location.LanguageFamily],
+			fragment,
+		)
+	}
+	families := make([]string, 0, len(byFamily))
+	for family := range byFamily {
+		families = append(families, family)
+	}
+	sort.Strings(families)
+
+	for leftFamily := 0; leftFamily < len(families); leftFamily++ {
+		for rightFamily := leftFamily + 1; rightFamily < len(families); rightFamily++ {
+			if err := compareLanguagePair(
+				byFamily[families[leftFamily]],
+				byFamily[families[rightFamily]],
+				collector,
+			); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func compareSelectedLanguagePairs(
+	fragments []model.Fragment,
+	pairs []LanguagePair,
+	collector *matchCollector,
+) error {
 	byLanguage := make(map[string][]model.Fragment)
 	for _, fragment := range fragments {
 		byLanguage[fragment.Location.Language] = append(
@@ -237,21 +271,25 @@ func compareAcrossLanguages(fragments []model.Fragment, collector *matchCollecto
 			fragment,
 		)
 	}
-	languages := make([]string, 0, len(byLanguage))
-	for languageID := range byLanguage {
-		languages = append(languages, languageID)
-	}
-	sort.Strings(languages)
-
-	for leftLanguage := 0; leftLanguage < len(languages); leftLanguage++ {
-		for rightLanguage := leftLanguage + 1; rightLanguage < len(languages); rightLanguage++ {
-			if err := compareLanguagePair(
-				byLanguage[languages[leftLanguage]],
-				byLanguage[languages[rightLanguage]],
-				collector,
-			); err != nil {
+	seen := make(map[string]struct{})
+	for _, pair := range pairs {
+		leftID, rightID := pair.Left, pair.Right
+		if rightID < leftID {
+			leftID, rightID = rightID, leftID
+		}
+		key := leftID + "\x00" + rightID
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		if leftID == rightID {
+			if err := compareAll(byLanguage[leftID], collector); err != nil {
 				return err
 			}
+			continue
+		}
+		if err := compareLanguagePair(byLanguage[leftID], byLanguage[rightID], collector); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -316,60 +354,162 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 		return nil
 	}
 
-	candidate := matchCandidate{similarity: score, left: left, right: right}
-	candidate.id = fingerprint.Pair(left.Fingerprint, right.Fingerprint)
-	if collector.options.Suppress != nil && collector.options.Suppress(candidate.id) {
-		collector.report.Suppressed++
+	id := fingerprint.Pair(left.Fingerprint, right.Fingerprint)
+	if collector.options.Suppress != nil && collector.options.Suppress(id, left.Location, right.Location) {
+		collector.report.SuppressedLocationPairs++
+		collector.suppressedGroups[id] = struct{}{}
 		return nil
 	}
-	collector.report.TotalMatches++
-	if collector.options.MaxMatches == 0 {
-		collector.unbounded = append(collector.unbounded, candidate)
-		return nil
+	collector.report.TotalLocationPairs++
+	group, exists := collector.groups[id]
+	if !exists {
+		group = &groupCandidate{
+			similarity: score,
+			id:         id,
+			left:       left,
+			right:      right,
+			profiles:   make(map[string]*profileAggregate, 2),
+			pathPairs:  make(map[string]model.LocationPair),
+		}
+		collector.groups[id] = group
 	}
-	if len(collector.bounded) < collector.options.MaxMatches {
-		heap.Push(&collector.bounded, candidate)
-		return nil
+	group.locationPairs++
+	group.addPathPair(left.Location, right.Location)
+	if candidateBetter(left, right, group.left, group.right) {
+		group.left = left
+		group.right = right
 	}
-	if candidateBetter(candidate, collector.bounded[0]) {
-		collector.bounded[0] = candidate
-		heap.Fix(&collector.bounded, 0)
-	}
+	collector.addProfileOccurrence(group, left)
+	collector.addProfileOccurrence(group, right)
 	return nil
 }
 
 func (collector *matchCollector) finish() {
-	candidates := collector.unbounded
-	if collector.options.MaxMatches > 0 {
-		candidates = append([]matchCandidate(nil), collector.bounded...)
+	candidates := make([]*groupCandidate, 0, len(collector.groups))
+	for _, candidate := range collector.groups {
+		candidates = append(candidates, candidate)
 	}
 	sort.Slice(candidates, func(i, j int) bool {
-		return candidateBetter(candidates[i], candidates[j])
+		return groupBetter(candidates[i], candidates[j])
 	})
+	collector.report.TotalMatchGroups = len(candidates)
+	collector.report.SuppressedMatchGroups = len(collector.suppressedGroups)
+	if collector.options.MaxGroups > 0 && len(candidates) > collector.options.MaxGroups {
+		candidates = candidates[:collector.options.MaxGroups]
+		collector.report.Truncated = true
+	}
 
-	collector.report.Matches = make([]model.Match, 0, len(candidates))
+	collector.report.Groups = make([]model.MatchGroup, 0, len(candidates))
 	for _, candidate := range candidates {
-		collector.report.Matches = append(collector.report.Matches, model.Match{
+		collector.report.Groups = append(collector.report.Groups, model.MatchGroup{
 			ID:             candidate.id,
 			Similarity:     candidate.similarity,
-			Left:           candidate.left.Summary(),
-			Right:          candidate.right.Summary(),
+			LocationPairs:  candidate.locationPairs,
+			Profiles:       publicProfiles(candidate.profiles, collector.options.MaxOccurrences),
+			ShapeSummary:   similarity.Shape(candidate.left.Features, candidate.right.Features),
 			SharedFeatures: similarity.Shared(candidate.left.Features, candidate.right.Features, 8),
+			PathPairs:      publicPathPairs(candidate.pathPairs),
 		})
 	}
-	collector.report.Truncated = collector.report.TotalMatches > len(collector.report.Matches)
 }
 
-func candidateBetter(left matchCandidate, right matchCandidate) bool {
+func (group *groupCandidate) addPathPair(left model.Location, right model.Location) {
+	leftKey := locationKey(left)
+	rightKey := locationKey(right)
+	if rightKey < leftKey {
+		left, right = right, left
+		leftKey, rightKey = rightKey, leftKey
+	}
+	group.pathPairs[leftKey+"\x00"+rightKey] = model.LocationPair{Left: left, Right: right}
+}
+
+func publicPathPairs(pairs map[string]model.LocationPair) []model.LocationPair {
+	keys := make([]string, 0, len(pairs))
+	for key := range pairs {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	result := make([]model.LocationPair, 0, len(keys))
+	for _, key := range keys {
+		result = append(result, pairs[key])
+	}
+	return result
+}
+
+func (collector *matchCollector) addProfileOccurrence(
+	group *groupCandidate,
+	fragment model.Fragment,
+) {
+	profile, exists := group.profiles[fragment.Fingerprint]
+	if !exists {
+		profile = &profileAggregate{
+			fingerprint:  fragment.Fingerprint,
+			tokenCount:   fragment.TokenCount,
+			featureCount: fragment.FeatureCount,
+			occurrences:  make(map[string]model.FragmentSummary),
+		}
+		group.profiles[fragment.Fingerprint] = profile
+	}
+	key := locationKey(fragment.Location)
+	if _, exists := profile.occurrences[key]; exists {
+		return
+	}
+	profile.occurrences[key] = fragment.Summary()
+}
+
+func publicProfiles(profiles map[string]*profileAggregate, limit int) []model.FragmentProfile {
+	result := make([]model.FragmentProfile, 0, len(profiles))
+	for _, profile := range profiles {
+		occurrences := make([]model.FragmentSummary, 0, len(profile.occurrences))
+		for _, occurrence := range profile.occurrences {
+			occurrences = append(occurrences, occurrence)
+		}
+		sort.Slice(occurrences, func(i, j int) bool {
+			return locationKey(occurrences[i].Location) < locationKey(occurrences[j].Location)
+		})
+		occurrenceCount := len(occurrences)
+		if limit > 0 && len(occurrences) > limit {
+			occurrences = occurrences[:limit]
+		}
+		result = append(result, model.FragmentProfile{
+			Fingerprint:     profile.fingerprint,
+			TokenCount:      profile.tokenCount,
+			FeatureCount:    profile.featureCount,
+			OccurrenceCount: occurrenceCount,
+			Occurrences:     occurrences,
+		})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Fingerprint < result[j].Fingerprint })
+	return result
+}
+
+func groupBetter(left *groupCandidate, right *groupCandidate) bool {
 	if left.similarity != right.similarity {
 		return left.similarity > right.similarity
 	}
-	leftKey := locationKey(left.left.Location)
-	rightKey := locationKey(right.left.Location)
+	leftEvidence := min(left.left.FeatureCount, left.right.FeatureCount)
+	rightEvidence := min(right.left.FeatureCount, right.right.FeatureCount)
+	if leftEvidence != rightEvidence {
+		return leftEvidence > rightEvidence
+	}
+	if left.locationPairs != right.locationPairs {
+		return left.locationPairs > right.locationPairs
+	}
+	return left.id < right.id
+}
+
+func candidateBetter(
+	leftA model.Fragment,
+	rightA model.Fragment,
+	leftB model.Fragment,
+	rightB model.Fragment,
+) bool {
+	leftKey := locationKey(leftA.Location)
+	rightKey := locationKey(leftB.Location)
 	if leftKey != rightKey {
 		return leftKey < rightKey
 	}
-	return locationKey(left.right.Location) < locationKey(right.right.Location)
+	return locationKey(rightA.Location) < locationKey(rightB.Location)
 }
 
 func fragmentLess(left model.Fragment, right model.Fragment) bool {
