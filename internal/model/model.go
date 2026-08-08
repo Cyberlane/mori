@@ -1,8 +1,10 @@
 // Package model defines the analyzer's stable internal and output models.
 package model
 
+import "github.com/Cyberlane/mori/internal/buildinfo"
+
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -95,10 +97,27 @@ type MatchGroup struct {
 	ID             string            `json:"content_pair_id"`
 	Similarity     float64           `json:"similarity"`
 	LocationPairs  int               `json:"location_pairs"`
+	Focused        bool              `json:"focused"`
+	FocusedCount   int               `json:"focused_occurrences"`
 	Profiles       []FragmentProfile `json:"profiles"`
 	ShapeSummary   []string          `json:"shape_summary"`
 	SharedFeatures []SharedFeature   `json:"shared_features"`
 	PathPairs      []LocationPair    `json:"-"`
+}
+
+// FocusConfig records deterministic path focus inputs and their resolution.
+type FocusConfig struct {
+	Mode                 string   `json:"mode"`
+	ExplicitPaths        []string `json:"explicit_paths"`
+	RequestedBase        string   `json:"requested_base,omitempty"`
+	BaseCommit           string   `json:"base_commit,omitempty"`
+	MergeBase            string   `json:"merge_base,omitempty"`
+	HeadCommit           string   `json:"head_commit,omitempty"`
+	WorkingTreeIncluded  bool     `json:"working_tree_included"`
+	UntrackedIncluded    bool     `json:"untracked_included"`
+	ChangedPaths         []string `json:"changed_paths"`
+	DeletedPaths         []string `json:"deleted_paths"`
+	DiscoveredFocusFiles int      `json:"discovered_focus_files"`
 }
 
 // ParseDiagnostic identifies one bounded Tree-sitter error or missing node.
@@ -124,29 +143,32 @@ type Warning struct {
 // EffectiveConfig records the scan inputs needed to reproduce discovery and
 // pair selection.
 type EffectiveConfig struct {
-	ConfigPath        string   `json:"config_path,omitempty"`
-	IgnoreFiles       []string `json:"ignore_files"`
-	RespectIgnore     bool     `json:"respect_ignore"`
-	Excludes          []string `json:"excludes"`
-	MinTokens         int      `json:"min_tokens"`
-	MaxGroups         int      `json:"max_groups"`
-	MaxOccurrences    int      `json:"max_occurrences"`
-	MaxPairs          int      `json:"max_pairs"`
-	MaxFileBytes      int64    `json:"max_file_bytes"`
-	CrossLanguageOnly bool     `json:"cross_language_only"`
-	LanguagePairs     []string `json:"language_pairs"`
-	BaselinePath      string   `json:"baseline_path,omitempty"`
+	ConfigPath        string       `json:"config_path,omitempty"`
+	IgnoreFiles       []string     `json:"ignore_files"`
+	RespectIgnore     bool         `json:"respect_ignore"`
+	Excludes          []string     `json:"excludes"`
+	MinTokens         int          `json:"min_tokens"`
+	MaxGroups         int          `json:"max_groups"`
+	MaxOccurrences    int          `json:"max_occurrences"`
+	MaxPairs          int          `json:"max_pairs"`
+	MaxFileBytes      int64        `json:"max_file_bytes"`
+	CrossLanguageOnly bool         `json:"cross_language_only"`
+	LanguagePairs     []string     `json:"language_pairs"`
+	BaselinePath      string       `json:"baseline_path,omitempty"`
+	Focus             *FocusConfig `json:"focus,omitempty"`
 }
 
 // Report is the stable JSON and text reporting model.
 type Report struct {
 	SchemaVersion           int             `json:"schema_version"`
+	Tool                    buildinfo.Info  `json:"tool"`
 	Threshold               float64         `json:"threshold"`
 	Files                   int             `json:"files"`
 	Fragments               int             `json:"fragments"`
 	CandidatePairs          int             `json:"candidate_pairs"`
 	TotalLocationPairs      int             `json:"total_location_pairs"`
 	TotalMatchGroups        int             `json:"total_match_groups"`
+	TotalFocusedMatchGroups int             `json:"total_focused_match_groups"`
 	SuppressedLocationPairs int             `json:"suppressed_location_pairs"`
 	SuppressedMatchGroups   int             `json:"suppressed_match_groups"`
 	Truncated               bool            `json:"truncated"`

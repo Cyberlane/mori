@@ -67,6 +67,25 @@ mori scan \
   .
 ```
 
+When reviewing a branch or working-tree change and the comparison base already
+exists locally, use Mori's native focus mode instead of filtering the scan:
+
+```sh
+mori scan \
+  --format json \
+  --threshold 0.85 \
+  --min-tokens 40 \
+  --max-groups 250 \
+  --max-occurrences 10 \
+  --changed-since origin/main \
+  .
+```
+
+Mori still scans changed and unchanged files together, then prioritizes groups
+with a changed occurrence. It never fetches the revision. Use repeatable
+`--focus-path` for exact paths when Git-derived focus is unavailable or when a
+review includes additional files. The two focus inputs are additive.
+
 Mori honors `.gitignore`, `.moriignore`, and an upward-discovered `.mori.json`
 by default. Inspect `configuration` in the JSON report to verify the effective
 config, ignore files, exclusions, and pair filters. Use `--no-ignore` or
@@ -90,8 +109,9 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `3`. Record the Mori version and scan
-options. Inspect:
+Require `schema_version` to equal `4`. Validate the mandatory `tool` object,
+including the full source revision, modified flag, platform, Go version, and
+normalization version. Inspect:
 
 - `warnings`: disclose every incomplete or failed input;
 - structured parse diagnostics: inspect the grammar, source range, node kind,
@@ -99,6 +119,13 @@ options. Inspect:
 - `truncated`: state when lower-ranked content identities are omitted;
 - `total_location_pairs`: count all qualifying source-location pairs;
 - `total_match_groups`: count distinct content-pair identities;
+- `total_focused_match_groups`: count all focused identities before bounded
+  group retention;
+- `configuration.focus`: verify explicit paths or the requested Git base, full
+  base/merge-base/HEAD commits, working-tree semantics, changed/deleted paths,
+  and how many focused files were actually discovered;
+- `focused` and `focused_occurrences`: use these exact group fields rather than
+  inferring focus from sampled occurrences;
 - suppression counts: distinguish suppressed location pairs from baseline
   content identities;
 - `content_pair_id`: use the stable content identity across scans;
@@ -109,12 +136,13 @@ options. Inspect:
   highly without treating the summary as behavioral evidence.
 
 Treat an operational error or an unexpected schema as a failed scan. Exit
-status `3` means policy findings were found with `--fail-on-match`; it is not a
-tool crash.
+status `3` means policy findings were found with `--fail-on-match` or
+`--fail-on-focused-match`; it is not a tool crash. Use the focused policy only
+after the repository has adopted a reviewed threshold, scope, and exclusions.
 
-When reviewing a change, prioritize groups where any retained occurrence is in
-a changed file. Review at most 25 distinct identities deeply, not the first 25
-raw location pairs. Still retain the full bounded scan as the evidence source.
+When reviewing a change, rely on native focus ordering when available. Review
+at most 25 distinct identities deeply, not the first 25 raw location pairs.
+Still retain the full bounded scan as the evidence source.
 
 Before baselining a noisy repository, first establish repeatable project scope
 with `.mori.json`, `.moriignore`, or existing repository ignore files. Use

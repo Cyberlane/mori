@@ -58,6 +58,16 @@ func Text(writer io.Writer, report model.Report) error {
 			return err
 		}
 	}
+	if report.Configuration.Focus != nil {
+		if _, err := fmt.Fprintf(
+			writer,
+			"%d focused group(s); %d focused file(s) discovered\n",
+			report.TotalFocusedMatchGroups,
+			report.Configuration.Focus.DiscoveredFocusFiles,
+		); err != nil {
+			return err
+		}
+	}
 	if report.Configuration.ConfigPath != "" {
 		if _, err := fmt.Fprintf(writer, "config %s\n", terminalSafe(report.Configuration.ConfigPath)); err != nil {
 			return err
@@ -74,12 +84,17 @@ func Text(writer io.Writer, report model.Report) error {
 	}
 
 	for index, group := range report.Groups {
+		focusLabel := ""
+		if group.Focused {
+			focusLabel = fmt.Sprintf(" · focused (%d occurrence(s))", group.FocusedCount)
+		}
 		if _, err := fmt.Fprintf(
 			writer,
-			"\n%d. %.1f%% structural similarity · %d location pair(s) · identity %s\n",
+			"\n%d. %.1f%% structural similarity · %d location pair(s)%s · identity %s\n",
 			index+1,
 			group.Similarity*100,
 			group.LocationPairs,
+			focusLabel,
 			terminalSafe(group.ID),
 		); err != nil {
 			return err

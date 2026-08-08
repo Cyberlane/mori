@@ -117,6 +117,10 @@ Write results as JSON for a script or CI system:
 mori scan --format json .
 ```
 
+Schema-4 reports embed deterministic `tool` build provenance and exact focus
+metadata. They do not include a scan timestamp, hostname, username, source
+body, diff, or Git remote.
+
 Fail a CI job when Mori finds a match at your threshold:
 
 ```sh
@@ -124,6 +128,20 @@ mori scan --threshold 0.85 --fail-on-match .
 ```
 
 With `--fail-on-match`, Mori exits with status `3` when it finds a match.
+
+For change review, keep the full repository comparison universe while putting
+groups that touch changed files first:
+
+```sh
+mori scan --changed-since origin/main --threshold 0.85 .
+```
+
+The revision must already exist locally. Mori uses the merge base through the
+current working tree, including staged, unstaged, and untracked non-ignored
+files; it never fetches a remote. Add repeatable `--focus-path <path>` values
+for explicit paths. `--fail-on-focused-match` exits with status `3` only when
+an unsuppressed focused group exists and is mutually exclusive with
+`--fail-on-match`.
 
 To record intentional candidates and use Mori as a stable CI gate:
 

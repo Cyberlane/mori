@@ -7,6 +7,18 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Deterministic tool provenance in schema-4 JSON reports, including full source
+  revision, build state, platform, Go version, and normalization version.
+- Repeatable explicit path focus and local Git changed-file focus with exact
+  group metadata, focused-first bounded retrieval, and a focused CI policy.
+
+### Changed
+
+- The bundled review skill now validates report provenance and uses Mori's
+  native changed-file focus without narrowing the scan to changed files.
+
 ## [0.4.1] - 2026-08-08
 
 ### Changed

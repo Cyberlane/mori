@@ -264,6 +264,59 @@ func TestCollectorGroupsEquivalentLocationPairs(t *testing.T) {
 	}
 }
 
+func TestCollectorPrioritizesFocusedGroupsBeforeRetention(t *testing.T) {
+	t.Parallel()
+
+	report := model.Report{}
+	collector := matchCollector{
+		ctx: context.Background(),
+		options: Options{
+			Threshold: 0.5, MaxGroups: 1, MaxOccurrences: 1, MaxPairs: 10,
+			FocusActive: true,
+			FocusPaths:  map[string]struct{}{"focused.go": {}},
+		},
+		report:           &report,
+		groups:           make(map[string]*groupCandidate),
+		suppressedGroups: make(map[string]struct{}),
+	}
+
+	nonFocusedLeft := groupingFragment("best-a.go", 1)
+	nonFocusedLeft.Fingerprint = "best-a"
+	nonFocusedRight := groupingFragment("best-b.go", 1)
+	nonFocusedRight.Fingerprint = "best-b"
+	if err := collector.score(nonFocusedLeft, nonFocusedRight); err != nil {
+		t.Fatalf("score non-focused: %v", err)
+	}
+
+	focusedLeft := groupingFragment("focused.go", 1)
+	focusedLeft.Fingerprint = "focused"
+	focusedLeft.FeatureCount = 2
+	focusedLeft.Features = model.FeatureBag{"node:flow:return": 1, "node:branch:if": 1}
+	focusedRight := groupingFragment("existing.go", 1)
+	focusedRight.Fingerprint = "existing"
+	if err := collector.score(focusedLeft, focusedRight); err != nil {
+		t.Fatalf("score focused: %v", err)
+	}
+
+	secondFocused := focusedLeft
+	secondFocused.Location.StartLine = 10
+	secondFocused.Location.EndLine = 11
+	if err := collector.score(secondFocused, focusedRight); err != nil {
+		t.Fatalf("score second focused occurrence: %v", err)
+	}
+	collector.finish()
+
+	if report.TotalMatchGroups != 2 || report.TotalFocusedMatchGroups != 1 || len(report.Groups) != 1 {
+		t.Fatalf("focused totals = %+v", report)
+	}
+	if !report.Groups[0].Focused || report.Groups[0].FocusedCount != 2 {
+		t.Fatalf("retained group = %+v, want two exact focused occurrences", report.Groups[0])
+	}
+	if len(report.Groups[0].Profiles[0].Occurrences) != 1 {
+		t.Fatalf("occurrence sample was not bounded: %+v", report.Groups[0].Profiles)
+	}
+}
+
 func groupingFragment(path string, line int) model.Fragment {
 	return model.Fragment{
 		Location: model.Location{
