@@ -1,8 +1,10 @@
 // Package model defines the analyzer's stable internal and output models.
 package model
 
+import "github.com/Cyberlane/mori/internal/buildinfo"
+
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -141,6 +143,7 @@ type EffectiveConfig struct {
 // Report is the stable JSON and text reporting model.
 type Report struct {
 	SchemaVersion           int             `json:"schema_version"`
+	Tool                    buildinfo.Info  `json:"tool"`
 	Threshold               float64         `json:"threshold"`
 	Files                   int             `json:"files"`
 	Fragments               int             `json:"fragments"`

@@ -82,7 +82,7 @@ jobs:
           go test ./...
 
           version="${TAG#v}"
-          commit="$(git rev-parse --short=12 HEAD)"
+          commit="$(git rev-parse HEAD)"
           timestamp="$(git show -s --format=%cI HEAD)"
           goos="$(go env GOOS)"
           goarch="$(go env GOARCH)"

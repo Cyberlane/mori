@@ -21,6 +21,7 @@ import (
 	"github.com/Cyberlane/mori/internal/diagnostic"
 	"github.com/Cyberlane/mori/internal/language"
 	"github.com/Cyberlane/mori/internal/model"
+	"github.com/Cyberlane/mori/internal/normalize"
 	"github.com/Cyberlane/mori/internal/report"
 	"github.com/Cyberlane/mori/internal/source"
 )
@@ -546,6 +547,8 @@ func executeScan(
 		LanguagePairs:     append([]string{}, options.languagePairs...),
 		BaselinePath:      displayOptionalPath(options.baselinePath),
 	}
+	result.Tool = buildinfo.Current()
+	result.Tool.NormalizationVersion = normalize.Version
 	sort.Strings(result.Configuration.Excludes)
 	sort.Strings(result.Configuration.LanguagePairs)
 	return result, nil
@@ -605,11 +608,11 @@ func runVersion(args []string, stdout io.Writer, stderr io.Writer) int {
 	if _, err := fmt.Fprintf(
 		stdout,
 		"mori %s (%s, %s, %s/%s)\n",
-		buildinfo.Version,
-		buildinfo.Commit,
-		buildinfo.Date,
-		runtime.GOOS,
-		runtime.GOARCH,
+		buildinfo.Current().Version,
+		buildinfo.DisplayRevision(buildinfo.Current()),
+		buildinfo.Current().SourceDate,
+		buildinfo.Current().GOOS,
+		buildinfo.Current().GOARCH,
 	); err != nil {
 		return exitError
 	}
