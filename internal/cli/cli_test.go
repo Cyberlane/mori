@@ -66,7 +66,7 @@ func TestRunScanJSONAndFailOnMatch(t *testing.T) {
 	if result.Warnings == nil {
 		t.Fatal("warnings must encode as an empty array, not null")
 	}
-	if result.SchemaVersion != 4 || result.Tool.Name != "mori" || result.Tool.Revision == "" ||
+	if result.SchemaVersion != model.SchemaVersion || result.Tool.Name != "mori" || result.Tool.Revision == "" ||
 		result.Tool.NormalizationVersion != 1 {
 		t.Fatalf("report provenance = schema %d, tool %#v", result.SchemaVersion, result.Tool)
 	}
@@ -314,6 +314,19 @@ func TestRunRejectsInvalidThreshold(t *testing.T) {
 				t.Fatalf("stderr = %q, want threshold explanation", stderr.String())
 			}
 		})
+	}
+}
+
+func TestRunRejectsIncompatibleLanguageDomains(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--language-pair", "sql,go", ".",
+	}, &stdout, &stderr)
+	if code != exitUsage || !strings.Contains(stderr.String(), "incompatible comparison domains") {
+		t.Fatalf("exit/stderr = %d/%q", code, stderr.String())
 	}
 }
 

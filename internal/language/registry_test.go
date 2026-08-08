@@ -14,6 +14,7 @@ func TestEveryGrammarHasCompatibleABI(t *testing.T) {
 		"javascript": 15,
 		"python":     15,
 		"rust":       15,
+		"sql":        14,
 		"tsx":        14,
 		"typescript": 14,
 	}
@@ -56,6 +57,7 @@ func TestDetect(t *testing.T) {
 		"component.tsx": "tsx",
 		"module.pyi":    "python",
 		"lib.rs":        "rust",
+		"queries.SQL":   "sql",
 	}
 	for path, expected := range tests {
 		spec, ok := Detect(path)
@@ -77,11 +79,27 @@ func TestAllReturnsIndependentSpecifications(t *testing.T) {
 
 	first := All()
 	first[0].Extensions[0] = ".mutated"
-	first[0].functionKinds["mutated"] = struct{}{}
+	first[0].fragmentKinds["mutated"] = struct{}{}
 
 	second := All()
-	if second[0].Extensions[0] == ".mutated" || second[0].IsFunction("mutated") {
+	if second[0].Extensions[0] == ".mutated" || second[0].IsFragmentBoundary("mutated") {
 		t.Fatal("mutating All result changed the registry")
+	}
+}
+
+func TestComparisonDomainsAndFragmentKinds(t *testing.T) {
+	t.Parallel()
+
+	for _, spec := range All() {
+		if spec.ID == "sql" {
+			if spec.ComparisonDomain != "sql-query" || spec.FragmentKind != "query" {
+				t.Fatalf("SQL spec = %#v", spec)
+			}
+			continue
+		}
+		if spec.ComparisonDomain != "code" || spec.FragmentKind != "function" {
+			t.Fatalf("code spec %s = %#v", spec.ID, spec)
+		}
 	}
 }
 

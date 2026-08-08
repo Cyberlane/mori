@@ -4,22 +4,24 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 4
+const SchemaVersion = 5
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
 
-// Location identifies a function-like source fragment.
+// Location identifies one source fragment.
 type Location struct {
-	Path           string `json:"path"`
-	Language       string `json:"language"`
-	LanguageFamily string `json:"language_family"`
-	Name           string `json:"name"`
-	StartLine      int    `json:"start_line"`
-	EndLine        int    `json:"end_line"`
+	Path             string `json:"path"`
+	Language         string `json:"language"`
+	LanguageFamily   string `json:"language_family"`
+	ComparisonDomain string `json:"comparison_domain"`
+	FragmentKind     string `json:"fragment_kind"`
+	Name             string `json:"name"`
+	StartLine        int    `json:"start_line"`
+	EndLine          int    `json:"end_line"`
 }
 
-// Fragment is a normalized function-like syntax tree.
+// Fragment is one normalized source syntax tree.
 type Fragment struct {
 	Location     Location   `json:"location"`
 	StartByte    uint       `json:"-"`

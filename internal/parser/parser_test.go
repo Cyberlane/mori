@@ -115,6 +115,44 @@ export function outer(value: string) {
 	}
 }
 
+func TestFileExtractsOnlyTopLevelSQLQueries(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "queries.sql")
+	content := `-- name: ListVisible :many
+WITH visible AS (
+  SELECT id FROM folders WHERE tenant_id = ?
+)
+SELECT id FROM visible ORDER BY id;
+
+CREATE TABLE ignored (id INTEGER PRIMARY KEY);
+
+UPDATE folders SET name = $1 WHERE id = $2 AND tenant_id = $3;
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.Detect(path)
+	if !ok {
+		t.Fatal("SQL grammar not detected")
+	}
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "queries.sql", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 2 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want two query fragments and no warnings", fragments, warnings)
+	}
+	for _, fragment := range fragments {
+		if fragment.Location.Language != "sql" || fragment.Location.LanguageFamily != "sql" ||
+			fragment.Location.ComparisonDomain != "sql-query" || fragment.Location.FragmentKind != "query" {
+			t.Fatalf("SQL location = %#v", fragment.Location)
+		}
+		if fragment.NestingDepth != 0 || fragment.Parent != nil {
+			t.Fatalf("SQL query was treated as nested: %#v", fragment)
+		}
+	}
+}
+
 func TestFileEnforcesReadLimit(t *testing.T) {
 	t.Parallel()
 

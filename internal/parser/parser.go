@@ -18,7 +18,7 @@ import (
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-// File parses one file and returns every function-like fragment that meets the
+// File parses one file and returns every source fragment that meets the
 // minimum normalized token count.
 func File(
 	ctx context.Context,
@@ -107,14 +107,15 @@ func collect(
 			return err
 		}
 		current := cursor.Node()
-		if file.Language.IsFunction(current.Kind()) && current.HasError() {
+		if file.Language.AcceptsFragmentBoundary(current) && current.HasError() {
 			(*skippedFragments)++
-		} else if file.Language.IsFunction(current.Kind()) {
+		} else if file.Language.AcceptsFragmentBoundary(current) {
 			profile, err := normalize.Build(
 				ctx,
 				current,
 				content,
-				file.Language.IsFunction,
+				file.Language.IsFragmentBoundary,
+				file.Language.ExcludesNestedBoundaries(),
 			)
 			if err != nil {
 				return err
@@ -129,12 +130,14 @@ func collect(
 
 				*fragments = append(*fragments, model.Fragment{
 					Location: model.Location{
-						Path:           file.DisplayPath,
-						Language:       file.Language.ID,
-						LanguageFamily: file.Language.Family,
-						Name:           fragmentName(current, content),
-						StartLine:      int(start.Row) + 1,
-						EndLine:        endLine,
+						Path:             file.DisplayPath,
+						Language:         file.Language.ID,
+						LanguageFamily:   file.Language.Family,
+						ComparisonDomain: file.Language.ComparisonDomain,
+						FragmentKind:     file.Language.FragmentKind,
+						Name:             fragmentName(current, content),
+						StartLine:        int(start.Row) + 1,
+						EndLine:          endLine,
 					},
 					StartByte:    current.StartByte(),
 					EndByte:      current.EndByte(),

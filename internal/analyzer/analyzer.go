@@ -185,7 +185,7 @@ func Analyze(
 	} else if options.CrossLanguageOnly {
 		compareErr = compareAcrossFamilies(ordered, &collector)
 	} else {
-		compareErr = compareAll(ordered, &collector)
+		compareErr = compareCompatibleDomains(ordered, &collector)
 	}
 	if compareErr != nil {
 		return report, compareErr
@@ -193,6 +193,27 @@ func Analyze(
 	collector.finish()
 
 	return report, nil
+}
+
+func compareCompatibleDomains(fragments []model.Fragment, collector *matchCollector) error {
+	byDomain := make(map[string][]model.Fragment)
+	for _, fragment := range fragments {
+		byDomain[fragment.Location.ComparisonDomain] = append(
+			byDomain[fragment.Location.ComparisonDomain],
+			fragment,
+		)
+	}
+	domains := make([]string, 0, len(byDomain))
+	for domain := range byDomain {
+		domains = append(domains, domain)
+	}
+	sort.Strings(domains)
+	for _, domain := range domains {
+		if err := compareAll(byDomain[domain], collector); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func validateOptions(options Options) error {
@@ -235,12 +256,30 @@ func compareAll(fragments []model.Fragment, collector *matchCollector) error {
 }
 
 func compareAcrossFamilies(fragments []model.Fragment, collector *matchCollector) error {
-	byFamily := make(map[string][]model.Fragment)
+	byDomain := make(map[string][]model.Fragment)
 	for _, fragment := range fragments {
-		byFamily[fragment.Location.LanguageFamily] = append(
-			byFamily[fragment.Location.LanguageFamily],
+		byDomain[fragment.Location.ComparisonDomain] = append(
+			byDomain[fragment.Location.ComparisonDomain],
 			fragment,
 		)
+	}
+	domains := make([]string, 0, len(byDomain))
+	for domain := range byDomain {
+		domains = append(domains, domain)
+	}
+	sort.Strings(domains)
+	for _, domain := range domains {
+		if err := compareAcrossDomainFamilies(byDomain[domain], collector); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func compareAcrossDomainFamilies(fragments []model.Fragment, collector *matchCollector) error {
+	byFamily := make(map[string][]model.Fragment)
+	for _, fragment := range fragments {
+		byFamily[fragment.Location.LanguageFamily] = append(byFamily[fragment.Location.LanguageFamily], fragment)
 	}
 	families := make([]string, 0, len(byFamily))
 	for family := range byFamily {

@@ -29,7 +29,8 @@ func Build(
 	ctx context.Context,
 	root *tree_sitter.Node,
 	source []byte,
-	isFunction func(string) bool,
+	isBoundary func(string) bool,
+	excludeNestedBoundaries bool,
 ) (Profile, error) {
 	profile := Profile{Features: make(model.FeatureBag)}
 	if root == nil {
@@ -60,7 +61,8 @@ func Build(
 				current.parentCanonical,
 				current.field,
 				source,
-				isFunction,
+				isBoundary,
+				excludeNestedBoundaries,
 				&profile,
 			)
 			if !descend {
@@ -97,7 +99,8 @@ func enterNode(
 	parentCanonical string,
 	field string,
 	source []byte,
-	isFunction func(string) bool,
+	isBoundary func(string) bool,
+	excludeNestedBoundaries bool,
 	profile *Profile,
 ) (string, bool) {
 	if node == nil || node.IsError() || node.IsMissing() || node.IsExtra() {
@@ -105,7 +108,7 @@ func enterNode(
 	}
 
 	kind := node.Kind()
-	if node.Id() != rootID && isFunction(kind) {
+	if excludeNestedBoundaries && node.Id() != rootID && isBoundary(kind) {
 		addFeature(profile.Features, "node:function:nested", 1)
 		if parentCanonical != "" {
 			addFeature(profile.Features, "edge:"+parentCanonical+">function:nested", 1)
