@@ -1,6 +1,6 @@
 ---
 name: mori-review-similarity
-description: Use Mori to find and assess structurally similar functions in local source code. Apply when adding or reviewing functions, investigating duplication, planning refactors, porting logic across languages, or checking whether changed code resembles an existing implementation.
+description: Use Mori to find and assess structurally similar functions and SQL queries in local source code. Apply when adding or reviewing functions or queries, investigating duplication, planning refactors, porting logic across languages, or checking whether changed code resembles an existing implementation.
 ---
 
 # Review structural similarity with Mori
@@ -99,6 +99,26 @@ go,typescript` when only one family pairing matters. Never combine
 family and do not count as cross-language. Raise `--min-tokens` when trivial
 wrappers or boilerplate dominate the report.
 
+For SQL review, use a separate deliberate scan profile such as:
+
+```sh
+mori scan \
+  --format json \
+  --threshold 0.70 \
+  --min-tokens 12 \
+  --max-groups 250 \
+  --max-occurrences 10 \
+  path/to/queries
+```
+
+SQL queries occupy the `sql-query` comparison domain and are never compared
+with code functions. Do not request `sql` in a language pair with a code
+language. Mori extracts top-level `SELECT`/set-operation, `INSERT`, `UPDATE`,
+and `DELETE` statements; DDL and nested queries are not independent fragments.
+Treat SQLC names as location labels, not fingerprint inputs. Inspect warnings
+for unsupported dialect syntax and verify schemas, permissions, transaction
+context, query plans, and tests before recommending consolidation.
+
 Add repeated `--exclude` flags for project-specific irrelevant paths not
 covered by ignore files. If `truncated` is true, review the retained identity
 diversity first, then increase `--max-groups` to 500 and at most 1,000 when
@@ -109,7 +129,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `4`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `5`. Validate the mandatory `tool` object,
 including the full source revision, modified flag, platform, Go version, and
 normalization version. Inspect:
 
@@ -131,6 +151,8 @@ normalization version. Inspect:
 - `content_pair_id`: use the stable content identity across scans;
 - `profiles[].occurrences`: inspect every retained source occurrence and note
   when occurrence sampling is truncated;
+- `comparison_domain` and `fragment_kind`: require compatible domains and use
+  the kind to describe functions versus queries accurately;
 - `similarity`: report it as structural similarity only; and
 - `shape_summary` and `shared_features`: use them to explain why a group ranked
   highly without treating the summary as behavioral evidence.
@@ -171,8 +193,8 @@ operational failure, not an empty baseline.
 
 Open both reported source ranges. Compare identifiers and literals in their
 real context, then inspect types, control flow, data flow, side effects, error
-handling, callers, tests, and runtime contracts. Classify each relevant result
-as one of:
+handling, callers, schemas, permissions, tests, and runtime contracts. Classify
+each relevant result as one of:
 
 - likely duplication;
 - intentional structural similarity; or

@@ -1,8 +1,8 @@
 # Adding a language
 
 Language support is more than linking a grammar. A complete adapter needs a
-compatible parser, useful fragment boundaries, cross-language normalization,
-fixtures, and a release-platform check.
+compatible parser, useful fragment boundaries, a deliberate comparison domain,
+normalization, fixtures, and a release-platform check.
 
 ## 1. Choose and audit a grammar
 
@@ -22,20 +22,21 @@ binding.
 
 Add a `language.Spec` in `internal/language/registry.go` with:
 
-- stable lowercase ID and review family;
+- stable lowercase ID, review family, comparison domain, and fragment kind;
 - human-readable name;
 - non-overlapping extensions;
 - language constructor; and
-- function-like node kinds that contain executable bodies.
+- a precise fragment-boundary predicate.
 
-Signatures, declarations without bodies, interfaces, and type members are
-usually poor comparison units.
+For code, signatures, declarations without bodies, interfaces, and type
+members are usually poor comparison units. Non-code languages must define
+their own coherent comparison domain; incompatible domains are never compared.
 
 The registry ABI test automatically calls `Parser.SetLanguage` for every spec.
 
 ## 3. Inspect real trees
 
-Use small fixtures for:
+For function-like code, use small fixtures for:
 
 - a free function;
 - a method;
@@ -48,11 +49,14 @@ Use small fixtures for:
 Do not infer node names from another grammar. Tree-sitter grammars are concrete
 syntax trees and differ even when the source constructs look similar.
 Assign dialect grammars such as TypeScript and TSX to the same family when
-maintainers would not reasonably describe them as cross-language results.
+maintainers would not reasonably describe them as cross-language results. For
+other fragment kinds, test top-level versus nested boundaries and explicitly
+document constructs that remain unsupported.
 
 ## 4. Extend normalization deliberately
 
-Add the smallest mappings that improve a demonstrated cross-language pair.
+Add the smallest mappings that improve a demonstrated comparison pair within
+one domain.
 
 For each broadening rule, include:
 
@@ -71,7 +75,7 @@ Run:
 ```sh
 make check
 go run ./cmd/mori languages
-go run ./cmd/mori scan --cross-language-only path/to/fixtures
+go run ./cmd/mori scan --threshold 0.70 path/to/fixtures
 ```
 
 Because grammar bindings use CGO, a local build proves only the current OS and
@@ -83,8 +87,8 @@ A language-support pull request should include:
 
 - upstream grammar and license links;
 - pinned version and ABI evidence;
-- supported extensions and fragment node kinds;
-- positive and negative cross-language fixtures;
+- supported extensions, comparison domain, fragment kind, and boundaries;
+- positive and nearby negative fixtures;
 - score changes at a stated threshold;
 - parse-error behavior; and
 - native platform results.

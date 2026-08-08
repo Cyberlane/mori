@@ -1,4 +1,4 @@
 interface:
   display_name: "Mori Structural Review"
   short_description: "Review structural similarity with Mori"
-  default_prompt: "Use $mori-review-similarity to review this project for structurally similar functions and explain the relevant candidates."
+  default_prompt: "Use $mori-review-similarity to review this project for structurally similar functions or SQL queries and explain the relevant candidates."

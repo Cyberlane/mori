@@ -7,7 +7,7 @@ flowchart LR
     A[Paths and options] --> B[Bounded discovery]
     B --> C[Language registry]
     C --> D[Native Tree-sitter parsers]
-    D --> E[Function fragments]
+    D --> E[Comparison fragments]
     E --> F[Canonical feature bags]
     F --> G[Size-bound pruning]
     G --> H[Weighted Jaccard]
@@ -15,9 +15,9 @@ flowchart LR
 ```
 
 Each stage owns one kind of uncertainty. Discovery decides what can be read,
-grammar adapters decide where functions begin and end, normalization decides
-which syntax distinctions matter, and scoring reports overlap without claiming
-behavioral equivalence.
+grammar adapters decide where comparison fragments begin and end,
+normalization decides which syntax distinctions matter, and scoring reports
+overlap without claiming behavioral equivalence.
 
 ## Package responsibilities
 
@@ -47,10 +47,10 @@ repeatable exclusions and language pairs are additive.
 
 The registry binds:
 
-- a stable language ID and review family;
+- a stable language ID, review family, comparison domain, and fragment kind;
 - display name and extensions;
 - one generated Tree-sitter grammar; and
-- grammar node kinds that represent function-like comparison units.
+- grammar node predicates that identify comparison units.
 
 Grammar versions are pinned as a compatible ABI set. A table-driven test calls
 `Parser.SetLanguage` for every entry; compilation alone does not detect grammar
@@ -65,12 +65,18 @@ Each worker:
 2. creates and closes its own Tree-sitter parser;
 3. installs the selected grammar;
 4. parses with cancellation support and closes the resulting tree;
-5. walks nodes iteratively to find function boundaries; and
+5. walks nodes iteratively to find fragment boundaries; and
 6. fingerprints valid fragments that meet `--min-tokens`.
 
 Tree-sitter can recover from malformed source. A root containing errors creates
 a structured warning with a bounded set of node ranges and the skipped-fragment
-count, while any function node containing an error is skipped.
+count, while any comparison fragment containing an error is skipped.
+
+Code languages extract function-like boundaries. SQL extracts only top-level
+`SELECT`/set-operation, `INSERT`, `UPDATE`, and `DELETE` statements. Exact,
+immediately adjacent SQLC name comments label query locations. DDL is ignored,
+and nested query structure remains inside its top-level query rather than
+becoming another occurrence.
 
 Nested functions are discovered independently. Their bodies are represented by
 a single nested-function feature in the containing function, preventing a
@@ -81,7 +87,8 @@ parent score is visibly an outer-body comparison.
 ### `internal/normalize`
 
 Tree-sitter yields grammar-specific concrete syntax trees, not one universal
-AST. The normalizer creates a shared representation with five feature classes:
+AST. The normalizer creates a shared representation within each comparison
+domain with five feature classes:
 
 1. canonical nodes;
 2. coarse classes;
@@ -94,8 +101,9 @@ syntax is excluded. Unknown nodes remain as namespaced syntax features instead
 of disappearing, preserving evidence while naturally reducing cross-language
 overlap.
 
-Operation families are intentionally small and curated. They are score hints,
-not semantic facts.
+Operation families are intentionally small and curated. SQL additionally maps
+query clauses, relational structure, and data-manipulation operations. All are
+score hints, not semantic facts.
 
 ### `internal/analyzer`
 
@@ -109,10 +117,12 @@ bag \(B\), weighted Jaccard cannot exceed:
 \frac{|A|}{|B|}
 \]
 
-Pairs whose upper bound is below the threshold are never scored. Cross-language
-scans group fragments by review family, so TypeScript and TSX are not treated
-as different languages. Explicit language-pair selectors expand families into
-concrete grammar-ID pairs without enumerating unrelated combinations. The
+Pairs whose upper bound is below the threshold are never scored. Fragments are
+first partitioned by comparison domain, so SQL queries are never compared with
+code functions. Cross-language scans then group fragments by review family, so
+TypeScript and TSX are not treated as different languages. Explicit
+language-pair selectors expand families into concrete grammar-ID pairs within
+one compatible domain without enumerating unrelated combinations. The
 `--max-pairs` cap bounds the remaining scored pairs and fails with an
 actionable error rather than returning an incomplete report.
 
@@ -169,8 +179,9 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-4 reports expose deterministic binary provenance, optional exact focus
-metadata, grouped content-pair identities, fragment fingerprints,
+Schema-5 reports expose deterministic binary provenance, comparison domains,
+fragment kinds, optional exact focus metadata, grouped content-pair identities,
+fragment fingerprints,
 occurrence samples and exact counts, nesting metadata, structured parser
 diagnostics, effective configuration, ignore sources, and separate baseline
 suppression counts for identities and source-location pairs.
@@ -194,7 +205,7 @@ and for every scan without focus, group ordering is:
   rejected;
 - file size and pair counts are bounded;
 - no network request or telemetry exists in the scan path; and
-- JSON output contains paths, function names, scores, and normalized features,
+- JSON output contains paths, fragment names, scores, and normalized features,
   but never source bodies.
 
 Filesystem metadata can change between checks. 森 verifies regular-file type and
