@@ -36,5 +36,7 @@ github.com/tree-sitter/tree-sitter-rust v0.24.2 h1:NL4nF67ib21RMzzfvkmXlVwe45vvh
 github.com/tree-sitter/tree-sitter-rust v0.24.2/go.mod h1:hfeGWic9BAfgTrc7Xf6FaOAguCFJRo3RBbs7QJ6D7MI=
 github.com/tree-sitter/tree-sitter-typescript v0.23.2 h1:/Odvphn18PniVixb9e97X0DbNVsU6Qocv9mfkyzdXwU=
 github.com/tree-sitter/tree-sitter-typescript v0.23.2/go.mod h1:zjzMXT/Ulffel2xfOcAkQQkiAkmgnbtPGlFQw/5X4xA=
+github.com/wippyai/tree-sitter-sql v0.0.4 h1:0hJyjkV6/lhoGA5FJAaf96od2xyo+OJINSEMx/IYqLQ=
+github.com/wippyai/tree-sitter-sql v0.0.4/go.mod h1:QN9CfIO55fwQNVNk1p/7pjxrLk7iKxrQs42Zh6lrr84=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
