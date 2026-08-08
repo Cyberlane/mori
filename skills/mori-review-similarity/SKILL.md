@@ -115,9 +115,11 @@ SQL queries occupy the `sql-query` comparison domain and are never compared
 with code functions. Do not request `sql` in a language pair with a code
 language. Mori extracts top-level `SELECT`/set-operation, `INSERT`, `UPDATE`,
 and `DELETE` statements; DDL and nested queries are not independent fragments.
-Treat SQLC names as location labels, not fingerprint inputs. Inspect warnings
-for unsupported dialect syntax and verify schemas, permissions, transaction
-context, query plans, and tests before recommending consolidation.
+Treat SQLC names as location labels, not fingerprint inputs. Mori supports
+common `?` and SQLC `LIMIT`/`OFFSET` parameters plus SQLite `ON CONFLICT`
+column targets. Inspect warnings for other unsupported dialect syntax and
+verify schemas, permissions, transaction context, query plans, and tests before
+recommending consolidation.
 
 Add repeated `--exclude` flags for project-specific irrelevant paths not
 covered by ignore files. If `truncated` is true, review the retained identity

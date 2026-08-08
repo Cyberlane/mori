@@ -14,7 +14,7 @@ import (
 // Version identifies the normalization contract used to build feature bags.
 // Bump it whenever the feature vocabulary, weights, canonical mappings, or
 // semantic-hint list changes.
-const Version = 2
+const Version = 3
 
 // Profile is a normalized, language-neutral view of one syntax fragment.
 // It is not the stable content identity exposed in reports.
@@ -574,6 +574,9 @@ func shouldSkipSubtree(kind string) bool {
 func sqlLiteralKind(value string) string {
 	value = strings.TrimSpace(value)
 	lower := strings.ToLower(value)
+	if value == "?" || isSQLCParameter(lower) {
+		return "parameter"
+	}
 	switch lower {
 	case "true", "false":
 		return "literal:boolean"
@@ -593,6 +596,16 @@ func sqlLiteralKind(value string) string {
 		return "literal:number"
 	}
 	return "literal:scalar"
+}
+
+func isSQLCParameter(value string) bool {
+	for _, prefix := range []string{"sqlc.arg(", "sqlc.narg("} {
+		if strings.HasPrefix(value, prefix) && strings.HasSuffix(value, ")") &&
+			strings.TrimSpace(value[len(prefix):len(value)-1]) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func addFeature(bag model.FeatureBag, feature string, count int) {

@@ -277,6 +277,27 @@ func TestSQLSemanticHintsHaveNearbyNegatives(t *testing.T) {
 	}
 }
 
+func TestSQLLimitParametersOutrankLiteralPagination(t *testing.T) {
+	t.Parallel()
+
+	fragments := parseSQL(t, `SELECT id FROM items LIMIT ? OFFSET ?;
+SELECT item_id FROM records LIMIT sqlc.arg(limit) OFFSET sqlc.narg(offset);
+SELECT item_id FROM records LIMIT 20 OFFSET 40;
+`)
+	if len(fragments) != 3 {
+		t.Fatalf("fragments = %d, want 3", len(fragments))
+	}
+	parameterScore, _, _ := similarity.WeightedJaccard(fragments[0].Features, fragments[1].Features)
+	literalScore, _, _ := similarity.WeightedJaccard(fragments[0].Features, fragments[2].Features)
+	if parameterScore <= literalScore {
+		t.Fatalf("parameter score %.3f did not outrank literal pagination %.3f", parameterScore, literalScore)
+	}
+	if fragments[0].Features["node:parameter"] == 0 || fragments[1].Features["node:parameter"] == 0 ||
+		fragments[2].Features["node:parameter"] != 0 {
+		t.Fatalf("parameter features = %#v / %#v / %#v", fragments[0].Features, fragments[1].Features, fragments[2].Features)
+	}
+}
+
 func TestSQLKeywordsAndValuesDoNotLeakIntoFeatures(t *testing.T) {
 	t.Parallel()
 

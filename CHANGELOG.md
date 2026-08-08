@@ -7,6 +7,25 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-09
+
+### Added
+
+- Byte-preserving parser support for SQLC and SQLite `LIMIT`/`OFFSET`
+  parameters and SQLite `ON CONFLICT` column targets.
+
+### Changed
+
+- Normalization version 3 classifies recovered pagination placeholders as
+  parameters while preserving schema version 5 and existing code features;
+  existing baselines must be reviewed and regenerated.
+
+### Fixed
+
+- Recognized raw ampersands in JSX text no longer invalidate otherwise valid
+  JavaScript or TSX function fragments; malformed JSX expressions still fail
+  closed.
+
 ## [0.6.1] - 2026-08-09
 
 ### Fixed

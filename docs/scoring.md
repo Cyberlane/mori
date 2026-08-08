@@ -155,14 +155,14 @@ The top-level shape is:
   "schema_version": 5,
   "tool": {
     "name": "mori",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "revision": "<full source revision>",
     "source_date": "<UTC commit time>",
     "modified": false,
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 2
+    "normalization_version": 3
   },
   "threshold": 0.7,
   "files": 4,

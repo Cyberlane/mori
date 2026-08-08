@@ -83,6 +83,53 @@ func TestFileWarnsAndSkipsInvalidFragment(t *testing.T) {
 	}
 }
 
+func TestFileRepairsKnownJSXRawAmpersandGrammarGap(t *testing.T) {
+	t.Parallel()
+
+	for _, extension := range []string{".jsx", ".tsx"} {
+		extension := extension
+		t.Run(extension, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "component"+extension)
+			content := `export function Header() {
+  return <h1>Roles & permissions</h1>;
+}
+`
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatalf("WriteFile: %v", err)
+			}
+			spec, _ := language.Detect(path)
+			fragments, warnings := File(context.Background(), source.File{
+				Path: path, DisplayPath: "component" + extension, Language: spec,
+			}, 1)
+			if len(warnings) != 0 || len(fragments) != 1 {
+				t.Fatalf("fragments/warnings = %#v/%#v, want one/none", fragments, warnings)
+			}
+		})
+	}
+}
+
+func TestFileDoesNotRepairInvalidJSXExpression(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "broken.tsx")
+	content := `export function Header(value: number) {
+  return <h1>{value & }</h1>;
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "broken.tsx", Language: spec,
+	}, 1)
+	if len(fragments) != 0 || len(warnings) != 1 || warnings[0].Kind != "parse" ||
+		warnings[0].SkippedFragments != 1 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want skipped invalid function", fragments, warnings)
+	}
+}
+
 func TestFileAnnotatesNestedFunctionBoundaries(t *testing.T) {
 	t.Parallel()
 
@@ -202,6 +249,59 @@ func TestSQLParseErrorDoesNotHideSeparateValidQuery(t *testing.T) {
 	if len(warnings) != 1 || warnings[0].Kind != "parse" || warnings[0].TotalDiagnostics == 0 ||
 		warnings[0].SkippedFragments == 0 {
 		t.Fatalf("warnings = %#v, want visible skipped invalid query", warnings)
+	}
+}
+
+func TestFileRepairsSQLiteAndSQLCQueryForms(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "sqlite.sql")
+	content := `-- name: PageItems :many
+SELECT * FROM items LIMIT ? OFFSET ?;
+-- name: SearchItems :many
+SELECT * FROM items LIMIT sqlc.arg(limit) OFFSET sqlc.narg('offset');
+-- name: UpsertItem :exec
+INSERT INTO items (id, name) VALUES (?, ?)
+ON CONFLICT (id) DO UPDATE SET name = excluded.name;
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "sqlite.sql", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 3 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want three/none", fragments, warnings)
+	}
+	for index, name := range []string{"PageItems", "SearchItems", "UpsertItem"} {
+		if fragments[index].Location.Name != name {
+			t.Errorf("fragment %d name = %q, want %q", index, fragments[index].Location.Name, name)
+		}
+	}
+	if fragments[0].Features["node:query:limit"] == 0 ||
+		fragments[0].Features["node:query:offset"] == 0 ||
+		fragments[2].Features["node:query:conflict"] == 0 {
+		t.Fatalf("repaired structural features = %#v / %#v", fragments[0].Features, fragments[2].Features)
+	}
+}
+
+func TestFileDoesNotRepairMalformedSQLiteForms(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "broken.sql")
+	content := `SELECT * FROM items LIMIT ? OFFSET;
+INSERT INTO items (id) VALUES (?) ON CONFLICT (id,) DO NOTHING;
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	_, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "broken.sql", Language: spec,
+	}, 1)
+	if len(warnings) != 1 || warnings[0].Kind != "parse" || warnings[0].TotalDiagnostics == 0 {
+		t.Fatalf("warnings = %#v, want visible malformed syntax", warnings)
 	}
 }
 
