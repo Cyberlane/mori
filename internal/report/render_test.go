@@ -85,6 +85,30 @@ func TestTextDisclosesSuppressedGroups(t *testing.T) {
 	}
 }
 
+func TestTextAnnotatesFocusedGroups(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	if err := Text(&output, model.Report{
+		SchemaVersion:           model.SchemaVersion,
+		Threshold:               0.7,
+		TotalFocusedMatchGroups: 1,
+		Configuration: model.EffectiveConfig{Focus: &model.FocusConfig{
+			Mode: "explicit", DiscoveredFocusFiles: 1,
+		}},
+		Groups: []model.MatchGroup{{
+			ID: "group", Similarity: 1, Focused: true, FocusedCount: 2,
+		}},
+	}); err != nil {
+		t.Fatalf("Text: %v", err)
+	}
+	for _, expected := range []string{"1 focused group(s); 1 focused file(s)", "focused (2 occurrence(s))"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("output missing %q:\n%s", expected, output.String())
+		}
+	}
+}
+
 func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
 	t.Parallel()
 

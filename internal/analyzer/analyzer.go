@@ -26,6 +26,8 @@ type Options struct {
 	Workers           int
 	CrossLanguageOnly bool
 	LanguagePairs     []LanguagePair
+	FocusPaths        map[string]struct{}
+	FocusActive       bool
 	Suppress          func(id string, left model.Location, right model.Location) bool
 }
 
@@ -61,6 +63,7 @@ type groupCandidate struct {
 	locationPairs int
 	profiles      map[string]*profileAggregate
 	pathPairs     map[string]model.LocationPair
+	focused       map[string]struct{}
 }
 
 type matchCollector struct {
@@ -370,6 +373,7 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 			right:      right,
 			profiles:   make(map[string]*profileAggregate, 2),
 			pathPairs:  make(map[string]model.LocationPair),
+			focused:    make(map[string]struct{}),
 		}
 		collector.groups[id] = group
 	}
@@ -381,6 +385,8 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 	}
 	collector.addProfileOccurrence(group, left)
 	collector.addProfileOccurrence(group, right)
+	group.addFocusedOccurrence(left.Location, collector.options.FocusPaths)
+	group.addFocusedOccurrence(right.Location, collector.options.FocusPaths)
 	return nil
 }
 
@@ -390,9 +396,17 @@ func (collector *matchCollector) finish() {
 		candidates = append(candidates, candidate)
 	}
 	sort.Slice(candidates, func(i, j int) bool {
+		if collector.options.FocusActive && (len(candidates[i].focused) > 0) != (len(candidates[j].focused) > 0) {
+			return len(candidates[i].focused) > 0
+		}
 		return groupBetter(candidates[i], candidates[j])
 	})
 	collector.report.TotalMatchGroups = len(candidates)
+	for _, candidate := range candidates {
+		if len(candidate.focused) > 0 {
+			collector.report.TotalFocusedMatchGroups++
+		}
+	}
 	collector.report.SuppressedMatchGroups = len(collector.suppressedGroups)
 	if collector.options.MaxGroups > 0 && len(candidates) > collector.options.MaxGroups {
 		candidates = candidates[:collector.options.MaxGroups]
@@ -405,11 +419,19 @@ func (collector *matchCollector) finish() {
 			ID:             candidate.id,
 			Similarity:     candidate.similarity,
 			LocationPairs:  candidate.locationPairs,
+			Focused:        len(candidate.focused) > 0,
+			FocusedCount:   len(candidate.focused),
 			Profiles:       publicProfiles(candidate.profiles, collector.options.MaxOccurrences),
 			ShapeSummary:   similarity.Shape(candidate.left.Features, candidate.right.Features),
 			SharedFeatures: similarity.Shared(candidate.left.Features, candidate.right.Features, 8),
 			PathPairs:      publicPathPairs(candidate.pathPairs),
 		})
+	}
+}
+
+func (group *groupCandidate) addFocusedOccurrence(location model.Location, paths map[string]struct{}) {
+	if _, focused := paths[location.Path]; focused {
+		group.focused[locationKey(location)] = struct{}{}
 	}
 }
 

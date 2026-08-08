@@ -70,26 +70,28 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 }
 
 type scanOptions struct {
-	excludes          stringList
-	languagePairs     stringList
-	threshold         float64
-	minTokens         int
-	maxGroups         int
-	maxOccurrences    int
-	maxPairs          int
-	maxFileBytes      int64
-	workers           int
-	format            string
-	crossLanguageOnly bool
-	failOnMatch       bool
-	baselinePath      string
-	baselineScope     string
-	respectIgnore     bool
-	noIgnore          bool
-	requestedConfig   string
-	configPath        string
-	noConfig          bool
-	check             bool
+	excludes           stringList
+	languagePairs      stringList
+	focusPaths         stringList
+	threshold          float64
+	minTokens          int
+	maxGroups          int
+	maxOccurrences     int
+	maxPairs           int
+	maxFileBytes       int64
+	workers            int
+	format             string
+	crossLanguageOnly  bool
+	failOnMatch        bool
+	failOnFocusedMatch bool
+	baselinePath       string
+	baselineScope      string
+	respectIgnore      bool
+	noIgnore           bool
+	requestedConfig    string
+	configPath         string
+	noConfig           bool
+	check              bool
 }
 
 func defaultScanOptions() scanOptions {
@@ -128,11 +130,18 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 		"language-pair",
 		"compare one language ID or family pair, such as go,typescript; repeatable",
 	)
+	flags.Var(&options.focusPaths, "focus-path", "prioritize groups containing this exact path; repeatable")
 	flags.BoolVar(
 		&options.failOnMatch,
 		"fail-on-match",
 		options.failOnMatch,
 		"exit with status 3 when one or more match groups are found",
+	)
+	flags.BoolVar(
+		&options.failOnFocusedMatch,
+		"fail-on-focused-match",
+		options.failOnFocusedMatch,
+		"exit with status 3 when one or more focused match groups are found",
 	)
 	flags.StringVar(&options.baselinePath, "baseline", options.baselinePath, "baseline file to load or write")
 	flags.StringVar(
@@ -333,6 +342,12 @@ func validateScanOptions(options scanOptions) error {
 	if options.crossLanguageOnly && len(options.languagePairs) > 0 {
 		return errors.New("--cross-language-only and --language-pair cannot be used together")
 	}
+	if options.failOnMatch && options.failOnFocusedMatch {
+		return errors.New("--fail-on-match and --fail-on-focused-match cannot be used together")
+	}
+	if options.failOnFocusedMatch && len(options.focusPaths) == 0 {
+		return errors.New("--fail-on-focused-match requires --focus-path or --changed-since")
+	}
 	if _, err := expandLanguagePairs(options.languagePairs); err != nil {
 		return err
 	}
@@ -370,6 +385,9 @@ func runScan(ctx context.Context, args []string, stdout io.Writer, stderr io.Wri
 	if options.failOnMatch && result.TotalMatchGroups > 0 {
 		return exitFindings
 	}
+	if options.failOnFocusedMatch && result.TotalFocusedMatchGroups > 0 {
+		return exitFindings
+	}
 	return exitSuccess
 }
 
@@ -396,6 +414,9 @@ func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, std
 	options, paths, code, ok := parseScanOptions("baseline update", args, stderr, false)
 	if !ok {
 		return code
+	}
+	if len(options.focusPaths) > 0 || options.failOnFocusedMatch {
+		return usageError(stderr, "focus options cannot be used with baseline update")
 	}
 	if options.baselinePath == "" {
 		return usageError(stderr, "--baseline is required for baseline update")
@@ -430,6 +451,9 @@ func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stde
 	options, paths, code, ok := parseScanOptions("baseline prune", args, stderr, true)
 	if !ok {
 		return code
+	}
+	if len(options.focusPaths) > 0 || options.failOnFocusedMatch {
+		return usageError(stderr, "focus options cannot be used with baseline prune")
 	}
 	if options.baselinePath == "" {
 		return usageError(stderr, "--baseline is required for baseline prune")
@@ -515,6 +539,11 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
 	}
+	focus, focusSet, focusWarnings, err := resolveExplicitFocus(options.focusPaths, discovered.Files)
+	if err != nil {
+		return model.Report{}, fmt.Errorf("resolve focus: %w", err)
+	}
+	discovered.Warnings = append(discovered.Warnings, focusWarnings...)
 	pairs, err := expandLanguagePairs(options.languagePairs)
 	if err != nil {
 		return model.Report{}, err
@@ -528,6 +557,8 @@ func executeScan(
 		Workers:           options.workers,
 		CrossLanguageOnly: options.crossLanguageOnly,
 		LanguagePairs:     pairs,
+		FocusPaths:        focusSet,
+		FocusActive:       focus != nil,
 		Suppress:          suppress,
 	})
 	if err != nil {
@@ -546,12 +577,65 @@ func executeScan(
 		CrossLanguageOnly: options.crossLanguageOnly,
 		LanguagePairs:     append([]string{}, options.languagePairs...),
 		BaselinePath:      displayOptionalPath(options.baselinePath),
+		Focus:             focus,
 	}
 	result.Tool = buildinfo.Current()
 	result.Tool.NormalizationVersion = normalize.Version
 	sort.Strings(result.Configuration.Excludes)
 	sort.Strings(result.Configuration.LanguagePairs)
 	return result, nil
+}
+
+func resolveExplicitFocus(values []string, files []source.File) (*model.FocusConfig, map[string]struct{}, []model.Warning, error) {
+	if len(values) == 0 {
+		return nil, nil, nil, nil
+	}
+	explicit := make([]string, 0, len(values))
+	requested := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		absolute, err := filepath.Abs(value)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		clean := filepath.Clean(absolute)
+		requested[clean] = struct{}{}
+		explicit = append(explicit, displayCLIPath(clean))
+	}
+	sort.Strings(explicit)
+	explicit = compactStrings(explicit)
+	matched := make(map[string]struct{})
+	for _, file := range files {
+		if _, ok := requested[filepath.Clean(file.Path)]; ok {
+			matched[file.DisplayPath] = struct{}{}
+		}
+	}
+	warnings := make([]model.Warning, 0)
+	if len(matched) < len(requested) {
+		warnings = append(warnings, model.Warning{
+			Kind:    "focus",
+			Message: fmt.Sprintf("%d focused path(s) were excluded, unsupported, or not discovered", len(requested)-len(matched)),
+		})
+	}
+	return &model.FocusConfig{
+		Mode:                 "explicit",
+		ExplicitPaths:        explicit,
+		ChangedPaths:         make([]string, 0),
+		DeletedPaths:         make([]string, 0),
+		DiscoveredFocusFiles: len(matched),
+	}, matched, warnings, nil
+}
+
+func compactStrings(values []string) []string {
+	if len(values) < 2 {
+		return values
+	}
+	result := values[:1]
+	for _, value := range values[1:] {
+		if value != result[len(result)-1] {
+			result = append(result, value)
+		}
+	}
+	return result
 }
 
 func expandLanguagePairs(values []string) ([]analyzer.LanguagePair, error) {
