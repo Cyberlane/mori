@@ -47,6 +47,9 @@ func TestReviewSimilarityPackage(t *testing.T) {
 		"name: " + ReviewSimilarityName,
 		"schema_version",
 		"never as proof of equivalent behavior",
+		"do not reject a usable binary",
+		"Never combine",
+		"Before baselining a noisy repository",
 		"Do not refactor, delete, or consolidate code solely because Mori reported a",
 	} {
 		if !strings.Contains(text, expected) {
