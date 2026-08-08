@@ -96,29 +96,40 @@ threshold.
 `candidate_pairs` counts pairs that passed size pruning and language filtering
 and were actually scored. `--max-pairs` is checked before each score.
 
-`total_matches` counts every pair at or above the threshold. Unless
-`--max-matches 0` is used, 森 retains only the requested best matches during
-scoring and sets `truncated` when the report is shorter than that exact total.
+`total_location_pairs` counts every source-location pair at or above the
+threshold. Pairs with the same stable content identity are aggregated into one
+group; `total_match_groups` counts those identities. Unless `--max-groups 0`
+is used, 森 retains only the requested best groups and sets `truncated` when
+the report omits lower-ranked identities. `--max-occurrences` separately bounds
+the displayed locations for each fingerprint while retaining the exact count.
+
+Groups are ordered by descending similarity, then descending minimum feature
+count, descending represented location-pair count, and stable identity. The
+second key favors more substantial shared evidence among equal scores; it is
+not an empirically validated actionability score.
 
 ## Explanations
 
-Reports include up to eight shared features. They are ordered by:
+Reports first include a non-semantic shared-shape summary of canonical calls,
+branches, loops, switches, returns, and bindings. They then include up to eight
+raw shared features, ordered by:
 
 1. descending shared count; and
 2. ascending feature name.
 
-An explanation helps answer “why did this pair score highly?” It is not a
-complete decomposition of the numerator or a proof that the pair should be
-refactored.
+An explanation helps answer “why did this group score highly?” It is not a
+complete decomposition of the numerator or a proof that the occurrences
+should be refactored. Domain descriptions still require source inspection.
 
 Every fragment report includes a stable content fingerprint derived from its
 normalized feature bag. Feature names are sorted before SHA-256 hashing and
 the result is truncated to 16 hexadecimal characters. Formatting, comments,
 literal values, most identifiers, line numbers, and file position do not
-affect this identity. A match ID joins its two fragment fingerprints in
-lexical order, so pair order does not affect the ID. This is useful for
-review workflows, but it also means an identical accepted fragment in a new
-location has the same identity.
+affect this identity. A content-pair ID joins its two fragment fingerprints in
+lexical order, so pair order does not affect the ID. Every qualifying location
+pair with that identity belongs to one report group. This is useful for review
+workflows, but it also means an identical accepted fragment in a new location
+has the same content identity.
 
 ## JSON schema
 
@@ -126,24 +137,40 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "threshold": 0.7,
   "files": 4,
   "fragments": 4,
   "candidate_pairs": 6,
-  "total_matches": 0,
-  "suppressed": 0,
+  "total_location_pairs": 0,
+  "total_match_groups": 0,
+  "suppressed_location_pairs": 0,
+  "suppressed_match_groups": 0,
   "truncated": false,
-  "matches": [],
-  "warnings": []
+  "groups": [],
+  "warnings": [],
+  "configuration": {
+    "ignore_files": [],
+    "respect_ignore": true,
+    "excludes": [],
+    "min_tokens": 12,
+    "max_groups": 100,
+    "max_occurrences": 20,
+    "max_pairs": 5000000,
+    "max_file_bytes": 2097152,
+    "cross_language_only": false,
+    "language_pairs": []
+  }
 }
 ```
 
-Match objects also include `id`, and each `left` and `right` fragment includes
-`fingerprint`. `suppressed` counts accepted candidates removed by an explicit
-baseline; it is not a count of compared pairs. The report schema version
-changes when these machine-readable fields are introduced; consumers should
-reject or explicitly handle unknown schema versions.
+Group objects include `content_pair_id`, `location_pairs`, one or two content
+profiles, occurrence counts and locations, a shape summary, and raw shared
+features. Fragment occurrences expose language family, nesting depth, parent
+identity, and the number of excluded nested functions. Warnings can include
+bounded parser node ranges and skipped-fragment counts. Suppression fields
+separate affected source pairs from content identities. Consumers should reject
+or explicitly handle unknown schema versions.
 
 Paths are relative to the current working directory when possible. Lines are
 one-based and inclusive. A future breaking shape change must increment
@@ -163,8 +190,15 @@ Create or replace a baseline with an untruncated scan:
 mori baseline update --baseline mori-baseline.json .
 ```
 
-The file records its schema, Mori version, normalization version, threshold,
-stable match IDs, and human-readable locations. The normalization version
+Baseline schema 2 records an explicit `identity_scope`. The default `content`
+scope accepts a normalized content-pair identity in every location, including
+future identical copies. `baseline update --baseline-scope path` records each
+reviewed source-path pair instead, so a copy in a new file reappears. Schema-1
+baselines load with their original content scope and are written as schema 2 on
+the next update or prune.
+
+The file also records the Mori version, normalization version, threshold,
+stable identities, and human-readable locations. The normalization version
 must match the running binary; after a normalization change, run `baseline
 update` deliberately and review the resulting diff.
 

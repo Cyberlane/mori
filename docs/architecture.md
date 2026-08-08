@@ -26,6 +26,7 @@ behavioral equivalence.
 - Expands explicit files and directories.
 - Detects supported extensions through the language registry.
 - Skips dependency, VCS, and build-output directories.
+- Loads nested `.gitignore` and `.moriignore` rules for directory scans.
 - Applies repeatable doublestar exclude globs.
 - Rejects discovered symlinks and symlinked components below trusted scan
   roots.
@@ -35,11 +36,18 @@ behavioral equivalence.
 
 Paths are sorted before parsing so worker scheduling cannot alter output.
 
+### `internal/config`
+
+Loads a strict, size-bounded `.mori.json` discovered upward from the current
+working directory or selected with `--config`. Unknown fields and non-regular
+files fail closed. Command-line flags override configured scalar values, while
+repeatable exclusions and language pairs are additive.
+
 ### `internal/language`
 
 The registry binds:
 
-- a stable language ID;
+- a stable language ID and review family;
 - display name and extensions;
 - one generated Tree-sitter grammar; and
 - grammar node kinds that represent function-like comparison units.
@@ -61,11 +69,14 @@ Each worker:
 6. fingerprints valid fragments that meet `--min-tokens`.
 
 Tree-sitter can recover from malformed source. A root containing errors creates
-a warning, while any function node containing an error is skipped.
+a structured warning with a bounded set of node ranges and the skipped-fragment
+count, while any function node containing an error is skipped.
 
 Nested functions are discovered independently. Their bodies are represented by
 a single nested-function feature in the containing function, preventing a
 large outer function from absorbing every feature in an inner callback.
+Reports expose nesting depth, parent identity, and nested-function count so a
+parent score is visibly an outer-body comparison.
 
 ### `internal/normalize`
 
@@ -99,28 +110,39 @@ bag \(B\), weighted Jaccard cannot exceed:
 \]
 
 Pairs whose upper bound is below the threshold are never scored. Cross-language
-scans group fragments by language so same-language Cartesian products are not
-enumerated. The `--max-pairs` cap bounds the remaining scored pairs and fails
-with an actionable error rather than returning an incomplete report.
+scans group fragments by review family, so TypeScript and TSX are not treated
+as different languages. Explicit language-pair selectors expand families into
+concrete grammar-ID pairs without enumerating unrelated combinations. The
+`--max-pairs` cap bounds the remaining scored pairs and fails with an
+actionable error rather than returning an incomplete report.
 
-By default only the best 100 candidates are retained in a bounded heap while
-the exact total match count is maintained. Shared-feature explanations are
-computed after selection. `--max-matches 0` explicitly opts into unbounded
-result retention.
+Qualifying location pairs are aggregated by their stable content-pair ID. The
+default report retains the best 100 distinct groups and at most 20 locations
+per fingerprint. Exact group and location-pair totals are maintained. Group
+aggregation remains bounded by the candidate-pair safety limit;
+`--max-groups 0` and `--max-occurrences 0` remove their respective output
+limits, while `--max-pairs 0` removes the scored-pair safety limit.
 
-When a baseline is supplied, accepted match IDs are filtered after scoring but
-before total-match accounting and bounded retention. This keeps suppressed
-candidates from consuming the report budget and makes `--fail-on-match` a
-usable regression gate. Baseline creation and pruning force unbounded
-retention so the review file cannot omit candidates past the display limit.
+Groups sort by score, shared evidence mass, represented location-pair count,
+and stable identity. Shared shape and raw feature explanations are computed
+after aggregation.
+
+When a baseline is supplied, accepted identities are filtered after scoring but
+before group and location-pair accounting. This keeps suppressed candidates
+from consuming the report budget and makes `--fail-on-match` a usable
+regression gate. Baseline creation and pruning force complete group and
+occurrence retention so the review file cannot omit identities past display
+limits.
 
 ### `internal/baseline`
 
-Baseline files are versioned JSON review artifacts. They store stable match
-IDs, the normalization version, the writing Mori version, the scan threshold,
-and locations for human context. Loading fails closed on a missing file,
-unsupported schema, or normalization-version mismatch. Writes are sorted and
-atomic; pruning removes stale entries without accepting newly discovered ones.
+Baseline files are versioned JSON review artifacts. Schema 2 stores an explicit
+`content` or `path` identity scope, stable content-pair IDs, the normalization
+version, the writing Mori version, the scan threshold, and locations for human
+context. Schema 1 remains readable as content scope. Loading fails closed on a
+missing file, unsupported schema, or normalization-version mismatch. Writes
+are sorted and atomic; pruning removes stale entries without accepting newly
+discovered ones.
 
 ### `internal/similarity`
 
@@ -133,14 +155,17 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Reports expose stable match IDs, fragment fingerprints, and the number of
-baseline-suppressed candidates.
+Schema-3 reports expose grouped content-pair identities, fragment fingerprints,
+occurrence samples and exact counts, nesting metadata, structured parser
+diagnostics, effective configuration, ignore sources, and separate baseline
+suppression counts for identities and source-location pairs.
 
-Match ordering is:
+Group ordering is:
 
 1. descending score;
-2. left source location; and
-3. right source location.
+2. descending minimum feature count;
+3. descending represented location-pair count; and
+4. stable content-pair identity.
 
 ## Trust boundaries
 

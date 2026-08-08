@@ -12,18 +12,20 @@ Never describe a score as proof of semantic or behavioral equivalence.
 
 - `cmd/mori`: process entrypoint.
 - `internal/cli`: commands, validation, output selection, and exit codes.
+- `internal/config`: strict `.mori.json` discovery and decoding.
 - `internal/agentskill`: safe installation of Mori's embedded Agent Skill.
 - `internal/diagnostic`: path-safe errors for public reports.
-- `internal/source`: bounded, deterministic source discovery.
-- `internal/language`: grammar registry and function boundaries.
-- `internal/parser`: Tree-sitter lifecycle and fragment extraction.
+- `internal/source`: bounded, deterministic, ignore-aware source discovery.
+- `internal/language`: grammar IDs, review families, and function boundaries.
+- `internal/parser`: Tree-sitter lifecycle, diagnostics, and fragment extraction.
 - `internal/normalize`: shared canonical nodes, edges, roles, and operation hints.
 - `internal/fingerprint`: stable content identities for normalized fragments and
   match pairs.
 - `internal/similarity`: weighted Jaccard and explanations.
-- `internal/analyzer`: concurrent parsing, size pruning, pair limits, and sorting.
-- `internal/baseline`: versioned accepted-candidate files and stale-entry pruning.
-- `internal/report`: stable text and schema-versioned JSON.
+- `internal/analyzer`: concurrent parsing, size pruning, pair limits, content
+  grouping, and sorting.
+- `internal/baseline`: scoped accepted-identity files and stale-entry pruning.
+- `internal/report`: grouped text and schema-versioned JSON.
 - `internal/release`: deterministic native archive assembly.
 - `skills/mori-review-similarity`: canonical portable Agent Skill source.
 
