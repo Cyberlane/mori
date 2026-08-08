@@ -7,6 +7,30 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-08
+
+### Added
+
+- Strict `.mori.json` project configuration with reproducible effective-option
+  metadata.
+- Nested `.gitignore` and `.moriignore` discovery with explicit-path behavior
+  and `--no-ignore`/`--no-config` controls.
+- Language-family-aware cross-language scans and explicit repeatable
+  `--language-pair` filters.
+- Content- and path-scoped baseline schema 2 with schema-1 content-scope
+  compatibility.
+- Structured parse diagnostics, nested-fragment metadata, and concise shared
+  shape summaries.
+
+### Changed
+
+- Machine-readable reports now use schema version 3 and group qualifying
+  source-location pairs by stable content-pair identity.
+- Equal-score groups now prefer larger shared evidence and wider occurrence
+  coverage before stable identity ordering.
+- The bundled review skill now uses bounded progressive group retrieval and
+  explains configuration, baseline scope, parser, and nested-function limits.
+
 ## [0.3.0] - 2026-08-08
 
 ### Added
@@ -51,7 +75,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Cyberlane/mori/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Cyberlane/mori/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Cyberlane/mori/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Cyberlane/mori/compare/v0.1.0...v0.2.0

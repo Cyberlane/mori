@@ -22,7 +22,7 @@ binding.
 
 Add a `language.Spec` in `internal/language/registry.go` with:
 
-- stable lowercase ID;
+- stable lowercase ID and review family;
 - human-readable name;
 - non-overlapping extensions;
 - language constructor; and
@@ -47,6 +47,8 @@ Use small fixtures for:
 
 Do not infer node names from another grammar. Tree-sitter grammars are concrete
 syntax trees and differ even when the source constructs look similar.
+Assign dialect grammars such as TypeScript and TSX to the same family when
+maintainers would not reasonably describe them as cross-language results.
 
 ## 4. Extend normalization deliberately
 

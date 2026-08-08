@@ -84,3 +84,15 @@ func TestAllReturnsIndependentSpecifications(t *testing.T) {
 		t.Fatal("mutating All result changed the registry")
 	}
 }
+
+func TestTypeScriptSelectorsIncludeTSXFamily(t *testing.T) {
+	t.Parallel()
+
+	resolved, ok := ResolveSelector("typescript")
+	if !ok || len(resolved) != 2 || resolved[0] != "tsx" || resolved[1] != "typescript" {
+		t.Fatalf("ResolveSelector(typescript) = %#v/%t", resolved, ok)
+	}
+	if _, ok := ResolveSelector("unknown"); ok {
+		t.Fatal("unknown selector resolved successfully")
+	}
+}

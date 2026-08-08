@@ -76,6 +76,43 @@ func TestFileWarnsAndSkipsInvalidFragment(t *testing.T) {
 	if len(warnings) != 1 {
 		t.Fatalf("warnings = %#v, want one parse warning", warnings)
 	}
+	if warnings[0].Kind != "parse" || warnings[0].Language != "python" ||
+		warnings[0].TotalDiagnostics == 0 || len(warnings[0].Diagnostics) == 0 ||
+		warnings[0].Diagnostics[0].StartLine < 1 {
+		t.Fatalf("parse warning is not actionable: %#v", warnings[0])
+	}
+}
+
+func TestFileAnnotatesNestedFunctionBoundaries(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "nested.ts")
+	content := `
+export function outer(value: string) {
+  const inner = () => value.trim();
+  return inner();
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.Detect(path)
+	if !ok {
+		t.Fatal("TypeScript grammar not detected")
+	}
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "nested.ts", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 2 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want two/none", fragments, warnings)
+	}
+	if fragments[0].NestedCount != 1 {
+		t.Fatalf("outer nested count = %d, want 1", fragments[0].NestedCount)
+	}
+	if fragments[1].NestingDepth != 1 || fragments[1].Parent == nil ||
+		fragments[1].ParentID != fragments[0].Fingerprint {
+		t.Fatalf("nested metadata = %#v, want parent linkage", fragments[1])
+	}
 }
 
 func TestFileEnforcesReadLimit(t *testing.T) {

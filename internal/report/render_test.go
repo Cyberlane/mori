@@ -13,26 +13,37 @@ func TestTextEscapesTerminalControlCharacters(t *testing.T) {
 
 	var output bytes.Buffer
 	err := Text(&output, model.Report{
-		SchemaVersion: model.SchemaVersion,
-		Threshold:     0.7,
-		Files:         2,
-		Fragments:     2,
-		TotalMatches:  1,
-		Matches: []model.Match{{
-			Similarity: 1,
-			Left: model.FragmentSummary{Location: model.Location{
-				Path:      "evil\npath.go",
-				Language:  "go",
-				Name:      "name\x1b[31m",
-				StartLine: 1,
-				EndLine:   2,
-			}},
-			Right: model.FragmentSummary{Location: model.Location{
-				Path:      "safe.go",
-				Language:  "go",
-				Name:      "safe",
-				StartLine: 1,
-				EndLine:   2,
+		SchemaVersion:      model.SchemaVersion,
+		Threshold:          0.7,
+		Files:              2,
+		Fragments:          2,
+		TotalMatchGroups:   1,
+		TotalLocationPairs: 1,
+		Groups: []model.MatchGroup{{
+			ID:            "identity",
+			Similarity:    1,
+			LocationPairs: 1,
+			Profiles: []model.FragmentProfile{{
+				Fingerprint:     "same",
+				OccurrenceCount: 2,
+				Occurrences: []model.FragmentSummary{
+					{Location: model.Location{
+						Path:           "evil\npath.go",
+						Language:       "go",
+						LanguageFamily: "go",
+						Name:           "name\x1b[31m",
+						StartLine:      1,
+						EndLine:        2,
+					}},
+					{Location: model.Location{
+						Path:           "safe.go",
+						Language:       "go",
+						LanguageFamily: "go",
+						Name:           "safe",
+						StartLine:      1,
+						EndLine:        2,
+					}},
+				},
 			}},
 			SharedFeatures: []model.SharedFeature{},
 		}},
@@ -57,18 +68,60 @@ func TestTextEscapesTerminalControlCharacters(t *testing.T) {
 	}
 }
 
-func TestTextDisclosesSuppressedMatches(t *testing.T) {
+func TestTextDisclosesSuppressedGroups(t *testing.T) {
 	t.Parallel()
 
 	var output bytes.Buffer
 	if err := Text(&output, model.Report{
-		SchemaVersion: model.SchemaVersion,
-		Threshold:     0.7,
-		Suppressed:    2,
+		SchemaVersion:           model.SchemaVersion,
+		Threshold:               0.7,
+		SuppressedLocationPairs: 15,
+		SuppressedMatchGroups:   6,
 	}); err != nil {
 		t.Fatalf("Text: %v", err)
 	}
-	if !strings.Contains(output.String(), "2 match(es) suppressed by baseline") {
-		t.Fatalf("output does not disclose suppression:\n%s", output.String())
+	if !strings.Contains(output.String(), "15 location pair(s) suppressed through 6 baseline") {
+		t.Fatalf("output does not disclose suppression identity scope:\n%s", output.String())
+	}
+}
+
+func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	if err := Text(&output, model.Report{
+		SchemaVersion:      model.SchemaVersion,
+		Threshold:          0.7,
+		TotalMatchGroups:   1,
+		TotalLocationPairs: 1,
+		Groups: []model.MatchGroup{{
+			ID:            "group",
+			Similarity:    1,
+			LocationPairs: 1,
+			Profiles: []model.FragmentProfile{{
+				Fingerprint:     "profile",
+				OccurrenceCount: 1,
+				Occurrences: []model.FragmentSummary{{
+					Location: model.Location{
+						Path: "file.ts", Language: "typescript", LanguageFamily: "typescript",
+						Name: "outer", StartLine: 1, EndLine: 8,
+					},
+					NestedCount: 1,
+				}},
+			}},
+		}},
+		Warnings: []model.Warning{{
+			Kind: "parse", Path: "file.ts", Message: "parse error",
+			Diagnostics: []model.ParseDiagnostic{{
+				NodeKind: "ERROR", StartLine: 3, StartColumn: 4, EndLine: 3, EndColumn: 5,
+			}},
+		}},
+	}); err != nil {
+		t.Fatalf("Text: %v", err)
+	}
+	for _, expected := range []string{"outer body only", "ERROR at 3:4-3:5"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("output missing %q:\n%s", expected, output.String())
+		}
 	}
 }

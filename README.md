@@ -23,9 +23,10 @@ For example, it can flag a JavaScript function and a Go function that both:
 - loop over those parts; and
 - return early when something is wrong.
 
-Each result includes a percentage and the code locations to review. A higher
-percentage means the functions have more structural overlap, not that they have
-identical behavior.
+Each result groups every retained source occurrence with the same normalized
+content-pair identity. It includes a percentage, a shared-shape summary, and
+the code locations to review. A higher percentage means the functions have
+more structural overlap, not that they have identical behavior.
 
 ## Install
 
@@ -57,6 +58,13 @@ To look only for matches between different languages:
 mori scan --cross-language-only --threshold 0.65 .
 ```
 
+TypeScript and TSX are one language family. To compare only Go with that
+family, use:
+
+```sh
+mori scan --language-pair go,typescript --threshold 0.65 .
+```
+
 To try Mori against this repository's example files:
 
 ```sh
@@ -66,9 +74,12 @@ mori scan --threshold 0.70 --cross-language-only examples/email-validation
 Example output:
 
 ```text
-1. 71.0% structural similarity
-   A  validator.js:1-4  [javascript] looksLikeEmail
-   B  validator.go:5-8  [go] LooksLikeEmail
+1. 71.0% structural similarity · 1 location pair(s)
+   A  fingerprint 1d4f4194cc92c56c · 1 occurrence(s)
+      - validator.go:5-8  [go] LooksLikeEmail
+   B  fingerprint 6d2ab0d68af9fb96 · 1 occurrence(s)
+      - validator.js:1-4  [javascript] looksLikeEmail
+      shared shape: 3 calls, 1 return, 1 binding
 ```
 
 Read both functions before acting on a match. Mori does not understand runtime
@@ -76,11 +87,29 @@ values, external calls, side effects, or all language-specific behavior.
 
 ## Common Uses
 
-Exclude test files:
+Mori honors nested `.gitignore` and `.moriignore` files during directory scans.
+An explicitly requested file is still scanned. Add command-line exclusions for
+additional policy:
 
 ```sh
 mori scan --exclude '**/*_test.go' --exclude '**/*.test.ts' .
 ```
+
+Store repeatable project settings in `.mori.json`:
+
+```json
+{
+  "threshold": 0.85,
+  "min_tokens": 40,
+  "max_groups": 250,
+  "language_pairs": ["go,typescript"],
+  "exclude": ["**/*_test.go"]
+}
+```
+
+Mori searches the current directory and its parents for `.mori.json`. Use
+`--config <path>`, `--no-config`, or `--no-ignore` to control discovery. See
+[Project configuration](docs/configuration.md) for the complete contract.
 
 Write results as JSON for a script or CI system:
 
@@ -106,18 +135,22 @@ mori baseline prune --baseline mori-baseline.json --check .
 
 `baseline update` accepts every candidate in the current untruncated scan, so
 review its file diff before committing it. Baselines are opt-in, and a
-suppressed candidate is reported in the scan summary. The conventional file
-name is `mori-baseline.json`; pass it explicitly with `--baseline`.
+suppressed candidate is reported as both a content-identity count and a
+location-pair count. The default `content` scope follows identical normalized
+content into new locations. Use `baseline update --baseline-scope path` when a
+copy in a new file must appear for review. The conventional file name is
+`mori-baseline.json`; pass it explicitly with `--baseline`.
 
 ## Supported Languages
 
-| Language | File types |
-| --- | --- |
-| Go | `.go` |
-| JavaScript and JSX | `.js`, `.jsx`, `.mjs`, `.cjs` |
-| TypeScript and TSX | `.ts`, `.tsx`, `.mts`, `.cts` |
-| Python | `.py`, `.pyi` |
-| Rust | `.rs` |
+| Parser language | Review family | File types |
+| --- | --- | --- |
+| Go | Go | `.go` |
+| JavaScript and JSX | JavaScript | `.js`, `.jsx`, `.mjs`, `.cjs` |
+| TypeScript | TypeScript | `.ts`, `.mts`, `.cts` |
+| TSX | TypeScript | `.tsx` |
+| Python | Python | `.py`, `.pyi` |
+| Rust | Rust | `.rs` |
 
 Run `mori languages` to see the languages in your installed version.
 
@@ -141,6 +174,7 @@ mori skill install --global
 ## More Detail
 
 - [How Mori scores functions](docs/scoring.md)
+- [Project configuration](docs/configuration.md)
 - [Architecture](docs/architecture.md)
 - [Add a language](docs/adding-a-language.md)
 - [Contributing](CONTRIBUTING.md)

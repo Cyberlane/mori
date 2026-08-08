@@ -23,8 +23,9 @@ func JSON(writer io.Writer, report model.Report) error {
 func Text(writer io.Writer, report model.Report) error {
 	if _, err := fmt.Fprintf(
 		writer,
-		"森 (mori): %d similarity candidate(s) from %d fragment(s) in %d file(s)\n",
-		report.TotalMatches,
+		"森 (mori): %d content-pair group(s) covering %d location pair(s) from %d fragment(s) in %d file(s)\n",
+		report.TotalMatchGroups,
+		report.TotalLocationPairs,
 		report.Fragments,
 		report.Files,
 	); err != nil {
@@ -33,8 +34,8 @@ func Text(writer io.Writer, report model.Report) error {
 	if report.Truncated {
 		if _, err := fmt.Fprintf(
 			writer,
-			"showing the top %d match(es); increase --max-matches to see more\n",
-			len(report.Matches),
+			"showing the top %d group(s); increase --max-groups to see more identities\n",
+			len(report.Groups),
 		); err != nil {
 			return err
 		}
@@ -47,37 +48,86 @@ func Text(writer io.Writer, report model.Report) error {
 	); err != nil {
 		return err
 	}
-	if report.Suppressed > 0 {
+	if report.SuppressedLocationPairs > 0 {
 		if _, err := fmt.Fprintf(
 			writer,
-			"%d match(es) suppressed by baseline\n",
-			report.Suppressed,
+			"%d location pair(s) suppressed through %d baseline content identity/identities\n",
+			report.SuppressedLocationPairs,
+			report.SuppressedMatchGroups,
+		); err != nil {
+			return err
+		}
+	}
+	if report.Configuration.ConfigPath != "" {
+		if _, err := fmt.Fprintf(writer, "config %s\n", terminalSafe(report.Configuration.ConfigPath)); err != nil {
+			return err
+		}
+	}
+	if len(report.Configuration.IgnoreFiles) > 0 {
+		if _, err := fmt.Fprintf(
+			writer,
+			"ignore rules: %s\n",
+			terminalSafe(strings.Join(report.Configuration.IgnoreFiles, ", ")),
 		); err != nil {
 			return err
 		}
 	}
 
-	for index, match := range report.Matches {
+	for index, group := range report.Groups {
 		if _, err := fmt.Fprintf(
 			writer,
-			"\n%d. %.1f%% structural similarity\n",
+			"\n%d. %.1f%% structural similarity · %d location pair(s) · identity %s\n",
 			index+1,
-			match.Similarity*100,
+			group.Similarity*100,
+			group.LocationPairs,
+			terminalSafe(group.ID),
 		); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(writer, "   A  %s\n", formatFragment(match.Left)); err != nil {
-			return err
+		for profileIndex, profile := range group.Profiles {
+			label := string(rune('A' + profileIndex))
+			if len(group.Profiles) == 1 {
+				label = "P"
+			}
+			if _, err := fmt.Fprintf(
+				writer,
+				"   %s  fingerprint %s · %d occurrence(s)\n",
+				label,
+				terminalSafe(profile.Fingerprint),
+				profile.OccurrenceCount,
+			); err != nil {
+				return err
+			}
+			for _, occurrence := range profile.Occurrences {
+				if _, err := fmt.Fprintf(writer, "      - %s\n", formatFragment(occurrence)); err != nil {
+					return err
+				}
+			}
+			if profile.OccurrenceCount > len(profile.Occurrences) {
+				if _, err := fmt.Fprintf(
+					writer,
+					"      - %d additional occurrence(s) omitted; increase --max-occurrences\n",
+					profile.OccurrenceCount-len(profile.Occurrences),
+				); err != nil {
+					return err
+				}
+			}
 		}
-		if _, err := fmt.Fprintf(writer, "   B  %s\n", formatFragment(match.Right)); err != nil {
-			return err
+		if len(group.ShapeSummary) > 0 {
+			if _, err := fmt.Fprintf(
+				writer,
+				"      shared shape: %s\n",
+				strings.Join(group.ShapeSummary, ", "),
+			); err != nil {
+				return err
+			}
 		}
-		if len(match.SharedFeatures) > 0 {
-			features := make([]string, 0, len(match.SharedFeatures))
-			for _, feature := range match.SharedFeatures {
+		if len(group.SharedFeatures) > 0 {
+			features := make([]string, 0, len(group.SharedFeatures))
+			for _, feature := range group.SharedFeatures {
 				features = append(features, fmt.Sprintf("%s ×%d", feature.Feature, feature.Count))
 			}
-			if _, err := fmt.Fprintf(writer, "      shared: %s\n", strings.Join(features, ", ")); err != nil {
+			if _, err := fmt.Fprintf(writer, "      raw features: %s\n", strings.Join(features, ", ")); err != nil {
 				return err
 			}
 		}
@@ -92,13 +142,39 @@ func Text(writer io.Writer, report model.Report) error {
 			if warning.Path != "" {
 				prefix = terminalSafe(warning.Path) + ": "
 			}
-			if _, err := fmt.Fprintf(
-				writer,
-				"  - %s%s\n",
-				prefix,
-				terminalSafe(warning.Message),
-			); err != nil {
+			if _, err := fmt.Fprintf(writer, "  - %s%s\n", prefix, terminalSafe(warning.Message)); err != nil {
 				return err
+			}
+			for _, diagnostic := range warning.Diagnostics {
+				if _, err := fmt.Fprintf(
+					writer,
+					"      %s at %d:%d-%d:%d\n",
+					terminalSafe(diagnostic.NodeKind),
+					diagnostic.StartLine,
+					diagnostic.StartColumn,
+					diagnostic.EndLine,
+					diagnostic.EndColumn,
+				); err != nil {
+					return err
+				}
+			}
+			if warning.TotalDiagnostics > len(warning.Diagnostics) {
+				if _, err := fmt.Fprintf(
+					writer,
+					"      %d additional parse diagnostic(s) omitted\n",
+					warning.TotalDiagnostics-len(warning.Diagnostics),
+				); err != nil {
+					return err
+				}
+			}
+			if warning.SkippedFragments > 0 {
+				if _, err := fmt.Fprintf(
+					writer,
+					"      %d invalid function fragment(s) skipped\n",
+					warning.SkippedFragments,
+				); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -116,13 +192,27 @@ func formatFragment(fragment model.FragmentSummary) string {
 	if location.StartLine == location.EndLine {
 		lines = fmt.Sprintf("%d", location.StartLine)
 	}
+	nested := ""
+	if fragment.NestedCount > 0 {
+		nested = fmt.Sprintf(
+			"; outer body only, %d nested function(s) scored separately",
+			fragment.NestedCount,
+		)
+	} else if fragment.NestingDepth > 0 {
+		nested = fmt.Sprintf("; nesting depth %d", fragment.NestingDepth)
+	}
+	languageLabel := location.Language
+	if location.LanguageFamily != "" && location.LanguageFamily != location.Language {
+		languageLabel += "/" + location.LanguageFamily
+	}
 	return fmt.Sprintf(
-		"%s:%s  [%s] %s  (%d tokens)",
+		"%s:%s  [%s] %s  (%d tokens%s)",
 		terminalSafe(location.Path),
 		lines,
-		terminalSafe(location.Language),
+		terminalSafe(languageLabel),
 		terminalSafe(location.Name),
 		fragment.TokenCount,
+		nested,
 	)
 }
 
