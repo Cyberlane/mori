@@ -24,6 +24,7 @@ import (
 	"github.com/Cyberlane/mori/internal/normalize"
 	"github.com/Cyberlane/mori/internal/report"
 	"github.com/Cyberlane/mori/internal/source"
+	"github.com/Cyberlane/mori/internal/vcs"
 )
 
 const (
@@ -73,6 +74,7 @@ type scanOptions struct {
 	excludes           stringList
 	languagePairs      stringList
 	focusPaths         stringList
+	changedSince       string
 	threshold          float64
 	minTokens          int
 	maxGroups          int
@@ -131,6 +133,12 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 		"compare one language ID or family pair, such as go,typescript; repeatable",
 	)
 	flags.Var(&options.focusPaths, "focus-path", "prioritize groups containing this exact path; repeatable")
+	flags.StringVar(
+		&options.changedSince,
+		"changed-since",
+		options.changedSince,
+		"prioritize files changed since this local Git revision",
+	)
 	flags.BoolVar(
 		&options.failOnMatch,
 		"fail-on-match",
@@ -345,7 +353,7 @@ func validateScanOptions(options scanOptions) error {
 	if options.failOnMatch && options.failOnFocusedMatch {
 		return errors.New("--fail-on-match and --fail-on-focused-match cannot be used together")
 	}
-	if options.failOnFocusedMatch && len(options.focusPaths) == 0 {
+	if options.failOnFocusedMatch && len(options.focusPaths) == 0 && options.changedSince == "" {
 		return errors.New("--fail-on-focused-match requires --focus-path or --changed-since")
 	}
 	if _, err := expandLanguagePairs(options.languagePairs); err != nil {
@@ -415,7 +423,7 @@ func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, std
 	if !ok {
 		return code
 	}
-	if len(options.focusPaths) > 0 || options.failOnFocusedMatch {
+	if len(options.focusPaths) > 0 || options.changedSince != "" || options.failOnFocusedMatch {
 		return usageError(stderr, "focus options cannot be used with baseline update")
 	}
 	if options.baselinePath == "" {
@@ -452,7 +460,7 @@ func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stde
 	if !ok {
 		return code
 	}
-	if len(options.focusPaths) > 0 || options.failOnFocusedMatch {
+	if len(options.focusPaths) > 0 || options.changedSince != "" || options.failOnFocusedMatch {
 		return usageError(stderr, "focus options cannot be used with baseline prune")
 	}
 	if options.baselinePath == "" {
@@ -539,7 +547,19 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
 	}
-	focus, focusSet, focusWarnings, err := resolveExplicitFocus(options.focusPaths, discovered.Files)
+	var changes *vcs.Changes
+	if options.changedSince != "" {
+		filePaths := make([]string, 0, len(discovered.Files))
+		for _, file := range discovered.Files {
+			filePaths = append(filePaths, file.Path)
+		}
+		resolved, resolveErr := vcs.ResolveChanged(ctx, filePaths, options.changedSince)
+		if resolveErr != nil {
+			return model.Report{}, fmt.Errorf("resolve changed files: %w", resolveErr)
+		}
+		changes = &resolved
+	}
+	focus, focusSet, focusWarnings, err := resolveFocus(options.focusPaths, changes, discovered.Files)
 	if err != nil {
 		return model.Report{}, fmt.Errorf("resolve focus: %w", err)
 	}
@@ -586,43 +606,90 @@ func executeScan(
 	return result, nil
 }
 
-func resolveExplicitFocus(values []string, files []source.File) (*model.FocusConfig, map[string]struct{}, []model.Warning, error) {
-	if len(values) == 0 {
+func resolveFocus(
+	values []string,
+	changes *vcs.Changes,
+	files []source.File,
+) (*model.FocusConfig, map[string]struct{}, []model.Warning, error) {
+	if len(values) == 0 && changes == nil {
 		return nil, nil, nil, nil
 	}
+	fileByPath := make(map[string]source.File, len(files))
+	for _, file := range files {
+		fileByPath[canonicalPath(file.Path)] = file
+	}
 	explicit := make([]string, 0, len(values))
-	requested := make(map[string]struct{}, len(values))
+	matched := make(map[string]struct{})
+	missing := 0
 	for _, value := range values {
-		absolute, err := filepath.Abs(value)
+		cwdAbsolute, err := filepath.Abs(value)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		clean := filepath.Clean(absolute)
-		requested[clean] = struct{}{}
-		explicit = append(explicit, displayCLIPath(clean))
+		candidates := []string{cwdAbsolute}
+		if changes != nil && !filepath.IsAbs(value) {
+			candidates = append(candidates, filepath.Join(changes.Root, filepath.FromSlash(value)))
+		}
+		found := false
+		for _, candidate := range candidates {
+			if file, ok := fileByPath[canonicalPath(candidate)]; ok {
+				matched[file.DisplayPath] = struct{}{}
+				found = true
+			}
+		}
+		if !found {
+			missing++
+		}
+		explicit = append(explicit, displayCLIPath(filepath.Clean(cwdAbsolute)))
 	}
 	sort.Strings(explicit)
 	explicit = compactStrings(explicit)
-	matched := make(map[string]struct{})
-	for _, file := range files {
-		if _, ok := requested[filepath.Clean(file.Path)]; ok {
-			matched[file.DisplayPath] = struct{}{}
+	config := &model.FocusConfig{
+		Mode:          "explicit",
+		ExplicitPaths: explicit,
+		ChangedPaths:  make([]string, 0),
+		DeletedPaths:  make([]string, 0),
+	}
+	if changes != nil {
+		config.Mode = "git"
+		if len(values) > 0 {
+			config.Mode = "git-and-explicit"
+		}
+		config.RequestedBase = changes.RequestedBase
+		config.BaseCommit = changes.BaseCommit
+		config.MergeBase = changes.MergeBase
+		config.HeadCommit = changes.HeadCommit
+		config.WorkingTreeIncluded = true
+		config.UntrackedIncluded = true
+		config.ChangedPaths = append(config.ChangedPaths, changes.ChangedPaths...)
+		config.DeletedPaths = append(config.DeletedPaths, changes.DeletedPaths...)
+		for _, changedPath := range changes.ChangedPaths {
+			file, ok := fileByPath[canonicalPath(filepath.Join(changes.Root, filepath.FromSlash(changedPath)))]
+			if ok {
+				matched[file.DisplayPath] = struct{}{}
+			} else {
+				missing++
+			}
 		}
 	}
 	warnings := make([]model.Warning, 0)
-	if len(matched) < len(requested) {
+	if missing > 0 {
 		warnings = append(warnings, model.Warning{
 			Kind:    "focus",
-			Message: fmt.Sprintf("%d focused path(s) were excluded, unsupported, or not discovered", len(requested)-len(matched)),
+			Message: fmt.Sprintf("%d focused path(s) were excluded, unsupported, or not discovered", missing),
 		})
 	}
-	return &model.FocusConfig{
-		Mode:                 "explicit",
-		ExplicitPaths:        explicit,
-		ChangedPaths:         make([]string, 0),
-		DeletedPaths:         make([]string, 0),
-		DiscoveredFocusFiles: len(matched),
-	}, matched, warnings, nil
+	config.DiscoveredFocusFiles = len(matched)
+	return config, matched, warnings, nil
+}
+
+func canonicalPath(path string) string {
+	clean := filepath.Clean(path)
+	canonical, err := filepath.EvalSymlinks(clean)
+	if err == nil {
+		return canonical
+	}
+	return clean
 }
 
 func compactStrings(values []string) []string {

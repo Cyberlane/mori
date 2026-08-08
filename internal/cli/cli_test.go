@@ -7,7 +7,9 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -103,6 +105,49 @@ func TestRunScanFocusPathAndFocusedPolicy(t *testing.T) {
 	}
 }
 
+func TestRunScanChangedSinceIncludesWorkingTree(t *testing.T) {
+	root := t.TempDir()
+	runTestGit(t, root, "init", "--initial-branch=main")
+	runTestGit(t, root, "config", "user.name", "Mori Test")
+	runTestGit(t, root, "config", "user.email", "mori@example.invalid")
+	left := filepath.Join(root, "left.go")
+	right := filepath.Join(root, "right.go")
+	content := "package sample\nfunc Same(value string) string { if value == \"\" { return \"\" }; return value }\n"
+	for _, file := range []string{left, right} {
+		if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+	runTestGit(t, root, "add", ".")
+	runTestGit(t, root, "commit", "-m", "base")
+	base := strings.TrimSpace(runTestGit(t, root, "rev-parse", "HEAD"))
+	if err := os.WriteFile(left, []byte(content+"// changed\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile change: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--threshold", "1", "--min-tokens", "1", "--format", "json",
+		"--changed-since", base, "--fail-on-focused-match", root,
+	}, &stdout, &stderr)
+	if code != exitFindings {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode JSON: %v\n%s", err, stdout.String())
+	}
+	focus := result.Configuration.Focus
+	if focus == nil || focus.Mode != "git" || focus.RequestedBase != base ||
+		focus.BaseCommit != base || focus.MergeBase != base || len(focus.HeadCommit) != 40 ||
+		!focus.WorkingTreeIncluded || !focus.UntrackedIncluded ||
+		!reflect.DeepEqual(focus.ChangedPaths, []string{"left.go"}) ||
+		focus.DiscoveredFocusFiles != 1 || result.TotalFocusedMatchGroups != 1 {
+		t.Fatalf("Git focus report = %+v", result)
+	}
+}
+
 func TestFocusPolicyValidation(t *testing.T) {
 	t.Parallel()
 
@@ -117,6 +162,16 @@ func TestFocusPolicyValidation(t *testing.T) {
 			t.Errorf("Run(%v) exit = %d, stderr = %q", args, code, stderr.String())
 		}
 	}
+}
+
+func runTestGit(t *testing.T, root string, args ...string) string {
+	t.Helper()
+	command := exec.Command("git", append([]string{"-C", root}, args...)...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, output)
+	}
+	return string(output)
 }
 
 func TestBaselineUpdateAndScanSuppression(t *testing.T) {
