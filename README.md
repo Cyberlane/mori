@@ -103,7 +103,9 @@ Mori extracts top-level `SELECT` and set-operation queries plus `INSERT`,
 `UPDATE`, and `DELETE` statements. It uses exact, immediately adjacent SQLC
 `-- name: Name :mode` comments for display names and otherwise reports
 `query@<line>`. DDL and nested queries are not independent comparison units;
-nested query structure remains part of its top-level query.
+nested query structure remains part of its top-level query. Common SQLite and
+SQLC pagination parameters and SQLite `ON CONFLICT` column targets are parsed
+without weakening diagnostics for malformed nearby syntax.
 
 ## Common Uses
 
@@ -197,10 +199,12 @@ Run `mori languages` to see the languages in your installed version.
 
 Tree-sitter recovery is visible in report warnings, and any comparison fragment
 containing a parse error is skipped. SQL dialect extensions outside Mori's
-pinned grammar may therefore produce diagnostics or incomplete coverage.
-Separately, an [upstream TypeScript/TSX grammar issue](https://github.com/tree-sitter/tree-sitter-javascript/issues/366)
-causes some raw ampersands in JSX text to be reported as parse errors; inspect
-the reported range before deciding whether the application source is invalid.
+pinned grammar and Mori's bounded SQLite/SQLC adaptations may therefore produce
+diagnostics or incomplete coverage. Mori also applies a bounded,
+byte-preserving repair for recognized cases of the
+[upstream raw-ampersand JSX text grammar issue](https://github.com/tree-sitter/tree-sitter-javascript/issues/366).
+Other JavaScript and TSX parse errors remain visible and invalidate affected
+function fragments.
 
 ## For AI Coding Tools
 

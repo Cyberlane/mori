@@ -64,13 +64,17 @@ Each worker:
    discovery;
 2. creates and closes its own Tree-sitter parser;
 3. installs the selected grammar;
-4. parses with cancellation support and closes the resulting tree;
+4. parses with cancellation support, applying bounded, byte-preserving
+   adaptations for recognized valid JSX, SQLite, and SQLC forms, and closes the
+   resulting tree;
 5. walks nodes iteratively to find fragment boundaries; and
 6. fingerprints valid fragments that meet `--min-tokens`.
 
 Tree-sitter can recover from malformed source. A root containing errors creates
 a structured warning with a bounded set of node ranges and the skipped-fragment
 count, while any comparison fragment containing an error is skipped.
+Adaptations never change byte offsets: normalization and report locations still
+refer to the original source. Nearby malformed forms remain parser errors.
 
 Code languages extract function-like boundaries. SQL extracts only top-level
 `SELECT`/set-operation, `INSERT`, `UPDATE`, and `DELETE` statements. Exact,
