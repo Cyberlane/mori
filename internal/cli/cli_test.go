@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/Cyberlane/mori/internal/model"
+	"github.com/Cyberlane/mori/internal/normalize"
 )
 
 type failingWriter struct{}
@@ -100,7 +101,7 @@ func TestRunScanJSONAndFailOnMatch(t *testing.T) {
 		t.Fatal("warnings must encode as an empty array, not null")
 	}
 	if result.SchemaVersion != model.SchemaVersion || result.Tool.Name != "mori" || result.Tool.Revision == "" ||
-		result.Tool.NormalizationVersion != 2 {
+		result.Tool.NormalizationVersion != normalize.Version {
 		t.Fatalf("report provenance = schema %d, tool %#v", result.SchemaVersion, result.Tool)
 	}
 }

@@ -43,12 +43,25 @@ func File(
 		}}
 	}
 
-	tree := treeParser.ParseCtx(ctx, content, nil)
+	parserInput := content
+	if file.Language.ID == "sql" {
+		parserInput = repairSQLParserInput(content)
+	}
+	tree := treeParser.ParseCtx(ctx, parserInput, nil)
 	if tree == nil {
 		return nil, []model.Warning{{
 			Path:    file.DisplayPath,
 			Message: "parser returned no syntax tree",
 		}}
+	}
+	if file.Language.ID == "tsx" || file.Language.ID == "javascript" {
+		if repaired := repairJSXParserInput(tree.RootNode(), parserInput); repaired != nil {
+			repairedTree := treeParser.ParseCtx(ctx, repaired, nil)
+			if repairedTree != nil {
+				tree.Close()
+				tree = repairedTree
+			}
+		}
 	}
 	defer tree.Close()
 
