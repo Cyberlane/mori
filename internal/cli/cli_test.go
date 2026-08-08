@@ -31,9 +31,42 @@ func TestRunLanguages(t *testing.T) {
 	if code != exitSuccess {
 		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
 	}
-	for _, expected := range []string{"Go", "JavaScript / JSX", "Python", "Rust", "TypeScript / TSX"} {
+	for _, expected := range []string{"Go", "JavaScript / JSX", "Python", "Rust", "SQL queries", "TypeScript / TSX", "sql-query"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Errorf("languages output missing %q", expected)
+		}
+	}
+}
+
+func TestRunScanSQLQueries(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--format", "json", "--threshold", "0.70", "--min-tokens", "12",
+		"../../examples/sql-queries",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode JSON: %v\n%s", err, stdout.String())
+	}
+	if result.Files != 4 || result.Fragments != 4 || result.TotalMatchGroups != 1 ||
+		len(result.Groups) != 1 || len(result.Warnings) != 0 {
+		t.Fatalf("SQL report summary = %+v", result)
+	}
+	profile := result.Groups[0].Profiles[0]
+	if profile.OccurrenceCount != 2 || len(profile.Occurrences) != 2 {
+		t.Fatalf("SQL profile = %+v", profile)
+	}
+	for _, occurrence := range profile.Occurrences {
+		location := occurrence.Location
+		if location.Language != "sql" || location.LanguageFamily != "sql" ||
+			location.ComparisonDomain != "sql-query" || location.FragmentKind != "query" {
+			t.Fatalf("SQL location = %+v", location)
 		}
 	}
 }
