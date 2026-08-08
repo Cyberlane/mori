@@ -30,7 +30,7 @@ func TestLoadRejectsMalformedAndMismatchedFiles(t *testing.T) {
 	}
 
 	mismatched := filepath.Join(t.TempDir(), "mismatched.json")
-	writeFixture(t, mismatched, `{"schema_version":2,"identity_scope":"content","normalization_version":99,"entries":[]}`)
+	writeFixture(t, mismatched, `{"schema_version":2,"identity_scope":"content","normalization_version":1,"entries":[]}`)
 	if _, err := Load(mismatched); err == nil || !strings.Contains(err.Error(), "run baseline update") {
 		t.Fatalf("mismatched Load error = %v", err)
 	}
@@ -43,7 +43,7 @@ func TestLoadSchemaOneAsContentScopeAndToleratesUnknownFields(t *testing.T) {
 	writeFixture(t, path, `{
   "schema_version": 1,
   "mori_version": "0.3.0",
-  "normalization_version": 1,
+  "normalization_version": 2,
   "threshold": 0.7,
   "future_field": true,
   "entries": [{
@@ -210,7 +210,7 @@ func TestLoadRejectsDuplicateIdentities(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "duplicate.json")
-	writeFixture(t, path, `{"schema_version":2,"identity_scope":"content","normalization_version":1,"entries":[{"id":"same"},{"id":"same"}]}`)
+	writeFixture(t, path, `{"schema_version":2,"identity_scope":"content","normalization_version":2,"entries":[{"id":"same"},{"id":"same"}]}`)
 	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "duplicate identity") {
 		t.Fatalf("duplicate Load error = %v", err)
 	}
@@ -246,7 +246,7 @@ func writeFixture(t *testing.T, path string, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	if normalize.Version != 1 {
-		t.Fatalf("test fixture version = %d, want 1", normalize.Version)
+	if normalize.Version != 2 {
+		t.Fatalf("test fixture version = %d, want 2", normalize.Version)
 	}
 }

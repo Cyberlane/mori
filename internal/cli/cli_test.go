@@ -67,7 +67,7 @@ func TestRunScanJSONAndFailOnMatch(t *testing.T) {
 		t.Fatal("warnings must encode as an empty array, not null")
 	}
 	if result.SchemaVersion != model.SchemaVersion || result.Tool.Name != "mori" || result.Tool.Revision == "" ||
-		result.Tool.NormalizationVersion != 1 {
+		result.Tool.NormalizationVersion != 2 {
 		t.Fatalf("report provenance = schema %d, tool %#v", result.SchemaVersion, result.Tool)
 	}
 }
