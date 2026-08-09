@@ -33,7 +33,7 @@ func TestRunLanguages(t *testing.T) {
 	if code != exitSuccess {
 		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
 	}
-	for _, expected := range []string{"Bash / POSIX shell", "Go", "JavaScript / JSX", "PostgreSQL queries", "Python", "Rust", "SQL queries", "Swift", "TypeScript / TSX", "Zsh", "shell", "sql-query", "bash, dash, sh"} {
+	for _, expected := range []string{"FRAGMENTS", "Bash / POSIX shell", "Go", "JavaScript / JSX", "PostgreSQL queries", "Python", "Rust", "SQL queries", "Swift", "TypeScript / TSX", "Zsh", "shell", "sql-query", "function, script", "bash, dash, sh"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Errorf("languages output missing %q", expected)
 		}

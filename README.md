@@ -317,6 +317,13 @@ An extension always takes precedence over a conflicting shebang. Run
 `mori languages` to see the exact languages and shebang names in your installed
 version; `mori languages --help` describes the columns.
 
+Shell files produce one `script` comparison fragment for their top-level
+executable statements plus independent `function` fragments for every named
+function. Function bodies are excluded from the script fingerprint and scored
+separately. A file containing only function definitions can therefore have no
+script fragment at a higher token floor while still contributing functions.
+Scripts and functions are never compared with each other.
+
 ## Known Parser Limits
 
 Tree-sitter recovery is visible in report warnings as potentially incomplete

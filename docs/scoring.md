@@ -184,7 +184,7 @@ The top-level shape is:
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 6
+    "normalization_version": 7
   },
   "threshold": 0.7,
   "files": 4,
@@ -222,8 +222,9 @@ Group objects include `content_pair_id`, `location_pairs`, one or two content
 profiles, occurrence counts and locations, a shape summary, and raw shared
 features. Fragment occurrences expose language family, `comparison_domain`,
 `fragment_kind`, nesting depth, parent identity, and the number of excluded
-nested functions. The current domains are `code` with `function` fragments and
-`sql-query` with `query` fragments. Cross-domain pairs are never candidates.
+nested functions. The current domains are `code` with `function` and shell
+`script` fragments, and `sql-query` with `query` fragments. Cross-domain and
+cross-fragment-kind pairs are never candidates.
 Selected comparison domains are applied before parsing. Same-language mode
 compares within review families, including TypeScript with TSX. Warnings can
 include bounded parser node ranges and skipped-fragment counts.

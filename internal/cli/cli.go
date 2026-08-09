@@ -1142,7 +1142,7 @@ func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) != 0 {
 		return usageError(stderr, "languages does not accept arguments")
 	}
-	if _, err := fmt.Fprintln(stdout, "LANGUAGE\tFAMILY\tDOMAIN\tEXTENSIONS\tSHEBANGS"); err != nil {
+	if _, err := fmt.Fprintln(stdout, "LANGUAGE\tFAMILY\tDOMAIN\tFRAGMENTS\tEXTENSIONS\tSHEBANGS"); err != nil {
 		return exitError
 	}
 	for _, spec := range language.All() {
@@ -1152,10 +1152,11 @@ func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
 		sort.Strings(shebangs)
 		if _, err := fmt.Fprintf(
 			stdout,
-			"%s\t%s\t%s\t%s\t%s\n",
+			"%s\t%s\t%s\t%s\t%s\t%s\n",
 			spec.DisplayName,
 			spec.Family,
 			spec.ComparisonDomain,
+			strings.Join(spec.FragmentKinds(), ", "),
 			strings.Join(extensions, ", "),
 			strings.Join(shebangs, ", "),
 		); err != nil {
@@ -1169,7 +1170,7 @@ func writeLanguagesUsage(writer io.Writer) error {
 	_, err := fmt.Fprint(
 		writer,
 		"Usage: mori languages\n",
-		"\nList supported parser languages, review families, comparison domains, file extensions, and extensionless-script shebang interpreters.\n",
+		"\nList supported parser languages, review families, comparison domains, fragment kinds, file extensions, and extensionless-script shebang interpreters.\n",
 		"Select one parser for discovered .sql files with --sql-dialect generic or postgresql.\n",
 	)
 	return err

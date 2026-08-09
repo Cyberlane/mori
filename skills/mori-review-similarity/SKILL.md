@@ -187,6 +187,11 @@ Never combine
 TypeScript and TSX belong to one family and do not count as cross-language.
 Bash/POSIX shell and Zsh likewise belong to the `shell` family. Use
 `--language-pair bash,zsh` when only cross-dialect shell results are wanted.
+Shell files produce a `script` comparison unit for top-level executable
+statements and separate `function` units for named functions, each subject to
+the token floor. Require both fragment kinds when claiming shell-file coverage;
+a function-only result does not cover top-level orchestration, and a script
+result excludes function bodies.
 Swift support covers implemented functions, initializers, deinitializers, and
 closures. Treat protocol requirements, computed properties, accessors, and
 subscripts as unexamined comparison units, and disclose any Swift parser
@@ -324,9 +329,12 @@ each relevant result as one of:
 Do not refactor, delete, or consolidate code solely because Mori reported a
 match.
 
-If an occurrence reports `nested_function_count` greater than zero, state that
-its score covers the outer body while nested bodies are separate fragments.
-Inspect linked nested occurrences before describing a 100% parent score as
+If an occurrence reports `nested_function_count` greater than zero, interpret
+it using `fragment_kind`. A `function` score covers the outer function body
+while nested function bodies are evaluated as separate comparison units. A
+shell `script` score covers only the top-level script body while all named
+function bodies are evaluated separately. The token floor still applies to
+each unit. Inspect linked occurrences before describing a 100% parent score as
 complete duplication.
 
 ## Report the result

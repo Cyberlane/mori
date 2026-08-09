@@ -127,9 +127,9 @@ to reject or explicitly handle unknown report schema versions.
 Domain and family selection do not change fragment features. SQL dialect
 selection chooses a different parser and is therefore recorded explicitly.
 Schema 8 additionally records explicit multi-worktree Git focus; it does not
-change selection or normalization. The current normalization version is 6
-because PostgreSQL canonical mappings
-extend the SQL feature vocabulary; baselines created with an older
+change selection or normalization. The current normalization version is 7
+because shell top-level `script` comparison units extend the selected fragment
+set while excluding named function bodies. Baselines created with an older
 normalization version must be reviewed and regenerated. Changing a selection
 profile still requires the ordinary human review expected for any baseline
 scope change.

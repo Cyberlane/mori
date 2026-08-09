@@ -79,13 +79,81 @@ function second { print -r -- "$1"; }
 			fragments, warnings := File(context.Background(), source.File{
 				Path: path, DisplayPath: name, Language: spec,
 			}, 1)
-			if len(warnings) != 0 || len(fragments) != 2 {
-				t.Fatalf("fragments/warnings = %#v/%#v, want two/none", fragments, warnings)
+			if len(warnings) != 0 || len(fragments) != 3 {
+				t.Fatalf("fragments/warnings = %#v/%#v, want script plus two functions/none", fragments, warnings)
 			}
-			if fragments[0].Location.Name != "first" || fragments[1].Location.Name != "second" {
-				t.Fatalf("names = %q/%q, want first/second", fragments[0].Location.Name, fragments[1].Location.Name)
+			if fragments[0].Location.Name != "top-level" ||
+				fragments[0].Location.FragmentKind != "script" || fragments[0].NestedCount != 2 {
+				t.Fatalf("top-level fragment = %#v", fragments[0])
+			}
+			if fragments[1].Location.Name != "first" || fragments[2].Location.Name != "second" {
+				t.Fatalf("function names = %q/%q, want first/second", fragments[1].Location.Name, fragments[2].Location.Name)
+			}
+			for _, fragment := range fragments[1:] {
+				if fragment.NestingDepth != 1 || fragment.Parent == nil ||
+					fragment.Parent.FragmentKind != "script" {
+					t.Fatalf("function parent metadata = %#v", fragment)
+				}
 			}
 		})
+	}
+}
+
+func TestShellTopLevelBodyIsIndependentFromFunctions(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "script.zsh")
+	content := `#!/bin/zsh
+source_dir=$1
+if [[ ! -d "$source_dir" ]]; then
+  print -u2 -- "missing source"
+  exit 1
+fi
+
+helper() {
+  print -r -- "$1"
+}
+
+helper "$source_dir"
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.Detect(path)
+	if !ok {
+		t.Fatal("Zsh grammar not detected")
+	}
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "script.zsh", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 2 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want script and function", fragments, warnings)
+	}
+	topLevel := fragments[0]
+	if topLevel.Location.FragmentKind != "script" || topLevel.Location.Name != "top-level" ||
+		topLevel.NestedCount != 1 || topLevel.Features["node:function:nested"] != 1 {
+		t.Fatalf("top-level fragment = %#v", topLevel)
+	}
+	if fragments[1].Location.FragmentKind != "function" || fragments[1].ParentID != topLevel.Fingerprint {
+		t.Fatalf("function fragment = %#v", fragments[1])
+	}
+
+	changedPath := filepath.Join(t.TempDir(), "changed.zsh")
+	changedContent := strings.Replace(content, `print -r -- "$1"`, `for value in "$@"; do print -r -- "$value"; done`, 1)
+	if err := os.WriteFile(changedPath, []byte(changedContent), 0o600); err != nil {
+		t.Fatalf("WriteFile changed: %v", err)
+	}
+	changed, changedWarnings := File(context.Background(), source.File{
+		Path: changedPath, DisplayPath: "changed.zsh", Language: spec,
+	}, 1)
+	if len(changedWarnings) != 0 || len(changed) != 2 {
+		t.Fatalf("changed fragments/warnings = %#v/%#v", changed, changedWarnings)
+	}
+	if changed[0].Fingerprint != topLevel.Fingerprint {
+		t.Fatalf("function-body edit changed script fingerprint: %q != %q", changed[0].Fingerprint, topLevel.Fingerprint)
+	}
+	if changed[1].Fingerprint == fragments[1].Fingerprint {
+		t.Fatal("function-body edit did not change function fingerprint")
 	}
 }
 

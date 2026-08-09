@@ -220,7 +220,14 @@ func Analyze(
 	}
 	var compareErr error
 	if len(options.LanguagePairs) > 0 {
-		compareErr = compareSelectedLanguagePairs(ordered, options.LanguagePairs, &collector)
+		compareErr = comparePartitions(
+			ordered,
+			&collector,
+			domainKey,
+			func(fragments []model.Fragment, collector *matchCollector) error {
+				return compareSelectedLanguagePairs(fragments, options.LanguagePairs, collector)
+			},
+		)
 	} else if options.SameLanguageOnly {
 		compareErr = compareWithinFamilies(ordered, &collector)
 	} else if options.CrossLanguageOnly {
@@ -291,11 +298,11 @@ func comparePartitions(
 }
 
 func domainKey(fragment model.Fragment) string {
-	return fragment.Location.ComparisonDomain
+	return fragment.Location.ComparisonDomain + "\x00" + fragment.Location.FragmentKind
 }
 
 func domainAndFamilyKey(fragment model.Fragment) string {
-	return fragment.Location.ComparisonDomain + "\x00" + fragment.Location.LanguageFamily
+	return domainKey(fragment) + "\x00" + fragment.Location.LanguageFamily
 }
 
 func validateOptions(options Options) error {

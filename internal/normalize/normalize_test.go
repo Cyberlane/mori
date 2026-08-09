@@ -153,10 +153,10 @@ func TestShellGrammarAliasesPreservePositiveAndNegativeSeparation(t *testing.T) 
 		parsed, warnings := parser.File(context.Background(), source.File{
 			Path: path, DisplayPath: name, Language: spec,
 		}, 1)
-		if len(warnings) != 0 || len(parsed) != 1 {
+		if len(warnings) != 0 || len(parsed) != 2 {
 			t.Fatalf("%s warnings/fragments = %#v/%d", name, warnings, len(parsed))
 		}
-		fragments[name] = parsed[0]
+		fragments[name] = parsed[1]
 	}
 
 	positive, _, _ := similarity.WeightedJaccard(
@@ -178,6 +178,69 @@ func TestShellGrammarAliasesPreservePositiveAndNegativeSeparation(t *testing.T) 
 			strings.Contains(feature, "glob_pattern") || strings.Contains(feature, "extglob_pattern") {
 			t.Fatalf("Zsh grammar vocabulary leaked into feature %q", feature)
 		}
+	}
+}
+
+func TestShellTopLevelBodiesPreservePositiveAndNegativeSeparation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	fixtures := map[string]string{
+		"positive.sh": `source_dir=$1
+if [ ! -d "$source_dir" ]; then
+  printf '%s\n' "missing source" >&2
+  exit 1
+fi
+selected=$(find "$source_dir" -type f | head -n 1)
+if [ -z "$selected" ]; then exit 1; fi
+printf '%s\n' "$selected"
+`,
+		"renamed.zsh": `input_root=$1
+if [ ! -d "$input_root" ]; then
+  printf '%s\n' "invalid folder" >&2
+  exit 1
+fi
+choice=$(find "$input_root" -type f | head -n 1)
+if [ -z "$choice" ]; then exit 1; fi
+printf '%s\n' "$choice"
+`,
+		"nearby.zsh": `for item in "$@"; do
+  printf '%s\n' "item: $item"
+done
+`,
+	}
+	fragments := make(map[string]model.Fragment, len(fixtures))
+	for name, content := range fixtures {
+		path := filepath.Join(root, name)
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+		spec, ok := language.Detect(path)
+		if !ok {
+			t.Fatalf("Detect(%s) returned unsupported", name)
+		}
+		parsed, warnings := parser.File(context.Background(), source.File{
+			Path: path, DisplayPath: name, Language: spec,
+		}, 1)
+		if len(warnings) != 0 || len(parsed) != 1 || parsed[0].Location.FragmentKind != "script" {
+			t.Fatalf("%s warnings/fragments = %#v/%#v", name, warnings, parsed)
+		}
+		fragments[name] = parsed[0]
+	}
+
+	positive, _, _ := similarity.WeightedJaccard(
+		fragments["positive.sh"].Features,
+		fragments["renamed.zsh"].Features,
+	)
+	nearby, _, _ := similarity.WeightedJaccard(
+		fragments["positive.sh"].Features,
+		fragments["nearby.zsh"].Features,
+	)
+	if positive < 0.90 {
+		t.Fatalf("shell top-level positive score = %.3f, want at least 0.90", positive)
+	}
+	if nearby >= 0.60 {
+		t.Fatalf("shell top-level nearby-negative score = %.3f, want below 0.60", nearby)
 	}
 }
 

@@ -178,7 +178,7 @@ func Text(writer io.Writer, report model.Report) error {
 		if groupHasNestedBoundaries(group) {
 			if _, err := fmt.Fprintln(
 				writer,
-				"   note: nested function bodies are excluded from this score and analyzed as separate fragments",
+				"   note: function bodies are excluded from this score and evaluated as separate comparison units",
 			); err != nil {
 				return err
 			}
@@ -318,10 +318,17 @@ func formatFragment(fragment model.FragmentSummary) string {
 	}
 	nested := ""
 	if fragment.NestedCount > 0 {
-		nested = fmt.Sprintf(
-			"; outer body only, %d nested function(s) scored separately",
-			fragment.NestedCount,
-		)
+		if location.FragmentKind == "script" {
+			nested = fmt.Sprintf(
+				"; top-level body only, %d function(s) evaluated separately",
+				fragment.NestedCount,
+			)
+		} else {
+			nested = fmt.Sprintf(
+				"; outer body only, %d nested function(s) evaluated separately",
+				fragment.NestedCount,
+			)
+		}
 	} else if fragment.NestingDepth > 0 {
 		nested = fmt.Sprintf("; nesting depth %d", fragment.NestingDepth)
 	}

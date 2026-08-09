@@ -133,11 +133,15 @@ func TestAllReturnsIndependentSpecifications(t *testing.T) {
 	first[0].Extensions[0] = ".mutated"
 	first[0].Shebangs[0] = "mutated"
 	first[0].fragmentKinds["mutated"] = struct{}{}
+	first[0].topLevelKinds["mutated"] = struct{}{}
 
 	second := All()
 	if second[0].Extensions[0] == ".mutated" || second[0].Shebangs[0] == "mutated" ||
 		second[0].IsFragmentBoundary("mutated") {
 		t.Fatal("mutating All result changed the registry")
+	}
+	if _, exists := second[0].topLevelKinds["mutated"]; exists {
+		t.Fatal("mutating top-level kinds changed the registry")
 	}
 }
 
@@ -153,6 +157,14 @@ func TestComparisonDomainsAndFragmentKinds(t *testing.T) {
 		}
 		if spec.ComparisonDomain != "code" || spec.FragmentKind != "function" {
 			t.Fatalf("code spec %s = %#v", spec.ID, spec)
+		}
+		kinds := spec.FragmentKinds()
+		if spec.Family == "shell" {
+			if len(kinds) != 2 || kinds[0] != "function" || kinds[1] != "script" {
+				t.Fatalf("shell fragment kinds for %s = %#v", spec.ID, kinds)
+			}
+		} else if len(kinds) != 1 || kinds[0] != "function" {
+			t.Fatalf("code fragment kinds for %s = %#v", spec.ID, kinds)
 		}
 	}
 }

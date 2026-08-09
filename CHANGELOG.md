@@ -7,6 +7,24 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added whole-file `script` fragments for Bash/POSIX shell and Zsh. Script
+  fragments cover top-level executable statements while excluding function
+  bodies, which remain independent `function` fragments.
+- Added positive and nearby-negative cross-dialect fixtures for shell top-level
+  normalization.
+- `mori languages` now lists every fragment kind emitted by each grammar.
+
+### Changed
+
+- Normalization version 7 introduces shell script comparison units. Existing
+  baselines must be reviewed and regenerated. Report schema remains version 10.
+- Candidate partitioning now requires compatible fragment kinds, so shell
+  scripts are never compared with functions.
+- Text output distinguishes top-level script bodies from outer function bodies
+  when it discloses separately analyzed functions.
+
 ## [0.15.0] - 2026-08-09
 
 ### Added

@@ -89,7 +89,11 @@ explicit error node is skipped.
 Adaptations never change byte offsets: normalization and report locations still
 refer to the original source. Nearby malformed forms remain parser errors.
 
-Code languages extract function-like boundaries. Swift extracts implemented
+Code languages extract function-like boundaries. Bash/POSIX shell and Zsh also
+extract a whole-file `script` boundary containing only top-level executable
+statements; named function bodies remain separate and are excluded from that
+script profile. Script fragments compare only with scripts, never functions.
+Swift extracts implemented
 functions, initializers, deinitializers, and closures; bodyless protocol
 requirements, computed properties, accessors, and subscripts are not separate
 comparison units. Generic SQL and explicitly selected PostgreSQL each extract
@@ -135,16 +139,17 @@ score hints, not semantic facts.
 Files parse concurrently with independent parsers. Results are collected by
 input index and sorted by source location.
 
-Fragments are then ordered by feature count. For a smaller bag \(A\) and larger
+Fragments are partitioned by comparison domain and fragment kind, then ordered
+by feature count. For a smaller bag \(A\) and larger
 bag \(B\), weighted Jaccard cannot exceed:
 
 \[
 \frac{|A|}{|B|}
 \]
 
-Pairs whose upper bound is below the threshold are never scored. Fragments are
-first partitioned by comparison domain, so SQL queries are never compared with
-code functions. Same-language scans score within each review family, while
+Pairs whose upper bound is below the threshold are never scored. SQL queries,
+code functions, and shell scripts therefore never cross comparison-unit
+boundaries. Same-language scans score within each review family, while
 cross-language scans score across review families. TypeScript and TSX, and
 Bash/POSIX shell and Zsh, therefore remain same-family comparisons. Explicit language-pair selectors expand
 families into concrete grammar-ID pairs within one compatible domain without
