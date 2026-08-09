@@ -40,6 +40,11 @@ type Options struct {
 	ExcludedCoverage  []model.FileCoverage
 	Ranking           string
 	PriorityPaths     []model.PriorityPathRule
+	EmbeddedSQL       bool
+	SQLDialect        string
+	StatementBlocks   bool
+	BlockStatements   int
+	MaxBlocksPerFunc  int
 }
 
 // LanguagePair selects one concrete grammar-ID pair for comparison.
@@ -155,7 +160,14 @@ func Analyze(
 				if ctx.Err() != nil {
 					return
 				}
-				fragments, warnings := parser.File(ctx, job.file, options.MinTokens)
+				fragments, warnings := parser.FileWithOptions(ctx, job.file, parser.Options{
+					MinTokens:        options.MinTokens,
+					EmbeddedSQL:      options.EmbeddedSQL,
+					SQLDialect:       options.SQLDialect,
+					StatementBlocks:  options.StatementBlocks,
+					BlockStatements:  options.BlockStatements,
+					MaxBlocksPerFunc: options.MaxBlocksPerFunc,
+				})
 				results <- parseResult{
 					index:     job.index,
 					fragments: fragments,
@@ -255,11 +267,14 @@ func summarizeCoverage(
 		Path:             file.DisplayPath,
 		Language:         file.Language.ID,
 		LanguageFamily:   file.Language.Family,
-		ComparisonDomain: file.Language.ComparisonDomain,
+		ComparisonDomain: file.AnalysisDomain,
 		Status:           "analyzed",
 		Generated:        file.Generated,
 		GeneratedMarker:  file.Marker,
 		FragmentCount:    len(fragments),
+	}
+	if coverage.ComparisonDomain == "" {
+		coverage.ComparisonDomain = file.Language.ComparisonDomain
 	}
 	for _, warning := range warnings {
 		coverage.SkippedFragments += warning.SkippedFragments
@@ -318,6 +333,9 @@ func validateOptions(options Options) error {
 	}
 	if options.MaxGroups < 0 || options.MaxOccurrences < 0 || options.MaxPairs < 0 {
 		return errors.New("maximum values cannot be negative")
+	}
+	if options.StatementBlocks && (options.BlockStatements < 2 || options.MaxBlocksPerFunc < 1) {
+		return errors.New("statement-block limits are invalid")
 	}
 	selectionModes := 0
 	if options.SameLanguageOnly {
@@ -469,6 +487,9 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 	if err := collector.ctx.Err(); err != nil {
 		return err
 	}
+	if overlappingStatementBlocks(left, right) {
+		return nil
+	}
 	if collector.options.MaxPairs > 0 &&
 		collector.report.CandidatePairs >= collector.options.MaxPairs {
 		return fmt.Errorf(
@@ -516,6 +537,13 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 	group.addFocusedOccurrence(left.Location, collector.options.FocusPaths)
 	group.addFocusedOccurrence(right.Location, collector.options.FocusPaths)
 	return nil
+}
+
+func overlappingStatementBlocks(left model.Fragment, right model.Fragment) bool {
+	return left.Location.FragmentKind == "block" &&
+		right.Location.FragmentKind == "block" &&
+		left.Location.Path == right.Location.Path &&
+		left.StartByte < right.EndByte && right.StartByte < left.EndByte
 }
 
 func (collector *matchCollector) finish() {

@@ -174,7 +174,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 12,
+  "schema_version": 13,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -184,7 +184,7 @@ The top-level shape is:
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 7
+    "normalization_version": 8
   },
   "threshold": 0.85,
   "files": 4,
@@ -211,6 +211,10 @@ The top-level shape is:
     "max_file_bytes": 2097152,
     "comparison_domain": "code",
     "sql_dialect": "generic",
+		"embedded_sql": false,
+		"statement_blocks": false,
+		"block_statements": 3,
+		"max_blocks_per_function": 64,
     "ranking": "review",
     "priority_paths": [],
     "same_language_only": true,
@@ -222,15 +226,16 @@ The top-level shape is:
 
 Group objects include `content_pair_id`, `location_pairs`, one or two content
 profiles, occurrence counts and locations, a shape summary, and raw shared
-features. Schema 12 adds bounded `literal_evidence` when at least one compared
+features. Schema 12 added bounded `literal_evidence` when at least one compared
 location pair contains literals. It reports compared pairs, pairs with
 differences, the maximum differing positions, and literal-count mismatches.
 Literal values and their internal digests are never serialized; this evidence
 does not affect scores, fingerprints, ordering, or baselines. Fragment
 occurrences expose language family, `comparison_domain`,
 `fragment_kind`, nesting depth, parent identity, and the number of excluded
-nested functions. The current domains are `code` with `function` and shell
-`script` fragments, and `sql-query` with `query` fragments. Cross-domain and
+nested functions. The current domains are `code` with `function`, shell
+`script`, and opt-in `block` fragments, and `sql-query` with `query` fragments
+from `.sql` files or opt-in embedded Go SQL. Cross-domain and
 cross-fragment-kind pairs are never candidates.
 Selected comparison domains are applied before parsing. Same-language mode
 compares within review families, including TypeScript with TSX. Warnings can
@@ -256,6 +261,15 @@ rule adds its declared weight once per group and emits a
 `priority-path:GLOB(+WEIGHT)` signal. These rules are deterministic,
 presentation-only project policy; Mori does not infer security, reachability,
 or domain risk from source names.
+
+Schema 13 records `embedded_sql`, `statement_blocks`, `block_statements`, and
+`max_blocks_per_function`. Normalization version 8 covers the expanded opt-in
+comparison-unit contract. Statement blocks are fixed-size windows, retain
+parent-function linkage, and exclude overlapping same-file windows from pair
+eligibility. Embedded SQL uses source-mapped host literal locations and the
+explicitly selected SQL dialect. Existing baselines require review and
+regeneration because the normalization version changed, even when the new
+extractors remain disabled.
 
 Schema 9 added a deterministic `file_coverage` array with one entry per analyzed
 or generated-excluded supported file. Each entry records its language, review

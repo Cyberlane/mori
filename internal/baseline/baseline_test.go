@@ -43,7 +43,7 @@ func TestLoadSchemaOneAsContentScopeAndToleratesUnknownFields(t *testing.T) {
 	writeFixture(t, path, `{
   "schema_version": 1,
   "mori_version": "0.3.0",
-  "normalization_version": 7,
+  "normalization_version": 8,
   "threshold": 0.7,
   "future_field": true,
   "entries": [{
@@ -210,7 +210,7 @@ func TestLoadRejectsDuplicateIdentities(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "duplicate.json")
-	writeFixture(t, path, `{"schema_version":2,"identity_scope":"content","normalization_version":7,"entries":[{"id":"same"},{"id":"same"}]}`)
+	writeFixture(t, path, `{"schema_version":2,"identity_scope":"content","normalization_version":8,"entries":[{"id":"same"},{"id":"same"}]}`)
 	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "duplicate identity") {
 		t.Fatalf("duplicate Load error = %v", err)
 	}
@@ -246,7 +246,7 @@ func writeFixture(t *testing.T, path string, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	if normalize.Version != 7 {
-		t.Fatalf("test fixture version = %d, want 7", normalize.Version)
+	if normalize.Version != 8 {
+		t.Fatalf("test fixture version = %d, want 8", normalize.Version)
 	}
 }

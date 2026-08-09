@@ -36,6 +36,10 @@ func TestLoadStrictConfig(t *testing.T) {
   "max_groups": 250,
   "comparison_domain": "code",
   "sql_dialect": "postgresql",
+	"embedded_sql": false,
+	"statement_blocks": true,
+	"block_statements": 4,
+	"max_blocks_per_function": 80,
 	"ranking": "review",
 	"priority_paths": ["**/auth/**=25"],
   "same_language_only": false,
@@ -53,6 +57,10 @@ func TestLoadStrictConfig(t *testing.T) {
 		settings.MaxGroups == nil || *settings.MaxGroups != 250 ||
 		settings.ComparisonDomain != "code" ||
 		settings.SQLDialect != "postgresql" ||
+		settings.EmbeddedSQL == nil || *settings.EmbeddedSQL ||
+		settings.StatementBlocks == nil || !*settings.StatementBlocks ||
+		settings.BlockStatements == nil || *settings.BlockStatements != 4 ||
+		settings.MaxBlocksPerFunc == nil || *settings.MaxBlocksPerFunc != 80 ||
 		settings.Ranking != "review" ||
 		len(settings.PriorityPaths) != 1 || settings.PriorityPaths[0] != "**/auth/**=25" ||
 		settings.SameLanguageOnly == nil || *settings.SameLanguageOnly ||

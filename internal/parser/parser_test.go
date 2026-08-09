@@ -529,6 +529,188 @@ UPDATE folders SET name = $1 WHERE id = $2 AND tenant_id = $3;
 	}
 }
 
+func TestFileExtractsOptInEmbeddedGoDatabaseSQL(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "queries.go")
+	content := `package sample
+func load(ctx context.Context, db *sql.DB) error {
+	rows, err := db.QueryContext(ctx, ` + "`SELECT id FROM users WHERE tenant_id = $1 ORDER BY id`" + `, tenantID)
+	_, _ = store.Exec(ctx, ` + "`UPDATE users SET active = TRUE WHERE tenant_id = $1`" + `, tenantID)
+	log.Printf("SELECT id FROM ignored")
+	runSQL("SELECT id FROM ignored_too")
+	query := "SELECT id FROM variable_query"
+	_, _ = rows, query
+	return err
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := FileWithOptions(context.Background(), source.File{
+		Path: path, DisplayPath: "queries.go", Language: spec,
+	}, Options{
+		MinTokens: 1, EmbeddedSQL: true, SQLDialect: language.SQLDialectPostgreSQL,
+	})
+	if len(warnings) != 0 || len(fragments) != 2 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want two/none", fragments, warnings)
+	}
+	fragment := fragments[0]
+	if fragment.Location.Language != "postgresql" ||
+		fragment.Location.ComparisonDomain != "sql-query" ||
+		fragment.Location.FragmentKind != "query" ||
+		fragment.Location.StartLine != 3 || fragments[1].Location.StartLine != 4 || fragment.Parent == nil ||
+		fragment.Parent.Name != "load" || fragment.ParentID == "" {
+		t.Fatalf("embedded SQL fragment = %#v", fragment)
+	}
+}
+
+func TestFileReportsMalformedEmbeddedSQL(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "broken.go")
+	content := "package sample\nfunc load(db *sql.DB) { db.Query(`SELECT (1;`) }\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := FileWithOptions(context.Background(), source.File{
+		Path: path, DisplayPath: "broken.go", Language: spec,
+	}, Options{MinTokens: 1, EmbeddedSQL: true, SQLDialect: language.SQLDialectPostgreSQL})
+	if len(fragments) != 0 || len(warnings) != 1 || warnings[0].Kind != "parse" ||
+		!strings.Contains(warnings[0].Message, "host line 2") {
+		t.Fatalf("fragments/warnings = %#v/%#v, want visible embedded parse warning", fragments, warnings)
+	}
+}
+
+func TestFileTreatsOneEmbeddedStringAsOneQueryBatch(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "batch.go")
+	content := "package sample\nfunc load(db *sql.DB) { db.Exec(`SELECT id FROM users; SELECT id FROM folders;`) }\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := FileWithOptions(context.Background(), source.File{
+		Path: path, DisplayPath: "batch.go", Language: spec,
+	}, Options{MinTokens: 1, EmbeddedSQL: true, SQLDialect: language.SQLDialectGeneric})
+	if len(warnings) != 0 || len(fragments) != 1 ||
+		fragments[0].Features["node:query:batch"] != 1 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want one query batch", fragments, warnings)
+	}
+}
+
+func TestFileBoundsEmbeddedSQLPerFile(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "many.go")
+	content := "package sample\nfunc load(db *sql.DB) {\n" +
+		strings.Repeat("db.Query(`SELECT 1;`)\n", maxEmbeddedSQLCandidatesPerFile+1) + "}\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := FileWithOptions(context.Background(), source.File{
+		Path: path, DisplayPath: "many.go", Language: spec,
+	}, Options{MinTokens: 1, EmbeddedSQL: true, SQLDialect: language.SQLDialectGeneric})
+	if len(fragments) != 0 || len(warnings) != 1 || warnings[0].Kind != "coverage" ||
+		!strings.Contains(warnings[0].Message, "exceed per-file limit 1000") {
+		t.Fatalf("fragments/warnings = %#v/%#v, want visible embedded-SQL cap", fragments, warnings)
+	}
+}
+
+func TestFileExtractsBoundedStatementWindows(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "blocks.go")
+	content := `package sample
+func process(value string) error {
+	clean := strings.TrimSpace(value)
+	if clean == "" { return errors.New("empty") }
+	result := strings.ToLower(clean)
+	fmt.Println(result)
+	return nil
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := FileWithOptions(context.Background(), source.File{
+		Path: path, DisplayPath: "blocks.go", Language: spec,
+	}, Options{MinTokens: 1, StatementBlocks: true, BlockStatements: 3, MaxBlocksPerFunc: 10})
+	if len(warnings) != 0 || len(fragments) != 4 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want function plus three blocks", fragments, warnings)
+	}
+	for _, fragment := range fragments[1:] {
+		if fragment.Location.FragmentKind != "block" || fragment.Parent == nil ||
+			fragment.Parent.Name != "process" || fragment.ParentID != fragments[0].Fingerprint {
+			t.Fatalf("block linkage = %#v", fragment)
+		}
+	}
+}
+
+func TestFileSkipsStatementWindowsOverConfiguredCap(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "blocks.go")
+	content := `package sample
+func process() {
+	println(1)
+	println(2)
+	println(3)
+	println(4)
+	println(5)
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := FileWithOptions(context.Background(), source.File{
+		Path: path, DisplayPath: "blocks.go", Language: spec,
+	}, Options{MinTokens: 1, StatementBlocks: true, BlockStatements: 2, MaxBlocksPerFunc: 2})
+	if len(fragments) != 1 || len(warnings) != 1 || warnings[0].Kind != "coverage" ||
+		!strings.Contains(warnings[0].Message, "more than 2 windows would be emitted") {
+		t.Fatalf("fragments/warnings = %#v/%#v, want function and visible cap warning", fragments, warnings)
+	}
+}
+
+func TestStatementWindowsKeepNearbyStructuralNegative(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "negative.go")
+	content := `package sample
+func straight(value string) error {
+	clean := strings.TrimSpace(value)
+	fmt.Println(clean)
+	return nil
+}
+func branching(values []string) error {
+	for _, value := range values { fmt.Println(value) }
+	if len(values) == 0 { return errors.New("empty") }
+	return nil
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := FileWithOptions(context.Background(), source.File{
+		Path: path, DisplayPath: "negative.go", Language: spec,
+	}, Options{MinTokens: 1, StatementBlocks: true, BlockStatements: 3, MaxBlocksPerFunc: 10})
+	if len(warnings) != 0 || len(fragments) != 4 {
+		t.Fatalf("fragments/warnings = %#v/%#v", fragments, warnings)
+	}
+	if fragments[1].Location.FragmentKind != "block" ||
+		fragments[3].Location.FragmentKind != "block" ||
+		fragments[1].Fingerprint == fragments[3].Fingerprint {
+		t.Fatalf("nearby negative blocks = %#v / %#v", fragments[1], fragments[3])
+	}
+}
+
 func TestSQLCNameMustBeExactAndImmediatelyPrecedeQuery(t *testing.T) {
 	t.Parallel()
 

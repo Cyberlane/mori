@@ -599,6 +599,37 @@ func TestCollectorPrioritizesFocusedGroupsBeforeRetention(t *testing.T) {
 	}
 }
 
+func TestCollectorSkipsOverlappingStatementBlockPairs(t *testing.T) {
+	t.Parallel()
+
+	report := model.Report{}
+	collector := matchCollector{
+		ctx:     context.Background(),
+		options: Options{Threshold: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10},
+		report:  &report,
+		groups:  make(map[string]*groupCandidate), suppressedGroups: make(map[string]struct{}),
+	}
+	left := groupingFragment("same.go", 1)
+	left.Location.FragmentKind = "block"
+	left.StartByte, left.EndByte = 10, 40
+	overlap := groupingFragment("same.go", 2)
+	overlap.Location.FragmentKind = "block"
+	overlap.StartByte, overlap.EndByte = 30, 60
+	distinct := groupingFragment("same.go", 10)
+	distinct.Location.FragmentKind = "block"
+	distinct.StartByte, distinct.EndByte = 70, 100
+	for _, pair := range [][2]model.Fragment{{left, overlap}, {left, distinct}, {overlap, distinct}} {
+		if err := collector.score(pair[0], pair[1]); err != nil {
+			t.Fatalf("score: %v", err)
+		}
+	}
+	collector.finish()
+	if report.CandidatePairs != 2 || report.TotalLocationPairs != 2 ||
+		len(report.Groups) != 1 || report.Groups[0].LocationPairs != 2 {
+		t.Fatalf("report = %+v, want overlapping pair omitted before candidate count", report)
+	}
+}
+
 func groupingFragment(path string, line int) model.Fragment {
 	return model.Fragment{
 		Location: model.Location{

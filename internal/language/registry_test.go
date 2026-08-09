@@ -160,10 +160,10 @@ func TestComparisonDomainsAndFragmentKinds(t *testing.T) {
 		}
 		kinds := spec.FragmentKinds()
 		if spec.Family == "shell" {
-			if len(kinds) != 2 || kinds[0] != "function" || kinds[1] != "script" {
+			if len(kinds) != 3 || kinds[0] != "block" || kinds[1] != "function" || kinds[2] != "script" {
 				t.Fatalf("shell fragment kinds for %s = %#v", spec.ID, kinds)
 			}
-		} else if len(kinds) != 1 || kinds[0] != "function" {
+		} else if len(kinds) != 2 || kinds[0] != "block" || kinds[1] != "function" {
 			t.Fatalf("code fragment kinds for %s = %#v", spec.ID, kinds)
 		}
 	}

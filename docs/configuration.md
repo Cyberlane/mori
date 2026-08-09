@@ -37,7 +37,7 @@ Profiles deliberately do not guess project-specific test, migration, generated
 router, or framework exclusions. Add those only after auditing the repository's
 source categories and the first report.
 
-The selected profile is recorded in schema-12 reports. Omitting `profile`
+The selected profile is recorded in schema-13 reports. Omitting `profile`
 retains the legacy defaults. A CLI `--profile` replaces a configured profile;
 explicit fields from the config are then applied, followed by explicit CLI
 flags. An explicit language-selection mode replaces the profile's mode, so
@@ -59,6 +59,10 @@ flags. An explicit language-selection mode replaces the profile's mode, so
   "format": "json",
   "comparison_domain": "code",
   "sql_dialect": "generic",
+	"embedded_sql": false,
+	"statement_blocks": false,
+	"block_statements": 3,
+	"max_blocks_per_function": 64,
   "ranking": "review",
   "priority_paths": ["**/auth/**=25", "**/security/**=25"],
   "same_language_only": true,
@@ -83,6 +87,20 @@ omitted value selects every registered domain.
 It selects the parser for every discovered `.sql` file and does not affect
 non-SQL files. Use separate scans when one repository contains multiple SQL
 dialects.
+
+`embedded_sql` is an explicit opt-in for direct string arguments to recognized
+Go database methods. It requires `comparison_domain` to be `sql-query` and uses
+the selected `sql_dialect`. Arbitrary strings, variables, concatenations, and
+receiver-type inference remain outside extraction. Fixed safety limits skip a
+host file above 1,000 recognized calls and skip a decoded query above 256 KiB,
+with coverage warnings.
+
+`statement_blocks` enables fixed-size statement windows inside code functions.
+`block_statements` accepts 2 through 10 and defaults to 3.
+`max_blocks_per_function` accepts 1 through 256 and defaults to 64. Exceeding
+the cap skips block extraction for that function with a visible coverage
+warning instead of returning a partial hidden sample. Embedded SQL and
+statement blocks are mutually exclusive scan modes.
 
 `ranking` accepts `structural` or `review` and defaults to `structural`.
 Structural ordering sorts by similarity score, shared evidence mass,

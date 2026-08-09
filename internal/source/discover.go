@@ -21,13 +21,14 @@ import (
 
 // File is a source file paired with its parser grammar.
 type File struct {
-	Path        string
-	DisplayPath string
-	Language    language.Spec
-	Generated   bool
-	Marker      string
-	MaxBytes    int64
-	Info        os.FileInfo
+	Path           string
+	DisplayPath    string
+	Language       language.Spec
+	AnalysisDomain string
+	Generated      bool
+	Marker         string
+	MaxBytes       int64
+	Info           os.FileInfo
 }
 
 // Options controls file discovery.
@@ -37,6 +38,7 @@ type Options struct {
 	IgnoreFiles       bool
 	ComparisonDomains map[string]struct{}
 	SQLDialect        string
+	EmbeddedSQL       bool
 	ExcludeGenerated  bool
 }
 
@@ -255,7 +257,10 @@ func addFile(
 	}
 	if supported && len(options.ComparisonDomains) > 0 {
 		if _, selected := options.ComparisonDomains[spec.ComparisonDomain]; !selected {
-			return
+			_, sqlSelected := options.ComparisonDomains["sql-query"]
+			if !options.EmbeddedSQL || !sqlSelected || spec.ID != "go" {
+				return
+			}
 		}
 	}
 
@@ -302,6 +307,12 @@ func addFile(
 			}
 		}
 	}
+	analysisDomain := spec.ComparisonDomain
+	if options.EmbeddedSQL && spec.ID == "go" {
+		if _, selected := options.ComparisonDomains["sql-query"]; selected {
+			analysisDomain = "sql-query"
+		}
+	}
 	if options.MaxFileBytes > 0 && info.Size() > options.MaxFileBytes {
 		result.Warnings = append(result.Warnings, model.Warning{
 			Path: displayPath(cwd, path),
@@ -329,7 +340,7 @@ func addFile(
 			Path:             displayPath(cwd, cleanPath),
 			Language:         spec.ID,
 			LanguageFamily:   spec.Family,
-			ComparisonDomain: spec.ComparisonDomain,
+			ComparisonDomain: analysisDomain,
 			Status:           "excluded_generated",
 			Generated:        true,
 			GeneratedMarker:  marker,
@@ -337,13 +348,14 @@ func addFile(
 		return
 	}
 	result.Files = append(result.Files, File{
-		Path:        cleanPath,
-		DisplayPath: displayPath(cwd, cleanPath),
-		Language:    spec,
-		Generated:   generated,
-		Marker:      marker,
-		MaxBytes:    options.MaxFileBytes,
-		Info:        info,
+		Path:           cleanPath,
+		DisplayPath:    displayPath(cwd, cleanPath),
+		Language:       spec,
+		AnalysisDomain: analysisDomain,
+		Generated:      generated,
+		Marker:         marker,
+		MaxBytes:       options.MaxFileBytes,
+		Info:           info,
 	})
 }
 

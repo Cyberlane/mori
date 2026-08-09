@@ -96,6 +96,113 @@ func TestRunScanPostgreSQLQueries(t *testing.T) {
 	}
 }
 
+func TestRunScanEmbeddedGoSQLIsOptInAndSourceMapped(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	files := map[string]string{
+		"users.go":   "package sample\nfunc users(db *sql.DB) { db.Query(`SELECT id FROM users WHERE tenant_id = $1`) }\n",
+		"folders.go": "package sample\nfunc folders(db *sql.DB) { db.Query(`SELECT id FROM folders WHERE tenant_id = $1`) }\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	args := []string{
+		"scan", "--format", "json", "--comparison-domain", "sql-query",
+		"--embedded-sql", "--sql-dialect", "postgresql", "--threshold", "1",
+		"--min-tokens", "1", root,
+	}
+	code := Run(context.Background(), args, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode JSON: %v", err)
+	}
+	if result.Files != 2 || result.Fragments != 2 || result.TotalMatchGroups != 1 ||
+		!result.Configuration.EmbeddedSQL || result.Configuration.SQLDialect != "postgresql" {
+		t.Fatalf("embedded SQL report = %+v", result)
+	}
+	for _, coverage := range result.FileCoverage {
+		if coverage.Language != "go" || coverage.ComparisonDomain != "sql-query" {
+			t.Fatalf("embedded SQL coverage = %+v", coverage)
+		}
+	}
+	for _, profile := range result.Groups[0].Profiles {
+		for _, occurrence := range profile.Occurrences {
+			if occurrence.Location.Language != "postgresql" ||
+				occurrence.Location.ComparisonDomain != "sql-query" ||
+				occurrence.Parent == nil || occurrence.Parent.Language != "go" {
+				t.Fatalf("embedded occurrence = %+v", occurrence)
+			}
+		}
+	}
+	var repeated bytes.Buffer
+	stderr.Reset()
+	if code := Run(context.Background(), args, &repeated, &stderr); code != exitSuccess ||
+		!bytes.Equal(stdout.Bytes(), repeated.Bytes()) {
+		t.Fatalf("repeated embedded SQL scan = %d/%q; output changed", code, stderr.String())
+	}
+}
+
+func TestRunScanStatementBlocksFindsPartialFunctionDuplication(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	content := `package sample
+func first(value string) {
+	clean := strings.TrimSpace(value)
+	result := strings.ToLower(clean)
+	fmt.Println(result)
+	println("first only")
+}
+func second(input string) {
+	println("second only")
+	clean := strings.TrimSpace(input)
+	result := strings.ToLower(clean)
+	fmt.Println(result)
+}
+`
+	if err := os.WriteFile(filepath.Join(root, "blocks.go"), []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--format", "json", "--statement-blocks", "--block-statements", "3",
+		"--min-tokens", "1", "--threshold", "1", root,
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode JSON: %v", err)
+	}
+	foundBlock := false
+	for _, group := range result.Groups {
+		for _, profile := range group.Profiles {
+			for _, occurrence := range profile.Occurrences {
+				if occurrence.Location.FragmentKind == "block" {
+					foundBlock = true
+					if occurrence.Parent == nil {
+						t.Fatalf("block occurrence lacks parent: %+v", occurrence)
+					}
+				}
+			}
+		}
+	}
+	if !foundBlock || !result.Configuration.StatementBlocks ||
+		result.Configuration.BlockStatements != 3 || result.Configuration.MaxBlocksPerFunc != 64 {
+		t.Fatalf("statement-block report = %+v", result)
+	}
+}
+
 func TestRunLanguagesHelp(t *testing.T) {
 	t.Parallel()
 
@@ -781,6 +888,21 @@ func TestRunRejectsInvalidSelectionCombinations(t *testing.T) {
 			name: "unknown ranking",
 			args: []string{"scan", "--ranking", "magic", "."},
 			want: "unknown --ranking",
+		},
+		{
+			name: "embedded SQL without domain",
+			args: []string{"scan", "--embedded-sql", "."},
+			want: "requires --comparison-domain sql-query",
+		},
+		{
+			name: "blocks in SQL domain",
+			args: []string{"scan", "--statement-blocks", "--comparison-domain", "sql-query", "."},
+			want: "cannot be used with --comparison-domain sql-query",
+		},
+		{
+			name: "invalid block size",
+			args: []string{"scan", "--block-statements", "1", "."},
+			want: "--block-statements must be from 2 to 10",
 		},
 		{
 			name: "pair outside domain",

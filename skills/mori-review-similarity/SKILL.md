@@ -188,6 +188,17 @@ features, so inspect async and error-handling behavior in source.
 Lower `--min-tokens` toward 12 only when a deliberately broad exploratory pass
 is worth the additional callbacks, wrappers, and boilerplate.
 
+Use statement blocks only for an explicit partial-duplication question:
+
+```sh
+mori scan --statement-blocks --block-statements 3 --format json .
+```
+
+Verify `max_blocks_per_function`, every coverage warning, and parent-function
+metadata. Same-file overlapping windows are excluded, but low token floors can
+still produce many ordinary local shapes. Do not mix block and full-function
+findings; their fragment kinds are independently partitioned.
+
 For SQL review, use a separate deliberate scan profile such as:
 
 ```sh
@@ -214,6 +225,15 @@ column targets. Inspect warnings for other unsupported dialect syntax and
 verify schemas, permissions, transaction context, query plans, and tests before
 recommending consolidation.
 
+When the review explicitly includes SQL embedded in Go, add `--embedded-sql`
+to a `--comparison-domain sql-query` scan and select the dialect. Confirm that
+each finding is a direct recognized database-method string argument, inspect
+its Go parent, and disclose that Mori does not prove receiver types, variable
+contents, concatenations, or runtime query construction.
+Treat the fixed 1,000-call and 256-KiB query limits as coverage boundaries and
+report their warnings. A multi-statement string is one query-batch unit rather
+than several independently source-mapped occurrences.
+
 Add repeated `--exclude` flags for project-specific irrelevant paths not
 covered by ignore files. If `truncated` is true, review the retained identity
 diversity first, then increase `--max-groups` to 500 and at most 1,000 when
@@ -224,7 +244,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `12`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `13`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while
@@ -267,6 +287,8 @@ revision or date from the version string. Inspect:
 - `configuration.priority_paths`: disclose every project-supplied path weight
   and treat matching `priority-path:` signals as presentation policy only, not
   inferred security or refactoring confidence;
+- `configuration.embedded_sql`, `statement_blocks`, `block_statements`, and
+  `max_blocks_per_function`: disclose the opt-in extraction scope and bounds;
 - `similarity`: report it as structural similarity only; and
 - `shape_summary` and `shared_features`: use them to explain why a group ranked
   highly without treating the summary as behavioral evidence.

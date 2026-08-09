@@ -164,6 +164,26 @@ One scan uses one SQL dialect for every `.sql` file it discovers. Split mixed
 dialect repositories into separate profiles. PostgreSQL procedural bodies are
 not PL/pgSQL comparison units.
 
+Go repositories can explicitly include SQL passed as a direct string argument
+to recognized `database/sql`-style `Exec`, `Query`, `QueryRow`, and `Prepare`
+methods, including their `Context` variants:
+
+```sh
+mori scan \
+  --comparison-domain sql-query \
+  --embedded-sql \
+  --sql-dialect postgresql \
+  path/to/go/project
+```
+
+This mode is off by default and requires the `sql-query` domain. It does not
+guess from arbitrary strings, follow variables, concatenate expressions, or
+perform receiver type analysis. Locations point to the enclosing Go string and
+retain parent-function metadata; inspect the host call and runtime values.
+Mori skips a file with more than 1,000 recognized calls and skips an individual
+decoded query over 256 KiB, with visible coverage warnings in both cases. A
+single string containing multiple top-level statements is one query-batch unit.
+
 ## Common Uses
 
 Mori honors nested `.gitignore` and `.moriignore` files during directory scans.
@@ -247,6 +267,20 @@ This prioritizes disclosed same-name, cross-directory, cross-file, and repeated
 location-pair signals before the ordinary structural ordering. It does not
 change similarity scores, fingerprints, or which groups qualify.
 
+To investigate localized repetition inside functions, opt into fixed-size
+statement windows:
+
+```sh
+mori scan --statement-blocks --block-statements 3 .
+```
+
+Block windows are a separate `block` fragment kind and never compare with full
+functions. Overlapping windows from the same file are not candidates. Mori
+skips all block windows for a function, with a coverage warning, when their
+count exceeds `--max-blocks-per-function` (default 64, maximum 256). This mode
+is intentionally off by default because it expands candidate counts and can
+surface ordinary local syntax symmetry.
+
 Mori emits a `coverage` warning when a scan discovers no supported files or
 extracts no comparison fragments. Such a result is not evidence that the
 repository has no duplication. Use `--require-coverage` in automation to write
@@ -256,7 +290,7 @@ the report and exit with status `4` when either condition occurs:
 mori scan --format json --require-coverage .
 ```
 
-Schema-11 reports embed deterministic `tool` build provenance, the selected
+Schema-13 reports embed deterministic `tool` build provenance, the selected
 profile, comparison
 selection, domain and fragment-kind metadata, exact focus metadata, and a
 per-file coverage inventory including generated-source classification. They do
@@ -301,7 +335,7 @@ mori scan \
 `--changed-worktree PATH=REVISION` values describe the other worktrees. Mori
 requires every discovered file to belong to a resolved root, never inherits a
 parent revision for a nested repository, and records each root's requested
-base, full resolved commits, changed paths, and deleted paths in schema-11 JSON.
+base, full resolved commits, changed paths, and deleted paths in schema-13 JSON.
 Use only repeated `--changed-worktree` values when every scanned root should be
 explicit. Excluding and scanning a nested worktree separately remains valid;
 never interpret an excluded repository as unchanged. Mori bounds one scan to
@@ -345,12 +379,13 @@ An extension always takes precedence over a conflicting shebang. Run
 `mori languages` to see the exact languages and shebang names in your installed
 version; `mori languages --help` describes the columns.
 
-Shell files produce one `script` comparison fragment for their top-level
+Code parsers expose opt-in `block` fragments in addition to their normal
+function units. Shell files produce one `script` comparison fragment for their top-level
 executable statements plus independent `function` fragments for every named
 function. Function bodies are excluded from the script fingerprint and scored
 separately. A file containing only function definitions can therefore have no
 script fragment at a higher token floor while still contributing functions.
-Scripts and functions are never compared with each other.
+Scripts, functions, and blocks are never compared with each other.
 
 ## Known Parser Limits
 
@@ -368,7 +403,10 @@ can still produce visible diagnostics. Generic SQL
 dialect extensions outside Mori's pinned grammar and bounded SQLite/SQLC
 adaptations may produce diagnostics or incomplete coverage. The PostgreSQL
 parser targets PostgreSQL 18.3 syntax but does not extract PL/pgSQL bodies as
-independent comparison units. Mori also applies a bounded,
+independent units. Embedded SQL currently recognizes only direct Go string
+arguments to a bounded method-name set; it does not establish receiver types or
+runtime query contents. Statement blocks use bounded fixed-size windows rather
+than arbitrary subtree matching, and low token floors can be noisy. Mori also applies a bounded,
 byte-preserving repair for recognized cases of the
 [upstream raw-ampersand JSX text grammar issue](https://github.com/tree-sitter/tree-sitter-javascript/issues/366).
 Other JavaScript and TSX parse errors remain visible and invalidate affected

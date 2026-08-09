@@ -30,6 +30,10 @@ type Settings struct {
 	Format            *string  `json:"format,omitempty"`
 	ComparisonDomain  string   `json:"comparison_domain,omitempty"`
 	SQLDialect        string   `json:"sql_dialect,omitempty"`
+	EmbeddedSQL       *bool    `json:"embedded_sql,omitempty"`
+	StatementBlocks   *bool    `json:"statement_blocks,omitempty"`
+	BlockStatements   *int     `json:"block_statements,omitempty"`
+	MaxBlocksPerFunc  *int     `json:"max_blocks_per_function,omitempty"`
 	Ranking           string   `json:"ranking,omitempty"`
 	PriorityPaths     []string `json:"priority_paths,omitempty"`
 	SameLanguageOnly  *bool    `json:"same_language_only,omitempty"`

@@ -25,6 +25,26 @@ func File(
 	file source.File,
 	minTokens int,
 ) ([]model.Fragment, []model.Warning) {
+	return FileWithOptions(ctx, file, Options{MinTokens: minTokens})
+}
+
+// Options controls opt-in fragment extraction. Defaults preserve the
+// function- and query-level comparison contract used by earlier releases.
+type Options struct {
+	MinTokens        int
+	EmbeddedSQL      bool
+	SQLDialect       string
+	StatementBlocks  bool
+	BlockStatements  int
+	MaxBlocksPerFunc int
+}
+
+// FileWithOptions parses one file using explicit bounded extraction options.
+func FileWithOptions(
+	ctx context.Context,
+	file source.File,
+	options Options,
+) ([]model.Fragment, []model.Warning) {
 	content, err := readSource(ctx, file.Path, file.MaxBytes, file.Info)
 	if err != nil {
 		return nil, []model.Warning{{
@@ -81,6 +101,9 @@ func File(
 	defer tree.Close()
 
 	root := tree.RootNode()
+	if options.EmbeddedSQL && file.Language.ID == "go" {
+		return embeddedSQLFragments(ctx, root, content, file, options)
+	}
 	warnings := make([]model.Warning, 0, 1)
 	fragments := make([]model.Fragment, 0)
 	skippedFragments := 0
@@ -92,7 +115,7 @@ func File(
 			root,
 			content,
 			file,
-			minTokens,
+			options.MinTokens,
 			fragmentKind,
 			"top-level",
 			&fragments,
@@ -108,8 +131,9 @@ func File(
 		root,
 		content,
 		file,
-		minTokens,
+		options,
 		&fragments,
+		&warnings,
 		&skippedFragments,
 	); err != nil {
 		return nil, append(warnings, model.Warning{
@@ -138,8 +162,9 @@ func collect(
 	node *tree_sitter.Node,
 	content []byte,
 	file source.File,
-	minTokens int,
+	options Options,
 	fragments *[]model.Fragment,
+	warnings *[]model.Warning,
 	skippedFragments *int,
 ) error {
 	if node == nil {
@@ -163,12 +188,21 @@ func collect(
 				current,
 				content,
 				file,
-				minTokens,
+				options.MinTokens,
 				file.Language.FragmentKind,
 				"",
 				fragments,
 			); err != nil {
 				return err
+			}
+			if options.StatementBlocks {
+				blockWarnings, err := appendStatementBlocks(
+					ctx, current, content, file, options, fragments,
+				)
+				if err != nil {
+					return err
+				}
+				*warnings = append(*warnings, blockWarnings...)
 			}
 		}
 
@@ -327,6 +361,10 @@ func annotateNesting(fragments []model.Fragment) {
 			}
 			child := fragments[childIndex]
 			parent := fragments[parentIndex]
+			if child.Location.FragmentKind == "block" &&
+				parent.Location.FragmentKind == "block" {
+				continue
+			}
 			if parent.StartByte > child.StartByte || parent.EndByte < child.EndByte ||
 				(parent.StartByte == child.StartByte && parent.EndByte == child.EndByte) {
 				continue

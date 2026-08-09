@@ -84,6 +84,10 @@ type scanOptions struct {
 	languagePairs      stringList
 	comparisonDomain   string
 	sqlDialect         string
+	embeddedSQL        bool
+	statementBlocks    bool
+	blockStatements    int
+	maxBlocksPerFunc   int
 	ranking            string
 	priorityPaths      stringList
 	focusPaths         stringList
@@ -115,18 +119,20 @@ type scanOptions struct {
 
 func defaultScanOptions() scanOptions {
 	return scanOptions{
-		threshold:      0.70,
-		minTokens:      12,
-		maxGroups:      100,
-		maxOccurrences: 20,
-		maxPairs:       5_000_000,
-		maxFileBytes:   2 * 1024 * 1024,
-		workers:        runtime.GOMAXPROCS(0),
-		format:         "text",
-		sqlDialect:     language.SQLDialectGeneric,
-		ranking:        analyzer.RankingStructural,
-		baselineScope:  string(baseline.ScopeContent),
-		respectIgnore:  true,
+		threshold:        0.70,
+		minTokens:        12,
+		maxGroups:        100,
+		maxOccurrences:   20,
+		maxPairs:         5_000_000,
+		maxFileBytes:     2 * 1024 * 1024,
+		workers:          runtime.GOMAXPROCS(0),
+		format:           "text",
+		sqlDialect:       language.SQLDialectGeneric,
+		blockStatements:  3,
+		maxBlocksPerFunc: 64,
+		ranking:          analyzer.RankingStructural,
+		baselineScope:    string(baseline.ScopeContent),
+		respectIgnore:    true,
 	}
 }
 
@@ -146,6 +152,30 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 		"comparison-domain",
 		options.comparisonDomain,
 		"scan one comparison domain, such as code or sql-query",
+	)
+	flags.BoolVar(
+		&options.embeddedSQL,
+		"embedded-sql",
+		options.embeddedSQL,
+		"extract direct SQL string arguments from recognized Go database methods; requires --comparison-domain sql-query",
+	)
+	flags.BoolVar(
+		&options.statementBlocks,
+		"statement-blocks",
+		options.statementBlocks,
+		"compare bounded fixed-size statement windows inside functions",
+	)
+	flags.IntVar(
+		&options.blockStatements,
+		"block-statements",
+		options.blockStatements,
+		"number of direct statements in each opt-in block window",
+	)
+	flags.IntVar(
+		&options.maxBlocksPerFunc,
+		"max-blocks-per-function",
+		options.maxBlocksPerFunc,
+		"maximum block windows per function before visible coverage skip",
 	)
 	flags.Var(
 		&options.priorityPaths,
@@ -449,6 +479,18 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	if settings.SQLDialect != "" {
 		options.sqlDialect = settings.SQLDialect
 	}
+	if settings.EmbeddedSQL != nil {
+		options.embeddedSQL = *settings.EmbeddedSQL
+	}
+	if settings.StatementBlocks != nil {
+		options.statementBlocks = *settings.StatementBlocks
+	}
+	if settings.BlockStatements != nil {
+		options.blockStatements = *settings.BlockStatements
+	}
+	if settings.MaxBlocksPerFunc != nil {
+		options.maxBlocksPerFunc = *settings.MaxBlocksPerFunc
+	}
 	if settings.Ranking != "" {
 		options.ranking = settings.Ranking
 	}
@@ -546,6 +588,15 @@ func validateScanOptions(options scanOptions) error {
 	if _, err := resolveSQLDialect(options.sqlDialect); err != nil {
 		return err
 	}
+	if options.blockStatements < 2 || options.blockStatements > 10 {
+		return errors.New("--block-statements must be from 2 to 10")
+	}
+	if options.maxBlocksPerFunc < 1 || options.maxBlocksPerFunc > 256 {
+		return errors.New("--max-blocks-per-function must be from 1 to 256")
+	}
+	if options.embeddedSQL && options.statementBlocks {
+		return errors.New("--embedded-sql and --statement-blocks cannot be used together")
+	}
 	if _, err := resolveRanking(options.ranking); err != nil {
 		return err
 	}
@@ -582,6 +633,12 @@ func validateScanOptions(options scanOptions) error {
 	domain, _, err := resolveComparisonDomain(options.comparisonDomain)
 	if err != nil {
 		return err
+	}
+	if options.embeddedSQL && domain != "sql-query" {
+		return errors.New("--embedded-sql requires --comparison-domain sql-query")
+	}
+	if options.statementBlocks && domain == "sql-query" {
+		return errors.New("--statement-blocks cannot be used with --comparison-domain sql-query")
 	}
 	if err := validatePairDomain(pairs, domain); err != nil {
 		return err
@@ -814,6 +871,7 @@ func executeScan(
 		IgnoreFiles:       options.respectIgnore,
 		ComparisonDomains: domainSet,
 		SQLDialect:        sqlDialect,
+		EmbeddedSQL:       options.embeddedSQL,
 		ExcludeGenerated:  options.excludeGenerated,
 	})
 	if err != nil {
@@ -858,6 +916,11 @@ func executeScan(
 		ExcludedCoverage:  discovered.Excluded,
 		Ranking:           ranking,
 		PriorityPaths:     priorityPaths,
+		EmbeddedSQL:       options.embeddedSQL,
+		SQLDialect:        sqlDialect,
+		StatementBlocks:   options.statementBlocks,
+		BlockStatements:   options.blockStatements,
+		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
 	})
 	if err != nil {
 		return result, err
@@ -876,6 +939,10 @@ func executeScan(
 		MaxFileBytes:      options.maxFileBytes,
 		ComparisonDomain:  domain,
 		SQLDialect:        sqlDialect,
+		EmbeddedSQL:       options.embeddedSQL,
+		StatementBlocks:   options.statementBlocks,
+		BlockStatements:   options.blockStatements,
+		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
 		Ranking:           ranking,
 		PriorityPaths:     append(make([]model.PriorityPathRule, 0, len(priorityPaths)), priorityPaths...),
 		SameLanguageOnly:  options.sameLanguageOnly,

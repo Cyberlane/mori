@@ -79,7 +79,8 @@ Each worker:
 4. parses with cancellation support, applying bounded, byte-preserving
    adaptations for recognized valid JSX, Swift, SQLite, and SQLC forms, and
    closes the resulting tree;
-5. walks nodes iteratively to find fragment boundaries; and
+5. walks nodes iteratively to find fragment boundaries and any explicitly
+   enabled bounded embedded-SQL or statement-window units; and
 6. fingerprints valid fragments that meet `--min-tokens`.
 
 Tree-sitter can recover from malformed source. A root containing errors creates
@@ -105,6 +106,21 @@ only top-level
 immediately adjacent SQLC name comments label query locations. DDL is ignored,
 and nested query structure remains inside its top-level query rather than
 becoming another occurrence.
+
+Embedded SQL is opt-in and limited to direct Go string arguments on a bounded
+set of database method names. The chosen SQL grammar parses decoded string
+content, while report ranges identify the enclosing host literal and retain
+the Go parent function. This is syntax extraction, not receiver-type, data-flow,
+or runtime-value analysis. A decoded query is capped at 256 KiB, a host file is
+capped at 1,000 recognized calls, and a multi-statement string becomes one
+query-batch comparison unit. Exceeding either cap is visible in coverage
+warnings.
+
+Statement-block extraction is also opt-in. It creates fixed-size windows in
+recognized statement containers inside each function, deduplicates identical
+source spans, links every block to its containing function, and emits no block
+windows for a function whose configured cap would be exceeded. Same-file
+overlapping block windows are excluded before candidate counting.
 
 Nested functions are discovered independently. Their bodies are represented by
 a single nested-function feature in the containing function, preventing a
@@ -151,7 +167,7 @@ bag \(B\), weighted Jaccard cannot exceed:
 \]
 
 Pairs whose upper bound is below the threshold are never scored. SQL queries,
-code functions, and shell scripts therefore never cross comparison-unit
+code functions, shell scripts, and code blocks therefore never cross comparison-unit
 boundaries. Same-language scans score within each review family, while
 cross-language scans score across review families. TypeScript and TSX, and
 Bash/POSIX shell and Zsh, therefore remain same-family comparisons. Explicit language-pair selectors expand
