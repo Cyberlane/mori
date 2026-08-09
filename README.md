@@ -208,7 +208,7 @@ the report and exit with status `4` when either condition occurs:
 mori scan --format json --require-coverage .
 ```
 
-Schema-7 reports embed deterministic `tool` build provenance, comparison
+Schema-8 reports embed deterministic `tool` build provenance, comparison
 selection, domain and fragment-kind metadata, and exact focus metadata. They do
 not include a scan timestamp, hostname, username, source body, diff, or Git
 remote.
@@ -236,11 +236,26 @@ for explicit paths. `--fail-on-focused-match` exits with status `3` only when
 an unsuppressed focused group exists and is mutually exclusive with
 `--fail-on-match`.
 
-A changed-file scan rejects discovered source spanning nested Git worktrees or
-submodules because one revision cannot safely describe multiple histories.
-Exclude and scan each nested worktree separately, or use exact `--focus-path`
-values when they represent the intended review. Do not interpret an excluded
-nested repository as unchanged.
+One revision cannot safely describe multiple Git histories. Add each nested or
+sibling worktree explicitly with its own locally available revision:
+
+```sh
+mori scan \
+  --changed-since origin/main \
+  --changed-worktree byparr=origin/main \
+  --threshold 0.85 \
+  .
+```
+
+`--changed-since` describes the primary worktree; repeatable
+`--changed-worktree PATH=REVISION` values describe the other worktrees. Mori
+requires every discovered file to belong to a resolved root, never inherits a
+parent revision for a nested repository, and records each root's requested
+base, full resolved commits, changed paths, and deleted paths in schema-8 JSON.
+Use only repeated `--changed-worktree` values when every scanned root should be
+explicit. Excluding and scanning a nested worktree separately remains valid;
+never interpret an excluded repository as unchanged. Mori bounds one scan to
+64 explicit worktrees and 100,000 combined changed and deleted paths.
 
 To record intentional candidates and use Mori as a stable CI gate:
 

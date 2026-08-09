@@ -97,6 +97,39 @@ func TestResolveChangedRejectsNestedRepository(t *testing.T) {
 	}
 }
 
+func TestResolveChangedAtRootRequiresExactWorktreeAndKeepsRootLocalPaths(t *testing.T) {
+	root := initRepository(t)
+	writeFile(t, root, "main.go", "package sample\n")
+	runGit(t, root, "add", ".")
+	runGit(t, root, "commit", "-m", "base")
+	base := strings.TrimSpace(runGit(t, root, "rev-parse", "HEAD"))
+	writeFile(t, root, "main.go", "package sample\n// changed\n")
+	writeFile(t, root, "new.go", "package sample\n")
+
+	changes, err := ResolveChangedAtRoot(context.Background(), root, base)
+	if err != nil {
+		t.Fatalf("ResolveChangedAtRoot: %v", err)
+	}
+	canonicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatalf("EvalSymlinks: %v", err)
+	}
+	if changes.Root != canonicalRoot || !reflect.DeepEqual(changes.ChangedPaths, []string{"main.go", "new.go"}) {
+		t.Fatalf("changes = %#v", changes)
+	}
+	if _, err := ResolveChangedAtRoot(context.Background(), filepath.Join(root, "subdir"), base); err == nil ||
+		!strings.Contains(err.Error(), "canonicalize explicit Git worktree") {
+		t.Fatalf("missing explicit root error = %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "subdir"), 0o700); err != nil {
+		t.Fatalf("Mkdir: %v", err)
+	}
+	if _, err := ResolveChangedAtRoot(context.Background(), filepath.Join(root, "subdir"), base); err == nil ||
+		!strings.Contains(err.Error(), "resolves to parent worktree") {
+		t.Fatalf("parent worktree error = %v", err)
+	}
+}
+
 func TestResolveChangedHonorsCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

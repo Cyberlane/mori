@@ -22,17 +22,20 @@ import (
 	"github.com/Cyberlane/mori/internal/language"
 	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/normalize"
+	"github.com/Cyberlane/mori/internal/pathutil"
 	"github.com/Cyberlane/mori/internal/report"
 	"github.com/Cyberlane/mori/internal/source"
 	"github.com/Cyberlane/mori/internal/vcs"
 )
 
 const (
-	exitSuccess  = 0
-	exitError    = 1
-	exitUsage    = 2
-	exitFindings = 3
-	exitCoverage = 4
+	exitSuccess         = 0
+	exitError           = 1
+	exitUsage           = 2
+	exitFindings        = 3
+	exitCoverage        = 4
+	maxChangedWorktrees = 64
+	maxFocusedGitPaths  = 100_000
 )
 
 // Run executes one CLI invocation and returns its process exit code.
@@ -78,6 +81,7 @@ type scanOptions struct {
 	sqlDialect         string
 	focusPaths         stringList
 	changedSince       string
+	changedWorktrees   stringList
 	threshold          float64
 	minTokens          int
 	maxGroups          int
@@ -161,7 +165,12 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 		&options.changedSince,
 		"changed-since",
 		options.changedSince,
-		"prioritize files changed since this local Git revision",
+		"prioritize files in the primary Git worktree changed since this local revision",
+	)
+	flags.Var(
+		&options.changedWorktrees,
+		"changed-worktree",
+		"prioritize changes in an explicit Git worktree as PATH=REVISION; repeatable",
 	)
 	flags.BoolVar(
 		&options.failOnMatch,
@@ -408,8 +417,12 @@ func validateScanOptions(options scanOptions) error {
 	if options.failOnMatch && options.failOnFocusedMatch {
 		return errors.New("--fail-on-match and --fail-on-focused-match cannot be used together")
 	}
-	if options.failOnFocusedMatch && len(options.focusPaths) == 0 && options.changedSince == "" {
-		return errors.New("--fail-on-focused-match requires --focus-path or --changed-since")
+	if options.failOnFocusedMatch && len(options.focusPaths) == 0 && options.changedSince == "" &&
+		len(options.changedWorktrees) == 0 {
+		return errors.New("--fail-on-focused-match requires --focus-path, --changed-since, or --changed-worktree")
+	}
+	if _, err := parseChangedWorktreeSpecs(options.changedWorktrees); err != nil {
+		return err
 	}
 	pairs, err := expandLanguagePairs(options.languagePairs)
 	if err != nil {
@@ -489,7 +502,8 @@ func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, std
 	if !ok {
 		return code
 	}
-	if len(options.focusPaths) > 0 || options.changedSince != "" || options.failOnFocusedMatch {
+	if len(options.focusPaths) > 0 || options.changedSince != "" || len(options.changedWorktrees) > 0 ||
+		options.failOnFocusedMatch {
 		return usageError(stderr, "focus options cannot be used with baseline update")
 	}
 	if options.baselinePath == "" {
@@ -529,7 +543,8 @@ func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stde
 	if !ok {
 		return code
 	}
-	if len(options.focusPaths) > 0 || options.changedSince != "" || options.failOnFocusedMatch {
+	if len(options.focusPaths) > 0 || options.changedSince != "" || len(options.changedWorktrees) > 0 ||
+		options.failOnFocusedMatch {
 		return usageError(stderr, "focus options cannot be used with baseline prune")
 	}
 	if options.baselinePath == "" {
@@ -644,19 +659,21 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
 	}
-	var changes *vcs.Changes
-	if options.changedSince != "" {
-		filePaths := make([]string, 0, len(discovered.Files))
-		for _, file := range discovered.Files {
-			filePaths = append(filePaths, file.Path)
-		}
-		resolved, resolveErr := vcs.ResolveChanged(ctx, filePaths, options.changedSince)
-		if resolveErr != nil {
-			return model.Report{}, fmt.Errorf("resolve changed files: %w", resolveErr)
-		}
-		changes = &resolved
+	changes, worktreeMode, err := resolveChangedWorktrees(
+		ctx,
+		discovered.Files,
+		options.changedSince,
+		options.changedWorktrees,
+	)
+	if err != nil {
+		return model.Report{}, fmt.Errorf("resolve changed files: %w", err)
 	}
-	focus, focusSet, focusWarnings, err := resolveFocus(options.focusPaths, changes, discovered.Files)
+	focus, focusSet, focusWarnings, err := resolveFocus(
+		options.focusPaths,
+		changes,
+		worktreeMode,
+		discovered.Files,
+	)
 	if err != nil {
 		return model.Report{}, fmt.Errorf("resolve focus: %w", err)
 	}
@@ -721,12 +738,153 @@ func resolveSQLDialect(value string) (string, error) {
 	)
 }
 
+type changedWorktreeSpec struct {
+	Path     string
+	Revision string
+}
+
+func parseChangedWorktreeSpecs(values []string) ([]changedWorktreeSpec, error) {
+	if len(values) > maxChangedWorktrees {
+		return nil, fmt.Errorf(
+			"--changed-worktree count exceeded the %d worktree safety limit",
+			maxChangedWorktrees,
+		)
+	}
+	specs := make([]changedWorktreeSpec, 0, len(values))
+	for _, value := range values {
+		path, revision, ok := strings.Cut(value, "=")
+		path = strings.TrimSpace(path)
+		revision = strings.TrimSpace(revision)
+		if !ok || path == "" || revision == "" {
+			return nil, fmt.Errorf(
+				"invalid --changed-worktree %q; expected PATH=REVISION",
+				value,
+			)
+		}
+		specs = append(specs, changedWorktreeSpec{Path: path, Revision: revision})
+	}
+	return specs, nil
+}
+
+func resolveChangedWorktrees(
+	ctx context.Context,
+	files []source.File,
+	primaryRevision string,
+	values []string,
+) ([]vcs.Changes, bool, error) {
+	specs, err := parseChangedWorktreeSpecs(values)
+	if err != nil {
+		return nil, false, err
+	}
+	if primaryRevision == "" && len(specs) == 0 {
+		return nil, false, nil
+	}
+	type resolvedSpec struct {
+		changedWorktreeSpec
+		root  string
+		files int
+	}
+	resolved := make([]resolvedSpec, 0, len(specs))
+	seenRoots := make(map[string]struct{}, len(specs))
+	for _, spec := range specs {
+		absolute, err := filepath.Abs(spec.Path)
+		if err != nil {
+			return nil, true, fmt.Errorf("resolve --changed-worktree path: %w", err)
+		}
+		root, err := filepath.EvalSymlinks(filepath.Clean(absolute))
+		if err != nil {
+			return nil, true, fmt.Errorf("resolve --changed-worktree %q: %w", spec.Path, err)
+		}
+		if _, exists := seenRoots[root]; exists {
+			return nil, true, fmt.Errorf("duplicate --changed-worktree root %q", displayCLIPath(root))
+		}
+		seenRoots[root] = struct{}{}
+		resolved = append(resolved, resolvedSpec{changedWorktreeSpec: spec, root: root})
+	}
+	sort.Slice(resolved, func(left, right int) bool {
+		if len(resolved[left].root) != len(resolved[right].root) {
+			return len(resolved[left].root) > len(resolved[right].root)
+		}
+		return resolved[left].root < resolved[right].root
+	})
+
+	remaining := make([]string, 0, len(files))
+	for _, file := range files {
+		path := canonicalPath(file.Path)
+		assigned := false
+		for index := range resolved {
+			if pathutil.Within(resolved[index].root, path) {
+				resolved[index].files++
+				assigned = true
+				break
+			}
+		}
+		if !assigned {
+			remaining = append(remaining, file.Path)
+		}
+	}
+	for _, spec := range resolved {
+		if spec.files == 0 && len(files) > 0 {
+			return nil, true, fmt.Errorf(
+				"--changed-worktree root %q contains no discovered source files",
+				displayCLIPath(spec.root),
+			)
+		}
+	}
+	changes := make([]vcs.Changes, 0, len(resolved)+1)
+	totalPaths := 0
+	if primaryRevision != "" {
+		if len(remaining) == 0 {
+			return nil, true, errors.New(
+				"--changed-since has no discovered files outside --changed-worktree roots",
+			)
+		}
+		change, err := vcs.ResolveChanged(ctx, remaining, primaryRevision)
+		if err != nil {
+			return nil, true, err
+		}
+		totalPaths += len(change.ChangedPaths) + len(change.DeletedPaths)
+		changes = append(changes, change)
+	} else if len(remaining) > 0 {
+		return nil, true, fmt.Errorf(
+			"%d discovered source file(s) are outside the explicit --changed-worktree roots",
+			len(remaining),
+		)
+	}
+	for _, spec := range resolved {
+		change, err := vcs.ResolveChangedAtRoot(ctx, spec.root, spec.Revision)
+		if err != nil {
+			return nil, true, fmt.Errorf("resolve --changed-worktree %q: %w", spec.Path, err)
+		}
+		totalPaths += len(change.ChangedPaths) + len(change.DeletedPaths)
+		if totalPaths > maxFocusedGitPaths {
+			return nil, true, fmt.Errorf(
+				"Git changed path count exceeded the %d path safety limit across worktrees",
+				maxFocusedGitPaths,
+			)
+		}
+		changes = append(changes, change)
+	}
+	sort.Slice(changes, func(left, right int) bool {
+		return changes[left].Root < changes[right].Root
+	})
+	return changes, len(specs) > 0, nil
+}
+
+func displayWorktreePath(root string, path string) string {
+	if root == "." {
+		return filepath.ToSlash(path)
+	}
+	return filepath.ToSlash(filepath.Join(filepath.FromSlash(root), filepath.FromSlash(path)))
+}
+
 func resolveFocus(
 	values []string,
-	changes *vcs.Changes,
+	changes []vcs.Changes,
+	worktreeMode bool,
 	files []source.File,
 ) (*model.FocusConfig, map[string]struct{}, []model.Warning, error) {
-	if len(values) == 0 && changes == nil {
+	if len(values) == 0 && len(changes) == 0 {
 		return nil, nil, nil, nil
 	}
 	fileByPath := make(map[string]source.File, len(files))
@@ -742,8 +900,8 @@ func resolveFocus(
 			return nil, nil, nil, err
 		}
 		candidates := []string{cwdAbsolute}
-		if changes != nil && !filepath.IsAbs(value) {
-			candidates = append(candidates, filepath.Join(changes.Root, filepath.FromSlash(value)))
+		if len(changes) == 1 && !filepath.IsAbs(value) {
+			candidates = append(candidates, filepath.Join(changes[0].Root, filepath.FromSlash(value)))
 		}
 		found := false
 		for _, candidate := range candidates {
@@ -765,25 +923,60 @@ func resolveFocus(
 		ChangedPaths:  make([]string, 0),
 		DeletedPaths:  make([]string, 0),
 	}
-	if changes != nil {
+	if len(changes) > 0 {
 		config.Mode = "git"
 		if len(values) > 0 {
 			config.Mode = "git-and-explicit"
 		}
-		config.RequestedBase = changes.RequestedBase
-		config.BaseCommit = changes.BaseCommit
-		config.MergeBase = changes.MergeBase
-		config.HeadCommit = changes.HeadCommit
 		config.WorkingTreeIncluded = true
 		config.UntrackedIncluded = true
-		config.ChangedPaths = append(config.ChangedPaths, changes.ChangedPaths...)
-		config.DeletedPaths = append(config.DeletedPaths, changes.DeletedPaths...)
-		for _, changedPath := range changes.ChangedPaths {
-			file, ok := fileByPath[canonicalPath(filepath.Join(changes.Root, filepath.FromSlash(changedPath)))]
-			if ok {
-				matched[file.DisplayPath] = struct{}{}
-			} else {
-				missing++
+		if !worktreeMode && len(changes) == 1 {
+			change := changes[0]
+			config.RequestedBase = change.RequestedBase
+			config.BaseCommit = change.BaseCommit
+			config.MergeBase = change.MergeBase
+			config.HeadCommit = change.HeadCommit
+			config.ChangedPaths = append(config.ChangedPaths, change.ChangedPaths...)
+			config.DeletedPaths = append(config.DeletedPaths, change.DeletedPaths...)
+		} else {
+			config.Mode = "git-worktrees"
+			if len(values) > 0 {
+				config.Mode = "git-worktrees-and-explicit"
+			}
+			for _, change := range changes {
+				root := displayCLIPath(change.Root)
+				config.Worktrees = append(config.Worktrees, model.WorktreeFocusConfig{
+					Root:                root,
+					RequestedBase:       change.RequestedBase,
+					BaseCommit:          change.BaseCommit,
+					MergeBase:           change.MergeBase,
+					HeadCommit:          change.HeadCommit,
+					WorkingTreeIncluded: true,
+					UntrackedIncluded:   true,
+					ChangedPaths:        append([]string{}, change.ChangedPaths...),
+					DeletedPaths:        append([]string{}, change.DeletedPaths...),
+				})
+				for _, path := range change.ChangedPaths {
+					config.ChangedPaths = append(config.ChangedPaths, displayWorktreePath(root, path))
+				}
+				for _, path := range change.DeletedPaths {
+					config.DeletedPaths = append(config.DeletedPaths, displayWorktreePath(root, path))
+				}
+			}
+			sort.Slice(config.Worktrees, func(left, right int) bool {
+				return config.Worktrees[left].Root < config.Worktrees[right].Root
+			})
+			sort.Strings(config.ChangedPaths)
+			sort.Strings(config.DeletedPaths)
+		}
+		for _, change := range changes {
+			for _, changedPath := range change.ChangedPaths {
+				file, ok := fileByPath[canonicalPath(filepath.Join(change.Root, filepath.FromSlash(changedPath)))]
+				if ok {
+					matched[file.DisplayPath] = struct{}{}
+				} else {
+					missing++
+				}
 			}
 		}
 	}

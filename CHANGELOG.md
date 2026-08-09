@@ -7,6 +7,20 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added repeatable `--changed-worktree PATH=REVISION` focus for nested and
+  sibling Git worktrees with independently resolved revisions and local
+  working-tree state.
+
+### Changed
+
+- Machine-readable reports now use schema version 8 and record deterministic
+  per-worktree focus provenance. Normalization remains version 6 and existing
+  baselines remain compatible.
+- Updated CLI help, repository guidance, and the bundled review skill for
+  explicit multi-worktree and submodule review.
+
 ## [0.12.0] - 2026-08-09
 
 ### Added

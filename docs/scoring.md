@@ -174,10 +174,10 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 7,
+  "schema_version": 8,
   "tool": {
     "name": "mori",
-    "version": "0.12.0",
+    "version": "0.13.0",
     "revision": "<full source revision>",
     "source_date": "<RFC3339 commit time>",
     "modified": false,
@@ -227,6 +227,15 @@ compares within review families, including TypeScript with TSX. Warnings can
 include bounded parser node ranges and skipped-fragment counts.
 Suppression fields separate affected source pairs from content identities.
 Consumers should reject or explicitly handle unknown schema versions.
+
+Schema 8 adds `configuration.focus.worktrees` for explicit multi-worktree Git
+focus. Each entry contains `root`, `requested_base`, full `base_commit`,
+`merge_base`, and `head_commit` values, working-tree and untracked inclusion
+flags, plus changed and deleted paths relative to that root. A single
+`--changed-since` scan retains the established scalar focus fields. Multi-root
+mode also exposes deterministic root-qualified aggregate `changed_paths` and
+`deleted_paths`. This reporting change does not alter normalization version 6,
+fragment fingerprints, similarity scores, or baseline schema 2.
 
 Official release binaries populate the full `revision` and `source_date`.
 Source-built commands such as `go install ...@version` or `go run
