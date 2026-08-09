@@ -264,6 +264,9 @@ revision or date from the version string. Inspect:
   when occurrence sampling is truncated;
 - `comparison_domain` and `fragment_kind`: require compatible domains and use
   the kind to describe functions versus queries accurately;
+- `configuration.priority_paths`: disclose every project-supplied path weight
+  and treat matching `priority-path:` signals as presentation policy only, not
+  inferred security or refactoring confidence;
 - `similarity`: report it as structural similarity only; and
 - `shape_summary` and `shared_features`: use them to explain why a group ranked
   highly without treating the summary as behavioral evidence.

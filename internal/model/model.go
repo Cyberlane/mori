@@ -120,6 +120,13 @@ type LiteralEvidence struct {
 	LiteralCountMismatchPairs int `json:"literal_count_mismatch_pairs"`
 }
 
+// PriorityPathRule is one deterministic presentation-only review-priority
+// rule. It never changes structural scores or content identities.
+type PriorityPathRule struct {
+	Pattern  string `json:"pattern"`
+	Priority int    `json:"priority"`
+}
+
 // WorktreeFocusConfig records one explicitly resolved Git worktree and keeps
 // every path relative to that worktree root.
 type WorktreeFocusConfig struct {
@@ -188,25 +195,26 @@ type FileCoverage struct {
 // EffectiveConfig records the scan inputs needed to reproduce discovery and
 // pair selection.
 type EffectiveConfig struct {
-	Profile           string       `json:"profile,omitempty"`
-	ConfigPath        string       `json:"config_path,omitempty"`
-	IgnoreFiles       []string     `json:"ignore_files"`
-	RespectIgnore     bool         `json:"respect_ignore"`
-	ExcludeGenerated  bool         `json:"exclude_generated"`
-	Excludes          []string     `json:"excludes"`
-	MinTokens         int          `json:"min_tokens"`
-	MaxGroups         int          `json:"max_groups"`
-	MaxOccurrences    int          `json:"max_occurrences"`
-	MaxPairs          int          `json:"max_pairs"`
-	MaxFileBytes      int64        `json:"max_file_bytes"`
-	ComparisonDomain  string       `json:"comparison_domain"`
-	SQLDialect        string       `json:"sql_dialect"`
-	Ranking           string       `json:"ranking"`
-	SameLanguageOnly  bool         `json:"same_language_only"`
-	CrossLanguageOnly bool         `json:"cross_language_only"`
-	LanguagePairs     []string     `json:"language_pairs"`
-	BaselinePath      string       `json:"baseline_path,omitempty"`
-	Focus             *FocusConfig `json:"focus,omitempty"`
+	Profile           string             `json:"profile,omitempty"`
+	ConfigPath        string             `json:"config_path,omitempty"`
+	IgnoreFiles       []string           `json:"ignore_files"`
+	RespectIgnore     bool               `json:"respect_ignore"`
+	ExcludeGenerated  bool               `json:"exclude_generated"`
+	Excludes          []string           `json:"excludes"`
+	MinTokens         int                `json:"min_tokens"`
+	MaxGroups         int                `json:"max_groups"`
+	MaxOccurrences    int                `json:"max_occurrences"`
+	MaxPairs          int                `json:"max_pairs"`
+	MaxFileBytes      int64              `json:"max_file_bytes"`
+	ComparisonDomain  string             `json:"comparison_domain"`
+	SQLDialect        string             `json:"sql_dialect"`
+	Ranking           string             `json:"ranking"`
+	PriorityPaths     []PriorityPathRule `json:"priority_paths"`
+	SameLanguageOnly  bool               `json:"same_language_only"`
+	CrossLanguageOnly bool               `json:"cross_language_only"`
+	LanguagePairs     []string           `json:"language_pairs"`
+	BaselinePath      string             `json:"baseline_path,omitempty"`
+	Focus             *FocusConfig       `json:"focus,omitempty"`
 }
 
 // Report is the stable JSON and text reporting model.

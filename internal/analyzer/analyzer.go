@@ -15,6 +15,7 @@ import (
 	"github.com/Cyberlane/mori/internal/parser"
 	"github.com/Cyberlane/mori/internal/similarity"
 	"github.com/Cyberlane/mori/internal/source"
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 const (
@@ -38,6 +39,7 @@ type Options struct {
 	Suppress          func(id string, left model.Location, right model.Location) bool
 	ExcludedCoverage  []model.FileCoverage
 	Ranking           string
+	PriorityPaths     []model.PriorityPathRule
 }
 
 // LanguagePair selects one concrete grammar-ID pair for comparison.
@@ -519,7 +521,7 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 func (collector *matchCollector) finish() {
 	candidates := make([]*groupCandidate, 0, len(collector.groups))
 	for _, candidate := range collector.groups {
-		candidate.reviewPriority, candidate.reviewSignals = reviewPriority(candidate)
+		candidate.reviewPriority, candidate.reviewSignals = reviewPriority(candidate, collector.options.PriorityPaths)
 		candidates = append(candidates, candidate)
 	}
 	sort.Slice(candidates, func(i, j int) bool {
@@ -603,7 +605,7 @@ func abs(value int) int {
 	return value
 }
 
-func reviewPriority(candidate *groupCandidate) (int, []string) {
+func reviewPriority(candidate *groupCandidate, priorityPaths []model.PriorityPathRule) (int, []string) {
 	sameNameCrossDirectory := false
 	crossDirectory := false
 	sameNameCrossFile := false
@@ -646,6 +648,21 @@ func reviewPriority(candidate *groupCandidate) (int, []string) {
 	if candidate.locationPairs > 1 {
 		priority++
 		signals = append(signals, "repeated-location-pairs")
+	}
+	for _, rule := range priorityPaths {
+		matched := false
+		for _, pair := range candidate.pathPairs {
+			leftMatch, _ := doublestar.Match(rule.Pattern, filepath.ToSlash(pair.Left.Path))
+			rightMatch, _ := doublestar.Match(rule.Pattern, filepath.ToSlash(pair.Right.Path))
+			if leftMatch || rightMatch {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			priority += rule.Priority
+			signals = append(signals, fmt.Sprintf("priority-path:%s(+%d)", rule.Pattern, rule.Priority))
+		}
 	}
 	return priority, signals
 }

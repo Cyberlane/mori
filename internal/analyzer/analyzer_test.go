@@ -199,7 +199,7 @@ func TestReviewPriorityUsesOnlyExplainableLocationSignals(t *testing.T) {
 			},
 		},
 	}
-	priority, signals := reviewPriority(candidate)
+	priority, signals := reviewPriority(candidate, nil)
 	if priority != 10 {
 		t.Fatalf("priority = %d, want 10", priority)
 	}
@@ -212,6 +212,33 @@ func TestReviewPriorityUsesOnlyExplainableLocationSignals(t *testing.T) {
 	}
 	if !reflect.DeepEqual(signals, want) {
 		t.Fatalf("signals = %#v, want %#v", signals, want)
+	}
+}
+
+func TestReviewPriorityAddsConfiguredPathRulesOnce(t *testing.T) {
+	t.Parallel()
+
+	candidate := &groupCandidate{
+		locationPairs: 2,
+		pathPairs: map[string]model.LocationPair{
+			"one": {
+				Left:  model.Location{Path: "internal/auth/file.go", Name: "authorize"},
+				Right: model.Location{Path: "internal/store/file.go", Name: "authorize"},
+			},
+			"two": {
+				Left:  model.Location{Path: "internal/auth/other.go", Name: "authorize"},
+				Right: model.Location{Path: "internal/store/other.go", Name: "authorize"},
+			},
+		},
+	}
+	priority, signals := reviewPriority(candidate, []model.PriorityPathRule{{
+		Pattern: "**/auth/**", Priority: 25,
+	}})
+	if priority != 35 {
+		t.Fatalf("priority = %d, want base 10 plus configured 25", priority)
+	}
+	if signals[len(signals)-1] != "priority-path:**/auth/**(+25)" {
+		t.Fatalf("signals = %#v", signals)
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -22,6 +23,29 @@ type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) {
 	return 0, errors.New("write failed")
+}
+
+func TestPriorityPathRulesValidateAndSort(t *testing.T) {
+	t.Parallel()
+
+	rules, err := parsePriorityPathRules([]string{"**/z/**=5", "**/a/**=25"})
+	if err != nil {
+		t.Fatalf("parsePriorityPathRules: %v", err)
+	}
+	if len(rules) != 2 || rules[0].Pattern != "**/a/**" || rules[0].Priority != 25 {
+		t.Fatalf("rules = %#v", rules)
+	}
+	for _, values := range [][]string{
+		{"missing-weight"},
+		{"**/auth/**=0"},
+		{"**/auth/**=101"},
+		{"[=10"},
+		{"**/auth/**=10", "**/auth/**=20"},
+	} {
+		if _, err := parsePriorityPathRules(values); err == nil {
+			t.Fatalf("parsePriorityPathRules(%#v) succeeded", values)
+		}
+	}
 }
 
 func TestRunLanguages(t *testing.T) {
@@ -302,6 +326,41 @@ func TestRunScanJSONAndFailOnMatch(t *testing.T) {
 	if result.SchemaVersion != model.SchemaVersion || result.Tool.Name != "mori" || result.Tool.Revision == "" ||
 		result.Tool.NormalizationVersion != normalize.Version {
 		t.Fatalf("report provenance = schema %d, tool %#v", result.SchemaVersion, result.Tool)
+	}
+}
+
+func TestRunAppliesPriorityPathRule(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	auth := filepath.Join(root, "auth")
+	if err := os.MkdirAll(auth, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := "package auth\nfunc authorize(value string) string { return value }\n"
+	for _, name := range []string{"file.go", "folder.go"} {
+		if err := os.WriteFile(filepath.Join(auth, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--threshold", "1", "--min-tokens", "1", "--format", "json",
+		"--ranking", "review", "--priority-path", "**/auth/**=25", root,
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	if len(result.Configuration.PriorityPaths) != 1 || len(result.Groups) != 1 ||
+		result.Groups[0].ReviewPriority < 25 ||
+		!slices.Contains(result.Groups[0].ReviewSignals, "priority-path:**/auth/**(+25)") {
+		t.Fatalf("priority report = %#v", result)
 	}
 }
 

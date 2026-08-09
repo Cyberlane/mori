@@ -233,6 +233,16 @@ For a human review shortlist, opt into explainable source-location ranking:
 mori scan --ranking review .
 ```
 
+Projects can add deterministic presentation-only path priority without changing
+scores or match eligibility:
+
+```sh
+mori scan --profile review --priority-path '**/auth/**=25' .
+```
+
+Repeat the flag or use `priority_paths` in `.mori.json`. A matching path changes
+review order only and is not evidence that a finding is risky or actionable.
+
 This prioritizes disclosed same-name, cross-directory, cross-file, and repeated
 location-pair signals before the ordinary structural ordering. It does not
 change similarity scores, fingerprints, or which groups qualify.

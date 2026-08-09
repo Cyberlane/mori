@@ -212,7 +212,7 @@ func Text(writer io.Writer, report model.Report) error {
 				writer,
 				"   review priority %d · %s\n",
 				group.ReviewPriority,
-				signals,
+				terminalSafe(signals),
 			); err != nil {
 				return err
 			}

@@ -31,6 +31,7 @@ type Settings struct {
 	ComparisonDomain  string   `json:"comparison_domain,omitempty"`
 	SQLDialect        string   `json:"sql_dialect,omitempty"`
 	Ranking           string   `json:"ranking,omitempty"`
+	PriorityPaths     []string `json:"priority_paths,omitempty"`
 	SameLanguageOnly  *bool    `json:"same_language_only,omitempty"`
 	CrossLanguageOnly *bool    `json:"cross_language_only,omitempty"`
 	LanguagePairs     []string `json:"language_pairs,omitempty"`

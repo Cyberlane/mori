@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Cyberlane/mori/internal/analyzer"
@@ -26,6 +27,7 @@ import (
 	"github.com/Cyberlane/mori/internal/report"
 	"github.com/Cyberlane/mori/internal/source"
 	"github.com/Cyberlane/mori/internal/vcs"
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 const (
@@ -83,6 +85,7 @@ type scanOptions struct {
 	comparisonDomain   string
 	sqlDialect         string
 	ranking            string
+	priorityPaths      stringList
 	focusPaths         stringList
 	changedSince       string
 	changedWorktrees   stringList
@@ -143,6 +146,11 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 		"comparison-domain",
 		options.comparisonDomain,
 		"scan one comparison domain, such as code or sql-query",
+	)
+	flags.Var(
+		&options.priorityPaths,
+		"priority-path",
+		"add review priority for matching paths as GLOB=WEIGHT; repeatable",
 	)
 	flags.StringVar(
 		&options.sqlDialect,
@@ -444,6 +452,7 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	if settings.Ranking != "" {
 		options.ranking = settings.Ranking
 	}
+	options.priorityPaths = append(options.priorityPaths, settings.PriorityPaths...)
 	if settings.Baseline != "" {
 		options.baselinePath = resolveConfigPath(base, settings.Baseline)
 	}
@@ -538,6 +547,9 @@ func validateScanOptions(options scanOptions) error {
 		return err
 	}
 	if _, err := resolveRanking(options.ranking); err != nil {
+		return err
+	}
+	if _, err := parsePriorityPathRules(options.priorityPaths); err != nil {
 		return err
 	}
 	selectionModes := 0
@@ -792,6 +804,10 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, err
 	}
+	priorityPaths, err := parsePriorityPathRules(options.priorityPaths)
+	if err != nil {
+		return model.Report{}, err
+	}
 	discovered, err := source.DiscoverContext(ctx, paths, source.Options{
 		Excludes:          options.excludes,
 		MaxFileBytes:      options.maxFileBytes,
@@ -841,6 +857,7 @@ func executeScan(
 		Suppress:          suppress,
 		ExcludedCoverage:  discovered.Excluded,
 		Ranking:           ranking,
+		PriorityPaths:     priorityPaths,
 	})
 	if err != nil {
 		return result, err
@@ -860,6 +877,7 @@ func executeScan(
 		ComparisonDomain:  domain,
 		SQLDialect:        sqlDialect,
 		Ranking:           ranking,
+		PriorityPaths:     append(make([]model.PriorityPathRule, 0, len(priorityPaths)), priorityPaths...),
 		SameLanguageOnly:  options.sameLanguageOnly,
 		CrossLanguageOnly: options.crossLanguageOnly,
 		LanguagePairs:     append([]string{}, options.languagePairs...),
@@ -871,6 +889,45 @@ func executeScan(
 	sort.Strings(result.Configuration.Excludes)
 	sort.Strings(result.Configuration.LanguagePairs)
 	return result, nil
+}
+
+const maxPriorityPathRules = 32
+
+func parsePriorityPathRules(values []string) ([]model.PriorityPathRule, error) {
+	if len(values) > maxPriorityPathRules {
+		return nil, fmt.Errorf("at most %d --priority-path rules are allowed", maxPriorityPathRules)
+	}
+	rules := make([]model.PriorityPathRule, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		separator := strings.LastIndexByte(value, '=')
+		if separator <= 0 || separator == len(value)-1 {
+			return nil, fmt.Errorf("invalid --priority-path %q; expected GLOB=WEIGHT", value)
+		}
+		pattern := strings.TrimSpace(value[:separator])
+		weight, err := strconv.Atoi(strings.TrimSpace(value[separator+1:]))
+		if pattern == "" || err != nil || weight < 1 || weight > 100 {
+			return nil, fmt.Errorf("invalid --priority-path %q; weight must be an integer from 1 to 100", value)
+		}
+		if len(pattern) > 512 {
+			return nil, fmt.Errorf("invalid --priority-path %q; glob exceeds 512 bytes", value)
+		}
+		if _, exists := seen[pattern]; exists {
+			return nil, fmt.Errorf("duplicate --priority-path pattern %q", pattern)
+		}
+		if _, err := doublestar.Match(pattern, "path"); err != nil {
+			return nil, fmt.Errorf("invalid --priority-path pattern %q: %w", pattern, err)
+		}
+		seen[pattern] = struct{}{}
+		rules = append(rules, model.PriorityPathRule{Pattern: pattern, Priority: weight})
+	}
+	sort.Slice(rules, func(i, j int) bool {
+		if rules[i].Pattern != rules[j].Pattern {
+			return rules[i].Pattern < rules[j].Pattern
+		}
+		return rules[i].Priority < rules[j].Priority
+	})
+	return rules, nil
 }
 
 func resolveRanking(value string) (string, error) {
