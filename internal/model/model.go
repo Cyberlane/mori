@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 7
+const SchemaVersion = 8
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -107,19 +107,34 @@ type MatchGroup struct {
 	PathPairs      []LocationPair    `json:"-"`
 }
 
+// WorktreeFocusConfig records one explicitly resolved Git worktree and keeps
+// every path relative to that worktree root.
+type WorktreeFocusConfig struct {
+	Root                string   `json:"root"`
+	RequestedBase       string   `json:"requested_base"`
+	BaseCommit          string   `json:"base_commit"`
+	MergeBase           string   `json:"merge_base"`
+	HeadCommit          string   `json:"head_commit"`
+	WorkingTreeIncluded bool     `json:"working_tree_included"`
+	UntrackedIncluded   bool     `json:"untracked_included"`
+	ChangedPaths        []string `json:"changed_paths"`
+	DeletedPaths        []string `json:"deleted_paths"`
+}
+
 // FocusConfig records deterministic path focus inputs and their resolution.
 type FocusConfig struct {
-	Mode                 string   `json:"mode"`
-	ExplicitPaths        []string `json:"explicit_paths"`
-	RequestedBase        string   `json:"requested_base,omitempty"`
-	BaseCommit           string   `json:"base_commit,omitempty"`
-	MergeBase            string   `json:"merge_base,omitempty"`
-	HeadCommit           string   `json:"head_commit,omitempty"`
-	WorkingTreeIncluded  bool     `json:"working_tree_included"`
-	UntrackedIncluded    bool     `json:"untracked_included"`
-	ChangedPaths         []string `json:"changed_paths"`
-	DeletedPaths         []string `json:"deleted_paths"`
-	DiscoveredFocusFiles int      `json:"discovered_focus_files"`
+	Mode                 string                `json:"mode"`
+	ExplicitPaths        []string              `json:"explicit_paths"`
+	RequestedBase        string                `json:"requested_base,omitempty"`
+	BaseCommit           string                `json:"base_commit,omitempty"`
+	MergeBase            string                `json:"merge_base,omitempty"`
+	HeadCommit           string                `json:"head_commit,omitempty"`
+	WorkingTreeIncluded  bool                  `json:"working_tree_included"`
+	UntrackedIncluded    bool                  `json:"untracked_included"`
+	ChangedPaths         []string              `json:"changed_paths"`
+	DeletedPaths         []string              `json:"deleted_paths"`
+	Worktrees            []WorktreeFocusConfig `json:"worktrees,omitempty"`
+	DiscoveredFocusFiles int                   `json:"discovered_focus_files"`
 }
 
 // ParseDiagnostic identifies one bounded Tree-sitter error or missing node.

@@ -109,8 +109,8 @@ source constructs that are not comparison units, such as SQL DDL.
 
 ## Report and compatibility contract
 
-Schema version 7 adds the effective SQL parser to the schema-6 selection fields
-under `configuration`:
+Schema version 8 retains the effective SQL parser added in schema 7 and the
+selection fields under `configuration`:
 
 ```json
 {
@@ -126,7 +126,9 @@ to reject or explicitly handle unknown report schema versions.
 
 Domain and family selection do not change fragment features. SQL dialect
 selection chooses a different parser and is therefore recorded explicitly.
-The current normalization version is 6 because PostgreSQL canonical mappings
+Schema 8 additionally records explicit multi-worktree Git focus; it does not
+change selection or normalization. The current normalization version is 6
+because PostgreSQL canonical mappings
 extend the SQL feature vocabulary; baselines created with an older
 normalization version must be reviewed and regenerated. Changing a selection
 profile still requires the ordinary human review expected for any baseline

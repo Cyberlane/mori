@@ -112,13 +112,26 @@ with a changed occurrence. It never fetches the revision. Use repeatable
 `--focus-path` for exact paths when Git-derived focus is unavailable or when a
 review includes additional files. The two focus inputs are additive.
 
-`--changed-since` deliberately rejects a scan that spans nested Git worktrees
-or submodules because one revision does not safely describe multiple worktree
-histories. Exclude each nested boundary from the parent scan and scan it
-separately from its own root, or use explicit `--focus-path` values when that
-accurately represents the review. Disclose every excluded or separately scanned
-nested repository; never describe it as unchanged merely because the parent
-focus scan did not cover it.
+One revision does not safely describe multiple worktree histories. When the
+full scan includes a nested worktree or submodule, give it its own locally
+available revision with repeatable `--changed-worktree PATH=REVISION` values:
+
+```sh
+mori scan \
+  --format json \
+  --require-coverage \
+  --changed-since origin/main \
+  --changed-worktree nested=origin/main \
+  .
+```
+
+`--changed-since` describes the primary root. Each `--changed-worktree` entry
+is resolved independently and never inherits the primary revision. Use only
+repeated `--changed-worktree` values when all scanned roots should be explicit.
+If an appropriate local revision is unavailable, exclude and scan that root
+separately or use exact `--focus-path` values when they accurately represent
+the review. Disclose excluded or separately scanned roots; never describe one
+as unchanged merely because the parent focus scan did not cover it.
 
 Mori honors `.gitignore`, `.moriignore`, and an upward-discovered `.mori.json`
 by default. Inspect `configuration` in the JSON report to verify the effective
@@ -203,7 +216,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `7`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `8`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while
@@ -224,7 +237,9 @@ revision or date from the version string. Inspect:
   group retention;
 - `configuration.focus`: verify explicit paths or the requested Git base, full
   base/merge-base/HEAD commits, working-tree semantics, changed/deleted paths,
-  and how many focused files were actually discovered;
+  and how many focused files were actually discovered. In multi-worktree mode,
+  verify every `worktrees` entry and its independent requested base and full
+  commits; do not infer nested-repository coverage from the parent entry;
 - `focused` and `focused_occurrences`: use these exact group fields rather than
   inferring focus from sampled occurrences;
 - suppression counts: distinguish suppressed location pairs from baseline

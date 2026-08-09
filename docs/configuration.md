@@ -84,10 +84,12 @@ Ignore files affect directory traversal only. A file passed explicitly remains
 visible. Repeated `--exclude` globs remain additive and continue to exclude an
 explicitly requested file. Use `--no-ignore` to disable both ignore-file types.
 
-Schema-7 JSON reports record the effective options and every loaded ignore
+Schema-8 JSON reports record the effective options and every loaded ignore
 file under `configuration` so a scan can be reproduced. Review focus remains
-CLI-only: `--focus-path` is repeatable, and `--changed-since` always requires
-an explicit locally available Git revision.
+CLI-only: `--focus-path` is repeatable, `--changed-since` always requires an
+explicit locally available Git revision, and repeatable
+`--changed-worktree PATH=REVISION` values give every additional Git worktree
+its own revision. Dynamic Git revisions are intentionally not project config.
 
 See [Scan selection controls](scan-selection.md) for the complete validation,
 execution, compatibility, and reporting contract.

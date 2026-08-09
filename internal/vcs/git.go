@@ -54,6 +54,18 @@ func ResolveChanged(ctx context.Context, filePaths []string, revision string) (C
 	})
 }
 
+// ResolveChangedAtRoot resolves revision and local changes for one explicitly
+// named Git worktree without network access. root must be that worktree's
+// canonical top level, not merely a directory contained by it.
+func ResolveChangedAtRoot(ctx context.Context, root string, revision string) (Changes, error) {
+	return resolveChangedAtRoot(ctx, root, revision, resolverOptions{
+		executable: "git",
+		timeout:    commandTimeout,
+		maxOutput:  maxOutputBytes,
+		maxPaths:   maxPaths,
+	})
+}
+
 func resolveChanged(
 	ctx context.Context,
 	filePaths []string,
@@ -115,6 +127,70 @@ func resolveChanged(
 			)
 		}
 	}
+	return resolveChangedInCanonicalRoot(ctx, root, revision, "--changed-since", options)
+}
+
+func resolveChangedAtRoot(
+	ctx context.Context,
+	root string,
+	revision string,
+	options resolverOptions,
+) (Changes, error) {
+	if strings.TrimSpace(revision) == "" {
+		return Changes{}, errors.New("Git comparison revision cannot be empty")
+	}
+	if options.executable == "" {
+		options.executable = "git"
+	}
+	if options.timeout <= 0 {
+		options.timeout = commandTimeout
+	}
+	if options.maxOutput <= 0 {
+		options.maxOutput = maxOutputBytes
+	}
+	if options.maxPaths <= 0 {
+		options.maxPaths = maxPaths
+	}
+	absolute, err := filepath.Abs(root)
+	if err != nil {
+		return Changes{}, fmt.Errorf("resolve explicit Git worktree: %w", err)
+	}
+	canonical, err := filepath.EvalSymlinks(filepath.Clean(absolute))
+	if err != nil {
+		return Changes{}, fmt.Errorf("canonicalize explicit Git worktree: %w", err)
+	}
+	info, err := os.Stat(canonical)
+	if err != nil {
+		return Changes{}, fmt.Errorf("inspect explicit Git worktree: %w", err)
+	}
+	if !info.IsDir() {
+		return Changes{}, errors.New("explicit Git worktree is not a directory")
+	}
+	rootOutput, err := run(ctx, options, canonical, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return Changes{}, fmt.Errorf("resolve explicit Git worktree: %w", err)
+	}
+	resolved := filepath.Clean(strings.TrimSpace(string(rootOutput)))
+	if !filepath.IsAbs(resolved) {
+		return Changes{}, errors.New("Git returned a non-absolute worktree root")
+	}
+	resolved, err = filepath.EvalSymlinks(resolved)
+	if err != nil {
+		return Changes{}, fmt.Errorf("canonicalize Git worktree: %w", err)
+	}
+	if resolved != canonical {
+		return Changes{}, fmt.Errorf("explicit Git worktree resolves to parent worktree %s", filepath.Base(resolved))
+	}
+	return resolveChangedInCanonicalRoot(ctx, canonical, revision, "--changed-worktree", options)
+}
+
+func resolveChangedInCanonicalRoot(
+	ctx context.Context,
+	root string,
+	revision string,
+	option string,
+	options resolverOptions,
+) (Changes, error) {
 
 	baseOutput, err := run(
 		ctx,
@@ -126,7 +202,7 @@ func resolveChanged(
 		revision+"^{commit}",
 	)
 	if err != nil {
-		return Changes{}, fmt.Errorf("resolve --changed-since %q: %w", revision, err)
+		return Changes{}, fmt.Errorf("resolve %s revision %q: %w", option, revision, err)
 	}
 	headOutput, err := run(ctx, options, root, "rev-parse", "--verify", "HEAD^{commit}")
 	if err != nil {

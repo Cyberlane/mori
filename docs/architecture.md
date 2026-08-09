@@ -190,6 +190,13 @@ bounded NUL-delimited output, and no shell or network access. It resolves the
 requested commit, HEAD, and merge base, then combines tracked working-tree
 changes with untracked non-ignored paths. Renames use their destination;
 deletions remain report evidence but cannot create focused occurrences.
+Nested and sibling roots are opt-in through repeatable
+`--changed-worktree PATH=REVISION` values. Each path must resolve to the exact
+Git top level, contain discovered source, and resolve its own revision. Files
+are assigned to the deepest explicit root, so a parent worktree never supplies
+revision semantics for a nested repository. Any uncovered or ambiguous root is
+an error rather than silently unchanged. Multi-root focus is bounded to 64
+explicit worktrees and 100,000 combined changed and deleted paths.
 
 ### `internal/similarity`
 
@@ -202,12 +209,16 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-7 reports expose deterministic binary provenance, comparison selection,
+Schema-8 reports expose deterministic binary provenance, comparison selection,
 comparison domains, fragment kinds, optional exact focus metadata, grouped
 content-pair identities, fragment fingerprints, occurrence samples and exact
 counts, nesting metadata, structured parser
 diagnostics, effective configuration, ignore sources, and separate baseline
 suppression counts for identities and source-location pairs.
+Multi-worktree focus adds a deterministic `configuration.focus.worktrees`
+array with a display root and full Git resolution for every worktree. The
+legacy scalar Git focus fields remain unchanged for a single
+`--changed-since` worktree.
 
 When focus is active, focused groups form the first bucket. Within each bucket,
 and for every scan without focus, group ordering is:

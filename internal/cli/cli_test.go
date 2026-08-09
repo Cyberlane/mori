@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -85,7 +86,7 @@ func TestRunLanguagesHelp(t *testing.T) {
 	}
 }
 
-func TestRunScanHelpListsSQLDialect(t *testing.T) {
+func TestRunScanHelpListsDialectAndMultiWorktreeFocus(t *testing.T) {
 	t.Parallel()
 
 	var stdout bytes.Buffer
@@ -93,7 +94,9 @@ func TestRunScanHelpListsSQLDialect(t *testing.T) {
 	code := Run(context.Background(), []string{"scan", "--help"}, &stdout, &stderr)
 	if code != exitSuccess || stdout.Len() != 0 ||
 		!strings.Contains(stderr.String(), "-sql-dialect") ||
-		!strings.Contains(stderr.String(), "generic or postgresql") {
+		!strings.Contains(stderr.String(), "generic or postgresql") ||
+		!strings.Contains(stderr.String(), "-changed-worktree") ||
+		!strings.Contains(stderr.String(), "PATH=REVISION") {
 		t.Fatalf("scan help = %d/%q/%q", code, stdout.String(), stderr.String())
 	}
 }
@@ -373,8 +376,114 @@ func TestRunScanChangedSinceIncludesWorkingTree(t *testing.T) {
 		focus.BaseCommit != base || focus.MergeBase != base || len(focus.HeadCommit) != 40 ||
 		!focus.WorkingTreeIncluded || !focus.UntrackedIncluded ||
 		!reflect.DeepEqual(focus.ChangedPaths, []string{"left.go"}) ||
+		len(focus.Worktrees) != 0 ||
 		focus.DiscoveredFocusFiles != 1 || result.TotalFocusedMatchGroups != 1 {
 		t.Fatalf("Git focus report = %+v", result)
+	}
+}
+
+func TestRunScanChangedWorktreeResolvesNestedRepositoriesIndependently(t *testing.T) {
+	root := t.TempDir()
+	runTestGit(t, root, "init", "--initial-branch=main")
+	runTestGit(t, root, "config", "user.name", "Mori Test")
+	runTestGit(t, root, "config", "user.email", "mori@example.invalid")
+	content := "package sample\nfunc Same(value string) string { if value == \"\" { return \"\" }; return value }\n"
+	for _, name := range []string{"left.go", "right.go"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+	runTestGit(t, root, "add", ".")
+	runTestGit(t, root, "commit", "-m", "base")
+	rootBase := strings.TrimSpace(runTestGit(t, root, "rev-parse", "HEAD"))
+
+	nested := filepath.Join(root, "nested")
+	if err := os.Mkdir(nested, 0o700); err != nil {
+		t.Fatalf("Mkdir: %v", err)
+	}
+	runTestGit(t, nested, "init", "--initial-branch=main")
+	runTestGit(t, nested, "config", "user.name", "Mori Test")
+	runTestGit(t, nested, "config", "user.email", "mori@example.invalid")
+	for _, name := range []string{"nested.go", "copy.go"} {
+		if err := os.WriteFile(filepath.Join(nested, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile nested: %v", err)
+		}
+	}
+	runTestGit(t, nested, "add", ".")
+	runTestGit(t, nested, "commit", "-m", "base")
+	nestedBase := strings.TrimSpace(runTestGit(t, nested, "rev-parse", "HEAD"))
+	if err := os.WriteFile(filepath.Join(root, "left.go"), []byte(content+"// parent change\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile parent change: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "nested.go"), []byte(content+"// nested change\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile nested change: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--threshold", "1", "--min-tokens", "1", "--format", "json",
+		"--changed-since", rootBase,
+		"--changed-worktree", nested + "=" + nestedBase,
+		"--fail-on-focused-match", root,
+	}, &stdout, &stderr)
+	if code != exitFindings {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode JSON: %v\n%s", err, stdout.String())
+	}
+	focus := result.Configuration.Focus
+	if focus == nil || focus.Mode != "git-worktrees" || len(focus.Worktrees) != 2 ||
+		focus.RequestedBase != "" || focus.BaseCommit != "" || focus.MergeBase != "" ||
+		focus.HeadCommit != "" || focus.DiscoveredFocusFiles != 2 || result.TotalFocusedMatchGroups == 0 {
+		t.Fatalf("multi-worktree focus = %+v", result)
+	}
+	bases := map[string]string{}
+	changed := map[string][]string{}
+	for _, worktree := range focus.Worktrees {
+		bases[filepath.Base(filepath.FromSlash(worktree.Root))] = worktree.RequestedBase
+		changed[filepath.Base(filepath.FromSlash(worktree.Root))] = worktree.ChangedPaths
+		if len(worktree.BaseCommit) != 40 || len(worktree.MergeBase) != 40 || len(worktree.HeadCommit) != 40 ||
+			!worktree.WorkingTreeIncluded || !worktree.UntrackedIncluded {
+			t.Fatalf("worktree provenance = %+v", worktree)
+		}
+	}
+	if bases[filepath.Base(root)] != rootBase || bases["nested"] != nestedBase ||
+		!reflect.DeepEqual(changed[filepath.Base(root)], []string{"left.go", "nested"}) ||
+		!reflect.DeepEqual(changed["nested"], []string{"nested.go"}) {
+		t.Fatalf("worktree bases = %#v, changes = %#v", bases, changed)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	explicitArgs := []string{
+		"scan", "--threshold", "1", "--min-tokens", "1", "--format", "json",
+		"--changed-worktree", root + "=" + rootBase,
+		"--changed-worktree", nested + "=" + nestedBase,
+		"--fail-on-focused-match", root,
+	}
+	code = Run(context.Background(), explicitArgs, &stdout, &stderr)
+	if code != exitFindings {
+		t.Fatalf("explicit worktrees exit = %d, stderr = %q", code, stderr.String())
+	}
+	result = model.Report{}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode explicit-worktree JSON: %v\n%s", err, stdout.String())
+	}
+	if result.Configuration.Focus == nil || result.Configuration.Focus.Mode != "git-worktrees" ||
+		len(result.Configuration.Focus.Worktrees) != 2 ||
+		result.Configuration.Focus.DiscoveredFocusFiles != 2 {
+		t.Fatalf("explicit-worktree focus = %+v", result.Configuration.Focus)
+	}
+	firstOutput := append([]byte{}, stdout.Bytes()...)
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run(context.Background(), explicitArgs, &stdout, &stderr); code != exitFindings ||
+		!bytes.Equal(stdout.Bytes(), firstOutput) {
+		t.Fatalf("repeated explicit-worktree scan = %d, deterministic = %t, stderr = %q",
+			code, bytes.Equal(stdout.Bytes(), firstOutput), stderr.String())
 	}
 }
 
@@ -385,12 +494,33 @@ func TestFocusPolicyValidation(t *testing.T) {
 		{"scan", "--fail-on-match", "--fail-on-focused-match", "--focus-path", "file.go", "."},
 		{"scan", "--fail-on-focused-match", "."},
 		{"baseline", "update", "--baseline", "accepted.json", "--focus-path", "file.go", "."},
+		{"scan", "--changed-worktree", "missing-separator", "."},
+		{"baseline", "prune", "--baseline", "accepted.json", "--changed-worktree", ".=HEAD", "."},
 	} {
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		if code := Run(context.Background(), args, &stdout, &stderr); code != exitUsage {
 			t.Errorf("Run(%v) exit = %d, stderr = %q", args, code, stderr.String())
 		}
+	}
+}
+
+func TestParseChangedWorktreeSpecsRejectsMalformedAndUnboundedInput(t *testing.T) {
+	t.Parallel()
+
+	for _, values := range [][]string{{"missing-separator"}, {"=HEAD"}, {"nested="}} {
+		if _, err := parseChangedWorktreeSpecs(values); err == nil ||
+			!strings.Contains(err.Error(), "expected PATH=REVISION") {
+			t.Errorf("parseChangedWorktreeSpecs(%v) error = %v", values, err)
+		}
+	}
+	values := make([]string, maxChangedWorktrees+1)
+	for index := range values {
+		values[index] = fmt.Sprintf("nested-%d=HEAD", index)
+	}
+	if _, err := parseChangedWorktreeSpecs(values); err == nil ||
+		!strings.Contains(err.Error(), "worktree safety limit") {
+		t.Fatalf("unbounded specs error = %v", err)
 	}
 }
 
