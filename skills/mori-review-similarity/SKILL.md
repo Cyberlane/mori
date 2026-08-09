@@ -55,6 +55,19 @@ test -x "$MORI_BIN"
 If Mori is unavailable, stop and give the user an installation command. Do not
 download software or change global configuration without authorization.
 
+## Establish coverage before interpreting results
+
+Inventory the repository languages before scanning. Inspect tracked or visible
+source extensions, extensionless executable shebangs, build manifests, and
+nested repositories, then compare that inventory with `mori languages`. State
+which meaningful source is supported, excluded, nested, or unexamined. Do not
+infer repository-wide coverage from Mori's discovered-file count alone.
+
+Use `--require-coverage` for review and CI commands. Exit status `4` means Mori
+found no supported files or extracted no comparison fragments. The report is
+still written and contains a deterministic `coverage` warning; classify the
+scan as not applicable or insufficiently covered, never as a clean result.
+
 ## Produce structured evidence
 
 For a focused review, run:
@@ -62,6 +75,7 @@ For a focused review, run:
 ```sh
 mori scan \
   --format json \
+  --require-coverage \
   --comparison-domain code \
   --same-language-only \
   --threshold 0.85 \
@@ -77,6 +91,7 @@ exists locally, use Mori's native focus mode instead of filtering the scan:
 ```sh
 mori scan \
   --format json \
+  --require-coverage \
   --comparison-domain code \
   --same-language-only \
   --threshold 0.85 \
@@ -92,6 +107,14 @@ with a changed occurrence. It never fetches the revision. Use repeatable
 `--focus-path` for exact paths when Git-derived focus is unavailable or when a
 review includes additional files. The two focus inputs are additive.
 
+`--changed-since` deliberately rejects a scan that spans nested Git worktrees
+or submodules because one revision does not safely describe multiple worktree
+histories. Exclude each nested boundary from the parent scan and scan it
+separately from its own root, or use explicit `--focus-path` values when that
+accurately represents the review. Disclose every excluded or separately scanned
+nested repository; never describe it as unchanged merely because the parent
+focus scan did not cover it.
+
 Mori honors `.gitignore`, `.moriignore`, and an upward-discovered `.mori.json`
 by default. Inspect `configuration` in the JSON report to verify the effective
 config, ignore files, exclusions, comparison domain, and family or pair
@@ -105,6 +128,7 @@ Use this broad family selection:
 mori scan \
   --comparison-domain code \
   --cross-language-only \
+  --require-coverage \
   --threshold 0.65 \
   --min-tokens 40 \
   .
@@ -116,6 +140,7 @@ Use an explicit pair when only one family pairing matters:
 mori scan \
   --comparison-domain code \
   --language-pair go,typescript \
+  --require-coverage \
   --threshold 0.65 \
   --min-tokens 40 \
   .
@@ -132,6 +157,7 @@ For SQL review, use a separate deliberate scan profile such as:
 ```sh
 mori scan \
   --format json \
+  --require-coverage \
   --comparison-domain sql-query \
   --threshold 0.70 \
   --min-tokens 12 \
@@ -199,6 +225,8 @@ Treat an operational error or an unexpected schema as a failed scan. Exit
 status `3` means policy findings were found with `--fail-on-match` or
 `--fail-on-focused-match`; it is not a tool crash. Use the focused policy only
 after the repository has adopted a reviewed threshold, scope, and exclusions.
+Exit status `4` means required coverage was not met and must be reported as not
+applicable or incomplete rather than as a successful clean scan.
 
 When reviewing a change, rely on native focus ordering when available. Review
 at most 25 distinct identities deeply, not the first 25 raw location pairs.
