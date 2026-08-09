@@ -19,6 +19,12 @@ func runSkill(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		return exitUsage
 	}
+	if args[0] == "help" || args[0] == "-h" || args[0] == "--help" {
+		if err := writeSkillUsage(stdout); err != nil {
+			return exitError
+		}
+		return exitSuccess
+	}
 	if args[0] != "install" {
 		if _, err := fmt.Fprintf(stderr, "mori: unknown skill command %q\n\n", args[0]); err != nil {
 			return exitError

@@ -102,6 +102,11 @@ func Analyze(
 		return report, err
 	}
 	if len(files) == 0 {
+		report.Warnings = append(report.Warnings, model.Warning{
+			Kind:    "coverage",
+			Message: "no supported source files were discovered; no similarity assessment was performed",
+		})
+		sortWarnings(report.Warnings)
 		return report, nil
 	}
 
@@ -165,6 +170,12 @@ func Analyze(
 		report.Warnings = append(report.Warnings, result.warnings...)
 	}
 	sortFragments(fragments)
+	if len(fragments) == 0 {
+		report.Warnings = append(report.Warnings, model.Warning{
+			Kind:    "coverage",
+			Message: "no comparison fragments were extracted; coverage is insufficient for a similarity assessment",
+		})
+	}
 	sortWarnings(report.Warnings)
 	report.Fragments = len(fragments)
 

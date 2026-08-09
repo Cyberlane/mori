@@ -32,6 +32,7 @@ const (
 	exitError    = 1
 	exitUsage    = 2
 	exitFindings = 3
+	exitCoverage = 4
 )
 
 // Run executes one CLI invocation and returns its process exit code.
@@ -88,6 +89,7 @@ type scanOptions struct {
 	crossLanguageOnly  bool
 	failOnMatch        bool
 	failOnFocusedMatch bool
+	requireCoverage    bool
 	baselinePath       string
 	baselineScope      string
 	respectIgnore      bool
@@ -164,6 +166,12 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 		"fail-on-focused-match",
 		options.failOnFocusedMatch,
 		"exit with status 3 when one or more focused match groups are found",
+	)
+	flags.BoolVar(
+		&options.requireCoverage,
+		"require-coverage",
+		options.requireCoverage,
+		"exit with status 4 unless at least one supported file and comparison fragment are analyzed",
 	)
 	flags.StringVar(&options.baselinePath, "baseline", options.baselinePath, "baseline file to load or write")
 	flags.StringVar(
@@ -325,6 +333,9 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	if settings.FailOnMatch != nil {
 		options.failOnMatch = *settings.FailOnMatch
 	}
+	if settings.RequireCoverage != nil {
+		options.requireCoverage = *settings.RequireCoverage
+	}
 	if settings.RespectIgnore != nil {
 		options.respectIgnore = *settings.RespectIgnore
 	}
@@ -428,6 +439,9 @@ func runScan(ctx context.Context, args []string, stdout io.Writer, stderr io.Wri
 		fmt.Fprintf(stderr, "mori: write report: %v\n", err)
 		return exitError
 	}
+	if options.requireCoverage && !hasCoverage(result) {
+		return coverageFailure(stderr, result)
+	}
 	if options.failOnMatch && result.TotalMatchGroups > 0 {
 		return exitFindings
 	}
@@ -474,6 +488,9 @@ func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, std
 		fmt.Fprintf(stderr, "mori: %v\n", err)
 		return exitError
 	}
+	if options.requireCoverage && !hasCoverage(result) {
+		return coverageFailure(stderr, result)
+	}
 	scope := baseline.Scope(options.baselineScope)
 	if err := baseline.Write(options.baselinePath, result, scope); err != nil {
 		fmt.Fprintf(stderr, "mori: write baseline: %v\n", err)
@@ -516,6 +533,9 @@ func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stde
 		fmt.Fprintf(stderr, "mori: %v\n", err)
 		return exitError
 	}
+	if options.requireCoverage && !hasCoverage(result) {
+		return coverageFailure(stderr, result)
+	}
 	stale := baseline.Stale(set, result)
 	if options.check {
 		if len(stale) == 0 {
@@ -556,6 +576,21 @@ func countLabel(count int, singular string, plural string) string {
 		return fmt.Sprintf("%d %s", count, singular)
 	}
 	return fmt.Sprintf("%d %s", count, plural)
+}
+
+func hasCoverage(result model.Report) bool {
+	return result.Files > 0 && result.Fragments > 0
+}
+
+func coverageFailure(stderr io.Writer, result model.Report) int {
+	message := "no supported source files were discovered"
+	if result.Files > 0 {
+		message = "no comparison fragments were extracted"
+	}
+	if _, err := fmt.Fprintf(stderr, "mori: required coverage not met: %s\n", message); err != nil {
+		return exitError
+	}
+	return exitCoverage
 }
 
 func loadSuppression(
@@ -883,6 +918,7 @@ func writeRootUsage(writer io.Writer) error {
 		"  mori baseline prune --baseline <path> [options] [path ...]\n",
 		"  mori languages\n",
 		"  mori skill install (--project <path> | --global | --target <path>)\n",
+		"  mori skill --help\n",
 		"  mori version\n",
 		"  mori help\n",
 	)

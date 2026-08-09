@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Cyberlane/mori/internal/model"
@@ -134,6 +135,39 @@ func TestAnalyzeRejectsConflictingLanguageSelectionModes(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("Analyze accepted conflicting language selection modes")
+	}
+}
+
+func TestAnalyzeReportsEmptyCoverage(t *testing.T) {
+	t.Parallel()
+
+	options := Options{
+		Threshold: 1, MinTokens: 12, MaxGroups: 10, MaxOccurrences: 10,
+		MaxPairs: 10, Workers: 1,
+	}
+	empty, err := Analyze(context.Background(), nil, nil, options)
+	if err != nil {
+		t.Fatalf("Analyze empty: %v", err)
+	}
+	if len(empty.Warnings) != 1 || empty.Warnings[0].Kind != "coverage" ||
+		!strings.Contains(empty.Warnings[0].Message, "no supported source files") {
+		t.Fatalf("empty warnings = %#v", empty.Warnings)
+	}
+
+	root := t.TempDir()
+	writeFile := filepath.Join(root, "declarations.go")
+	if err := os.WriteFile(writeFile, []byte("package sample\nconst value = 1\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	discovered := source.Discover([]string{root}, source.Options{})
+	noFragments, err := Analyze(context.Background(), discovered.Files, nil, options)
+	if err != nil {
+		t.Fatalf("Analyze no fragments: %v", err)
+	}
+	if noFragments.Files != 1 || noFragments.Fragments != 0 || len(noFragments.Warnings) != 1 ||
+		noFragments.Warnings[0].Kind != "coverage" ||
+		!strings.Contains(noFragments.Warnings[0].Message, "no comparison fragments") {
+		t.Fatalf("no-fragment report = %#v", noFragments)
 	}
 }
 

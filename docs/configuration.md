@@ -27,6 +27,7 @@ file's directory. Command-line values override configured values; repeated
   "cross_language_only": false,
   "language_pairs": [],
   "fail_on_match": false,
+  "require_coverage": true,
   "baseline": "mori-baseline.json",
   "baseline_scope": "content",
   "exclude": ["**/*_test.go"],
@@ -49,6 +50,14 @@ Explicit pairs must belong to a selected comparison domain.
 the locations shown for each fingerprint while retaining the exact occurrence
 count. Zero opts into an unlimited value and should be used deliberately.
 `--max-matches` remains a deprecated alias for `--max-groups`.
+
+`require_coverage` requires at least one supported file and one extracted
+comparison fragment. When the requirement is not met, Mori still writes the
+deterministic report and its `coverage` warning, then exits with status `4`.
+This distinguishes an unsupported or inapplicable scan from a clean scan with
+no qualifying similarity groups. The command-line override is
+`--require-coverage`; use `--require-coverage=false` to disable a configured
+requirement for an explicitly exploratory invocation.
 
 ## Ignore files
 

@@ -169,6 +169,15 @@ Write results as JSON for a script or CI system:
 mori scan --format json .
 ```
 
+Mori emits a `coverage` warning when a scan discovers no supported files or
+extracts no comparison fragments. Such a result is not evidence that the
+repository has no duplication. Use `--require-coverage` in automation to write
+the report and exit with status `4` when either condition occurs:
+
+```sh
+mori scan --format json --require-coverage .
+```
+
 Schema-6 reports embed deterministic `tool` build provenance, comparison
 selection, domain and fragment-kind metadata, and exact focus metadata. They do
 not include a scan timestamp, hostname, username, source body, diff, or Git
@@ -177,10 +186,11 @@ remote.
 Fail a CI job when Mori finds a match at your threshold:
 
 ```sh
-mori scan --threshold 0.85 --fail-on-match .
+mori scan --threshold 0.85 --require-coverage --fail-on-match .
 ```
 
 With `--fail-on-match`, Mori exits with status `3` when it finds a match.
+Coverage failure takes precedence and exits with status `4`.
 
 For change review, keep the full repository comparison universe while putting
 groups that touch changed files first:
@@ -195,6 +205,12 @@ files; it never fetches a remote. Add repeatable `--focus-path <path>` values
 for explicit paths. `--fail-on-focused-match` exits with status `3` only when
 an unsuppressed focused group exists and is mutually exclusive with
 `--fail-on-match`.
+
+A changed-file scan rejects discovered source spanning nested Git worktrees or
+submodules because one revision cannot safely describe multiple histories.
+Exclude and scan each nested worktree separately, or use exact `--focus-path`
+values when they represent the intended review. Do not interpret an excluded
+nested repository as unchanged.
 
 To record intentional candidates and use Mori as a stable CI gate:
 

@@ -7,6 +7,14 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added deterministic coverage warnings for scans with no supported files or
+  no extracted comparison fragments.
+- Added `--require-coverage` and the equivalent `require_coverage` project
+  setting, which exit with status 4 when a scan cannot support a similarity
+  assessment.
+
 ### Changed
 
 - Corrected the schema-6 example, clarified release source-date formatting,
@@ -17,6 +25,15 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   containment without changing comparison behavior.
 - Added an explicit, non-discovered self-review profile and `make dogfood`
   workflow for production-code dogfooding.
+- Added language preflight, zero-coverage, and nested Git boundary guidance to
+  the bundled review skill.
+- Nested-worktree focus errors now identify the repository-relative boundary
+  and recommend a separate scan or explicit focus paths.
+
+### Fixed
+
+- `mori skill --help`, `mori skill -h`, and `mori skill help` now print skill
+  usage successfully instead of reporting an unknown skill command.
 
 ## [0.8.0] - 2026-08-09
 
