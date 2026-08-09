@@ -12,6 +12,10 @@ var (
 	sqlLimitOffsetParameter = regexp.MustCompile(`(?i)\b(?:LIMIT|OFFSET)[ \t]+(\?|sqlc\.(?:arg|narg)\([^()\r\n]+\))`)
 	sqlConflictTarget       = regexp.MustCompile(`(?i)\bON[ \t]+CONFLICT[ \t]*(\([^()\r\n]*\))[ \t]+DO[ \t]+(?:NOTHING|UPDATE)\b`)
 	sqlIdentifierList       = regexp.MustCompile(`^\([ \t]*[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*,[ \t]*[A-Za-z_][A-Za-z0-9_]*)*[ \t]*\)$`)
+	swiftOptionalTryAwait   = regexp.MustCompile(`\b(try\?[ \t]+await)[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]+\{`)
+	swiftSwitchAwait        = regexp.MustCompile(`\bswitch([ \t]+)await[ \t]+[A-Za-z_][A-Za-z0-9_]*([ \t]+)\{`)
+	swiftEmptyTupleArgument = regexp.MustCompile(`\.[A-Za-z_][A-Za-z0-9_]*\((\(\))\)`)
+	swiftCastNilCoalescing  = regexp.MustCompile(`=([ \t]+)[A-Za-z_][A-Za-z0-9_]*\[[^\]\r\n]+\][ \t]+as\?[ \t]+[A-Za-z_][A-Za-z0-9_.]*([ \t]+)\?\?`)
 )
 
 // repairSQLParserInput adapts a small set of valid SQLite and SQLC forms that
@@ -46,6 +50,51 @@ func repairSQLParserInput(content []byte) []byte {
 	}
 	if repaired == nil {
 		return content
+	}
+	return repaired
+}
+
+// repairSwiftParserInput adapts a bounded set of valid Swift forms that the
+// pinned grammar does not accept. Replacements preserve byte length and the
+// closest available syntax shape so locations remain exact. The caller only
+// accepts a repaired tree when it reduces parser diagnostics.
+func repairSwiftParserInput(content []byte) []byte {
+	var repaired []byte
+	clone := func() []byte {
+		if repaired == nil {
+			repaired = bytes.Clone(content)
+		}
+		return repaired
+	}
+
+	for _, match := range swiftOptionalTryAwait.FindAllSubmatchIndex(content, -1) {
+		start, end := match[2], match[3]
+		if start >= 0 && end > start {
+			for index := start; index < end; index++ {
+				clone()[index] = ' '
+			}
+		}
+	}
+	for _, match := range swiftSwitchAwait.FindAllSubmatchIndex(content, -1) {
+		leadingStart, trailingEnd := match[2], match[5]
+		if leadingStart >= 0 && trailingEnd > 0 {
+			clone()[leadingStart] = '('
+			clone()[trailingEnd-1] = ')'
+		}
+	}
+	for _, match := range swiftEmptyTupleArgument.FindAllSubmatchIndex(content, -1) {
+		start, end := match[2], match[3]
+		if start >= 0 && end-start == 2 {
+			clone()[start] = '['
+			clone()[start+1] = ']'
+		}
+	}
+	for _, match := range swiftCastNilCoalescing.FindAllSubmatchIndex(content, -1) {
+		leadingStart, trailingEnd := match[2], match[5]
+		if leadingStart >= 0 && trailingEnd > 0 {
+			clone()[leadingStart] = '('
+			clone()[trailingEnd-1] = ')'
+		}
 	}
 	return repaired
 }

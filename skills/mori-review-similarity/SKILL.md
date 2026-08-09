@@ -181,7 +181,10 @@ result excludes function bodies.
 Swift support covers implemented functions, initializers, deinitializers, and
 closures. Treat protocol requirements, computed properties, accessors, and
 subscripts as unexamined comparison units, and disclose any Swift parser
-warnings as incomplete coverage.
+warnings as incomplete coverage. Mori applies bounded compatibility repairs for
+several recognized valid Swift forms. A repaired optional-await binding retains
+the bound expression but omits its `try? await` wrapper from structural
+features, so inspect async and error-handling behavior in source.
 Lower `--min-tokens` toward 12 only when a deliberately broad exploratory pass
 is worth the additional callbacks, wrappers, and boilerplate.
 

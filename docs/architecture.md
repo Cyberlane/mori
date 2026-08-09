@@ -77,8 +77,8 @@ Each worker:
 2. creates and closes its own Tree-sitter parser;
 3. installs the selected grammar;
 4. parses with cancellation support, applying bounded, byte-preserving
-   adaptations for recognized valid JSX, SQLite, and SQLC forms, and closes the
-   resulting tree;
+   adaptations for recognized valid JSX, Swift, SQLite, and SQLC forms, and
+   closes the resulting tree;
 5. walks nodes iteratively to find fragment boundaries; and
 6. fingerprints valid fragments that meet `--min-tokens`.
 
@@ -88,6 +88,9 @@ count, while any comparison fragment containing an error or nested below an
 explicit error node is skipped.
 Adaptations never change byte offsets: normalization and report locations still
 refer to the original source. Nearby malformed forms remain parser errors.
+Swift adaptations are accepted only when a second parse reduces diagnostics.
+The optional-await binding adaptation retains the bound expression but cannot
+retain the unsupported `try? await` wrapper in the repaired syntax tree.
 
 Code languages extract function-like boundaries. Bash/POSIX shell and Zsh also
 extract a whole-file `script` boundary containing only top-level executable

@@ -63,6 +63,21 @@ func File(
 			}
 		}
 	}
+	if file.Language.ID == "swift" && tree.RootNode().HasError() {
+		if repaired := repairSwiftParserInput(parserInput); repaired != nil {
+			repairedTree := treeParser.ParseCtx(ctx, repaired, nil)
+			if repairedTree != nil {
+				_, originalDiagnostics := parseDiagnostics(tree.RootNode(), 0)
+				_, repairedDiagnostics := parseDiagnostics(repairedTree.RootNode(), 0)
+				if repairedDiagnostics < originalDiagnostics {
+					tree.Close()
+					tree = repairedTree
+				} else {
+					repairedTree.Close()
+				}
+			}
+		}
+	}
 	defer tree.Close()
 
 	root := tree.RootNode()

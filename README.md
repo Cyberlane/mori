@@ -349,7 +349,12 @@ comparison coverage, and any comparison fragment containing a parse error is
 skipped with an explicit count. Swift support extracts implemented functions,
 initializers, deinitializers, and closures. Protocol requirements, computed
 properties, accessors, and subscripts are not independent comparison units;
-unsupported Swift syntax can still produce visible diagnostics. Generic SQL
+Mori applies bounded byte-preserving compatibility adaptations for recognized
+valid optional-await bindings, awaited switches, empty-tuple call arguments,
+and conditional casts followed by nil coalescing. The optional-await binding
+adaptation omits the unsupported `try? await` wrapper from that repaired syntax
+tree while retaining the enclosed expression. Other unsupported Swift syntax
+can still produce visible diagnostics. Generic SQL
 dialect extensions outside Mori's pinned grammar and bounded SQLite/SQLC
 adaptations may produce diagnostics or incomplete coverage. The PostgreSQL
 parser targets PostgreSQL 18.3 syntax but does not extract PL/pgSQL bodies as
