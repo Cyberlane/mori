@@ -573,6 +573,74 @@ func TestRunRejectsUnknownConfigField(t *testing.T) {
 	}
 }
 
+func TestRunRequireCoverageDistinguishesEmptyFilesAndFragments(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name    string
+		content map[string]string
+		want    string
+	}{
+		{
+			name: "unsupported",
+			content: map[string]string{
+				"script.zsh": "print hello\n",
+			},
+			want: "no supported source files",
+		},
+		{
+			name: "no fragments",
+			content: map[string]string{
+				"constants.go": "package sample\nconst value = 1\n",
+			},
+			want: "no comparison fragments",
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			for name, content := range test.content {
+				if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+					t.Fatalf("WriteFile: %v", err)
+				}
+			}
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			code := Run(context.Background(), []string{
+				"scan", "--format", "json", "--require-coverage", root,
+			}, &stdout, &stderr)
+			if code != exitCoverage || !strings.Contains(stderr.String(), test.want) {
+				t.Fatalf("exit/stderr = %d/%q, want coverage failure %q", code, stderr.String(), test.want)
+			}
+			var result model.Report
+			if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+				t.Fatalf("decode report: %v\n%s", err, stdout.String())
+			}
+			if len(result.Warnings) == 0 || result.Warnings[len(result.Warnings)-1].Kind != "coverage" {
+				t.Fatalf("warnings = %#v", result.Warnings)
+			}
+		})
+	}
+}
+
+func TestRunRequireCoverageCanBeConfiguredAndOverridden(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	configPath := filepath.Join(root, ".mori.json")
+	if err := os.WriteFile(configPath, []byte(`{"require_coverage":true}`), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := Run(context.Background(), []string{
+		"scan", "--config", configPath, "--require-coverage=false", root,
+	}, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+}
+
 func TestRunAppliesConfigAndIgnoreFilesEndToEnd(t *testing.T) {
 	t.Parallel()
 

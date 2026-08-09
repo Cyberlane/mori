@@ -36,6 +36,7 @@ func TestLoadStrictConfig(t *testing.T) {
   "comparison_domain": "code",
   "same_language_only": false,
   "language_pairs": ["go,typescript"],
+  "require_coverage": true,
   "exclude": ["**/*_test.go"],
   "respect_ignore": true
 }`)
@@ -47,7 +48,8 @@ func TestLoadStrictConfig(t *testing.T) {
 		settings.MaxGroups == nil || *settings.MaxGroups != 250 ||
 		settings.ComparisonDomain != "code" ||
 		settings.SameLanguageOnly == nil || *settings.SameLanguageOnly ||
-		len(settings.LanguagePairs) != 1 || settings.RespectIgnore == nil || !*settings.RespectIgnore {
+		len(settings.LanguagePairs) != 1 || settings.RequireCoverage == nil || !*settings.RequireCoverage ||
+		settings.RespectIgnore == nil || !*settings.RespectIgnore {
 		t.Fatalf("settings = %#v", settings)
 	}
 }
