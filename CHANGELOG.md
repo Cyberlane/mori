@@ -7,6 +7,26 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added Swift function similarity for `.swift` files, covering implemented
+  functions, initializers, deinitializers, and closures with a pinned,
+  checksum-verified generated Tree-sitter grammar.
+- Added Swift-to-Go positive and nearby negative validation fixtures.
+
+### Changed
+
+- Normalization version 5 maps Swift declarations, expressions, arguments,
+  identifiers, and control transfers into the shared code vocabulary. Existing
+  baselines must be reviewed and regenerated.
+- The bundled review skill now describes Swift comparison boundaries and the
+  required warning disclosure.
+
+### Fixed
+
+- Function fragments nested below explicit parser error nodes are now rejected
+  instead of being scored from recovered malformed syntax.
+
 ## [0.10.0] - 2026-08-09
 
 ### Added

@@ -181,6 +181,72 @@ func TestShellGrammarAliasesPreservePositiveAndNegativeSeparation(t *testing.T) 
 	}
 }
 
+func TestSwiftMappingsPreservePositiveAndNegativeSeparation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	fixtures := map[string]string{
+		"positive.go": `package sample
+func clampNumber(value int, lower int, upper int) int {
+  if value < lower { return lower }
+  if value > upper { return upper }
+  return value
+}
+`,
+		"renamed.swift": `func clampValue(_ value: Int, minimum: Int, maximum: Int) -> Int {
+  if value < minimum { return minimum }
+  if value > maximum { return maximum }
+  return value
+}
+`,
+		"nearby.swift": `func sumValues(_ values: [Int]) -> Int {
+  var total = 0
+  for value in values { total += value }
+  return total
+}
+`,
+	}
+	fragments := make(map[string]model.Fragment, len(fixtures))
+	for name, content := range fixtures {
+		path := filepath.Join(root, name)
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+		spec, ok := language.Detect(path)
+		if !ok {
+			t.Fatalf("Detect(%s) returned unsupported", name)
+		}
+		parsed, warnings := parser.File(context.Background(), source.File{
+			Path: path, DisplayPath: name, Language: spec,
+		}, 1)
+		if len(warnings) != 0 || len(parsed) != 1 {
+			t.Fatalf("%s warnings/fragments = %#v/%d", name, warnings, len(parsed))
+		}
+		fragments[name] = parsed[0]
+	}
+
+	positive, _, _ := similarity.WeightedJaccard(
+		fragments["positive.go"].Features,
+		fragments["renamed.swift"].Features,
+	)
+	nearby, _, _ := similarity.WeightedJaccard(
+		fragments["positive.go"].Features,
+		fragments["nearby.swift"].Features,
+	)
+	if positive < 0.80 {
+		t.Fatalf("Swift positive score = %.3f, want at least 0.80", positive)
+	}
+	if nearby >= 0.60 {
+		t.Fatalf("Swift nearby-negative score = %.3f, want below 0.60", nearby)
+	}
+	for feature := range fragments["renamed.swift"].Features {
+		if strings.Contains(feature, "control_transfer") || strings.Contains(feature, "user_type") ||
+			strings.Contains(feature, "syntax:statements") {
+			t.Fatalf("Swift grammar vocabulary leaked into feature %q", feature)
+		}
+	}
+}
+
 func TestSemanticOperationFamiliesAndNearbyNames(t *testing.T) {
 	t.Parallel()
 

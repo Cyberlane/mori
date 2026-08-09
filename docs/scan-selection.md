@@ -118,10 +118,10 @@ string means that no domain restriction was requested. Consumers must continue
 to reject or explicitly handle unknown report schema versions.
 
 Selection itself does not change fragment features or the report schema. The
-current normalization version is 4 because shell grammar aliases change shell
-fingerprints; baselines created with an older normalization version must be
-reviewed and regenerated. Changing a selection profile still requires the
-ordinary human review expected for any baseline scope change.
+current normalization version is 5 because Swift canonical mappings extend the
+code feature vocabulary; baselines created with an older normalization version
+must be reviewed and regenerated. Changing a selection profile still requires
+the ordinary human review expected for any baseline scope change.
 
 ## Verification requirements
 

@@ -32,7 +32,7 @@ func TestRunLanguages(t *testing.T) {
 	if code != exitSuccess {
 		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
 	}
-	for _, expected := range []string{"Bash / POSIX shell", "Go", "JavaScript / JSX", "Python", "Rust", "SQL queries", "TypeScript / TSX", "Zsh", "shell", "sql-query", "bash, dash, sh"} {
+	for _, expected := range []string{"Bash / POSIX shell", "Go", "JavaScript / JSX", "Python", "Rust", "SQL queries", "Swift", "TypeScript / TSX", "Zsh", "shell", "sql-query", "bash, dash, sh"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Errorf("languages output missing %q", expected)
 		}
@@ -125,6 +125,37 @@ func TestRunScanShellDialects(t *testing.T) {
 	}
 	if !languages["bash"] || !languages["zsh"] {
 		t.Fatalf("shell languages = %+v", languages)
+	}
+}
+
+func TestRunScanSwiftAndGo(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--format", "json", "--threshold", "0.80", "--min-tokens", "12",
+		"--language-pair", "go,swift", "../../examples/swift-validation",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode JSON: %v\n%s", err, stdout.String())
+	}
+	if result.Files != 3 || result.Fragments != 3 || result.TotalMatchGroups != 1 ||
+		len(result.Groups) != 1 || len(result.Warnings) != 0 {
+		t.Fatalf("Swift report summary = %+v", result)
+	}
+	languages := make(map[string]bool)
+	for _, profile := range result.Groups[0].Profiles {
+		for _, occurrence := range profile.Occurrences {
+			languages[occurrence.Location.Language] = true
+		}
+	}
+	if !languages["go"] || !languages["swift"] {
+		t.Fatalf("Swift group languages = %+v", languages)
 	}
 }
 

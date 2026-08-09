@@ -120,7 +120,8 @@ func collect(
 			return err
 		}
 		current := cursor.Node()
-		if file.Language.AcceptsFragmentBoundary(current) && current.HasError() {
+		if file.Language.AcceptsFragmentBoundary(current) &&
+			(current.HasError() || hasInvalidAncestor(current)) {
 			(*skippedFragments)++
 		} else if file.Language.AcceptsFragmentBoundary(current) {
 			profile, err := normalize.Build(
@@ -175,6 +176,18 @@ func collect(
 			}
 		}
 	}
+}
+
+func hasInvalidAncestor(node *tree_sitter.Node) bool {
+	if node == nil {
+		return false
+	}
+	for parent := node.Parent(); parent != nil; parent = parent.Parent() {
+		if parent.IsError() || parent.IsMissing() {
+			return true
+		}
+	}
+	return false
 }
 
 func parseDiagnostics(root *tree_sitter.Node, limit int) ([]model.ParseDiagnostic, int) {
@@ -292,6 +305,9 @@ func fragmentName(node *tree_sitter.Node, content []byte, fragmentKind string) s
 			return name
 		}
 		return fmt.Sprintf("query@%d", node.StartPosition().Row+1)
+	}
+	if node.Kind() == "deinit_declaration" {
+		return "deinit"
 	}
 	if name := node.ChildByFieldName("name"); name != nil {
 		if value := cleanName(name.Utf8Text(content)); value != "" {

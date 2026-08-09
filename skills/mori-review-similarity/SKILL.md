@@ -156,6 +156,10 @@ Never combine
 TypeScript and TSX belong to one family and do not count as cross-language.
 Bash/POSIX shell and Zsh likewise belong to the `shell` family. Use
 `--language-pair bash,zsh` when only cross-dialect shell results are wanted.
+Swift support covers implemented functions, initializers, deinitializers, and
+closures. Treat protocol requirements, computed properties, accessors, and
+subscripts as unexamined comparison units, and disclose any Swift parser
+warnings as incomplete coverage.
 Lower `--min-tokens` toward 12 only when a deliberately broad exploratory pass
 is worth the additional callbacks, wrappers, and boilerplate.
 

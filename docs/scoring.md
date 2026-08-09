@@ -34,6 +34,13 @@ canonical features. A 100% result across those parsers is normalized structural
 identity, not byte identity or proof that shell options and runtime semantics
 are equivalent.
 
+Swift uses its own review family. Mori maps implemented declarations, closure
+parameters, arguments, identifiers, strings, collections, expressions, and
+control transfers into existing canonical code features. This improves useful
+Swift-to-other-language comparisons without preserving application-specific
+names or literal values; it does not model Swift types, dispatch, ownership,
+effects, or runtime behavior.
+
 The normalizer has a version constant for persisted review artifacts. Any
 change to the feature vocabulary, weights, canonical mappings, or
 semantic-hint list increments that version.
@@ -171,7 +178,7 @@ The top-level shape is:
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 4
+    "normalization_version": 5
   },
   "threshold": 0.7,
   "files": 4,

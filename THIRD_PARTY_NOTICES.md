@@ -15,6 +15,7 @@
 | Tree-sitter TypeScript/TSX grammars | 0.23.2 | Copyright (c) 2017 Max Brunsfeld | MIT |
 | Tree-sitter Python grammar | 0.25.0 | Copyright (c) 2016 Max Brunsfeld | MIT |
 | Tree-sitter Rust grammar | 0.24.2 | Copyright (c) 2017 Maxim Sokolov | MIT |
+| Tree-sitter Swift grammar (`github.com/alex-pinkus/tree-sitter-swift`) | 0.7.3 source at `8d02b7ff390a17a43ce90c4e987c49315cfc4be6` | Copyright (c) 2021 alex-pinkus | MIT |
 | Tree-sitter Zsh grammar (`github.com/georgeharker/tree-sitter-zsh`) | 0.63.5 | Copyright (c) 2017 Max Brunsfeld | MIT |
 | Tree-sitter SQL grammar (`github.com/wippyai/tree-sitter-sql`) | 0.0.4 | Copyright (c) 2021 Derek Stride | MIT |
 

@@ -16,6 +16,7 @@ func TestEveryGrammarHasCompatibleABI(t *testing.T) {
 		"python":     15,
 		"rust":       15,
 		"sql":        14,
+		"swift":      14,
 		"tsx":        14,
 		"typescript": 14,
 		"zsh":        15,
@@ -62,6 +63,7 @@ func TestDetect(t *testing.T) {
 		"module.pyi":    "python",
 		"lib.rs":        "rust",
 		"queries.SQL":   "sql",
+		"service.SWIFT": "swift",
 		"plugin.zsh":    "zsh",
 	}
 	for path, expected := range tests {
