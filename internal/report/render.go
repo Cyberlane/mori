@@ -86,20 +86,41 @@ func Text(writer io.Writer, report model.Report) error {
 	}
 
 	filesWithFragments := 0
+	analyzedFiles := 0
+	generatedAnalyzed := 0
+	generatedExcluded := 0
 	zeroFragmentFiles := make([]model.FileCoverage, 0)
 	for _, coverage := range report.FileCoverage {
+		if coverage.Status == "excluded_generated" {
+			generatedExcluded++
+			continue
+		}
+		analyzedFiles++
+		if coverage.Generated {
+			generatedAnalyzed++
+		}
 		if coverage.FragmentCount > 0 {
 			filesWithFragments++
 		} else {
 			zeroFragmentFiles = append(zeroFragmentFiles, coverage)
 		}
 	}
-	if len(report.FileCoverage) > 0 {
+	if analyzedFiles > 0 {
 		if _, err := fmt.Fprintf(
 			writer,
 			"coverage: %d of %d analyzed file(s) produced comparison fragments at the current token floor\n",
 			filesWithFragments,
-			len(report.FileCoverage),
+			analyzedFiles,
+		); err != nil {
+			return err
+		}
+	}
+	if generatedAnalyzed > 0 || generatedExcluded > 0 {
+		if _, err := fmt.Fprintf(
+			writer,
+			"generated sources: %d analyzed, %d excluded\n",
+			generatedAnalyzed,
+			generatedExcluded,
 		); err != nil {
 			return err
 		}

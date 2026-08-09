@@ -163,6 +163,15 @@ additional policy:
 mori scan --exclude '**/*_test.go' --exclude '**/*.test.ts' .
 ```
 
+Mori also classifies conservative generated-source header markers without
+changing the default scan. Use `--exclude-generated` to omit recognized
+generated files while retaining them as `excluded_generated` entries in the
+JSON `file_coverage` inventory:
+
+```sh
+mori scan --exclude-generated .
+```
+
 Store repeatable project settings in `.mori.json`:
 
 ```json

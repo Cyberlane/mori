@@ -30,6 +30,7 @@ overrides the configured SQL parser dialect.
   "language_pairs": [],
   "fail_on_match": false,
   "require_coverage": true,
+	"exclude_generated": true,
   "baseline": "mori-baseline.json",
   "baseline_scope": "content",
   "exclude": ["**/*_test.go"],
@@ -65,6 +66,15 @@ This distinguishes an unsupported or inapplicable scan from a clean scan with
 no qualifying similarity groups. The command-line override is
 `--require-coverage`; use `--require-coverage=false` to disable a configured
 requirement for an explicitly exploratory invocation.
+
+`exclude_generated` excludes supported files only when Mori recognizes a
+conservative generated-source comment marker in the first 8 KiB, including
+`Code generated ... DO NOT EDIT`, `@generated`, and common automatically
+generated-file headers. The equivalent command-line flag is
+`--exclude-generated`. Excluded files remain visible in `file_coverage` with
+status `excluded_generated`, the recognized marker class, and zero fragments.
+The default remains `false`, so upgrading never silently removes source from a
+scan.
 
 ## Ignore files
 

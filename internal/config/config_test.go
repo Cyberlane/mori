@@ -38,6 +38,7 @@ func TestLoadStrictConfig(t *testing.T) {
   "same_language_only": false,
   "language_pairs": ["go,typescript"],
   "require_coverage": true,
+	"exclude_generated": true,
   "exclude": ["**/*_test.go"],
   "respect_ignore": true
 }`)
@@ -51,6 +52,7 @@ func TestLoadStrictConfig(t *testing.T) {
 		settings.SQLDialect != "postgresql" ||
 		settings.SameLanguageOnly == nil || *settings.SameLanguageOnly ||
 		len(settings.LanguagePairs) != 1 || settings.RequireCoverage == nil || !*settings.RequireCoverage ||
+		settings.ExcludeGenerated == nil || !*settings.ExcludeGenerated ||
 		settings.RespectIgnore == nil || !*settings.RespectIgnore {
 		t.Fatalf("settings = %#v", settings)
 	}

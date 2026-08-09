@@ -31,6 +31,9 @@ overlap without claiming behavioral equivalence.
 - Loads nested `.gitignore` and `.moriignore` rules for directory scans.
 - Applies repeatable doublestar exclude globs.
 - Applies selected comparison domains before file-size checks and parsing.
+- Conservatively classifies generated-source comment markers in a bounded
+  header read and optionally excludes those files while retaining coverage
+  evidence.
 - Rejects discovered symlinks and symlinked components below trusted scan
   roots.
 - Enforces a file-size limit before and during reads.

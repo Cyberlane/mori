@@ -12,6 +12,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Added deterministic per-file coverage inventories to JSON reports, including
   fragment, skipped-fragment, and parse-diagnostic counts for every analyzed
   supported file.
+- Added conservative generated-source header classification and opt-in
+  `--exclude-generated` / `exclude_generated` filtering. Excluded generated
+  files remain visible in the per-file coverage inventory.
 
 ### Changed
 

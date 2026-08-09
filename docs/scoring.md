@@ -229,9 +229,10 @@ Suppression fields separate affected source pairs from content identities.
 Consumers should reject or explicitly handle unknown schema versions.
 
 Schema 9 adds a deterministic `file_coverage` array with one entry per analyzed
-supported file. Each entry records its language, review family, comparison
-domain, fragment count, skipped-fragment count, and parse-diagnostic count.
-Consumers must inspect zero-fragment entries instead of inferring per-file
+or generated-excluded supported file. Each entry records its language, review
+family, comparison domain, analysis status, generated-source classification,
+fragment count, skipped-fragment count, and parse-diagnostic count. Consumers
+must inspect zero-fragment and excluded entries instead of inferring per-file
 coverage from the aggregate `files` and `fragments` totals.
 
 Schema 8 added `configuration.focus.worktrees` for explicit multi-worktree Git

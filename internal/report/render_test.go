@@ -164,8 +164,9 @@ func TestTextDisclosesPerFileCoverage(t *testing.T) {
 		Files:         2,
 		Fragments:     3,
 		FileCoverage: []model.FileCoverage{
-			{Path: "functions.go", Language: "go", FragmentCount: 3},
-			{Path: "script.zsh", Language: "zsh"},
+			{Path: "functions.go", Language: "go", Status: "analyzed", FragmentCount: 3},
+			{Path: "script.zsh", Language: "zsh", Status: "analyzed"},
+			{Path: "sqlc.go", Language: "go", Status: "excluded_generated", Generated: true},
 		},
 	}); err != nil {
 		t.Fatalf("Text: %v", err)
@@ -175,6 +176,7 @@ func TestTextDisclosesPerFileCoverage(t *testing.T) {
 		"coverage: 1 of 2 analyzed file(s)",
 		"files without comparison fragments (1):",
 		"script.zsh [zsh]",
+		"generated sources: 0 analyzed, 1 excluded",
 	} {
 		if !strings.Contains(rendered, expected) {
 			t.Fatalf("output missing %q:\n%s", expected, rendered)

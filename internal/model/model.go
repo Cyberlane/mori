@@ -164,6 +164,9 @@ type FileCoverage struct {
 	Language         string `json:"language"`
 	LanguageFamily   string `json:"language_family"`
 	ComparisonDomain string `json:"comparison_domain"`
+	Status           string `json:"status"`
+	Generated        bool   `json:"generated"`
+	GeneratedMarker  string `json:"generated_marker,omitempty"`
 	FragmentCount    int    `json:"fragment_count"`
 	SkippedFragments int    `json:"skipped_fragments"`
 	ParseDiagnostics int    `json:"parse_diagnostics"`
@@ -175,6 +178,7 @@ type EffectiveConfig struct {
 	ConfigPath        string       `json:"config_path,omitempty"`
 	IgnoreFiles       []string     `json:"ignore_files"`
 	RespectIgnore     bool         `json:"respect_ignore"`
+	ExcludeGenerated  bool         `json:"exclude_generated"`
 	Excludes          []string     `json:"excludes"`
 	MinTokens         int          `json:"min_tokens"`
 	MaxGroups         int          `json:"max_groups"`
