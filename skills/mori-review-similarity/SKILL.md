@@ -21,6 +21,8 @@ with:
 - `0.85` for focused same-language review;
 - `0.65` for cross-language exploration;
 - `--min-tokens 40` for a low-noise same-language first pass;
+- `--min-tokens 40` for an initial cross-language pass, lowering toward 12 only
+  for deliberately broad exploration;
 - up to 250 reported content-pair groups, from which at most 25 are deeply
   reviewed; and
 - Mori's default file-size and candidate-pair limits.
@@ -60,6 +62,8 @@ For a focused review, run:
 ```sh
 mori scan \
   --format json \
+  --comparison-domain code \
+  --same-language-only \
   --threshold 0.85 \
   --min-tokens 40 \
   --max-groups 250 \
@@ -73,6 +77,8 @@ exists locally, use Mori's native focus mode instead of filtering the scan:
 ```sh
 mori scan \
   --format json \
+  --comparison-domain code \
+  --same-language-only \
   --threshold 0.85 \
   --min-tokens 40 \
   --max-groups 250 \
@@ -88,22 +94,45 @@ review includes additional files. The two focus inputs are additive.
 
 Mori honors `.gitignore`, `.moriignore`, and an upward-discovered `.mori.json`
 by default. Inspect `configuration` in the JSON report to verify the effective
-config, ignore files, exclusions, and pair filters. Use `--no-ignore` or
-`--no-config` only when the review scope requires it.
+config, ignore files, exclusions, comparison domain, and family or pair
+filters. Use `--no-ignore` or `--no-config` only when the review scope requires
+it.
 
-For intentional cross-language discovery, choose exactly one filtering mode:
-use `--cross-language-only --threshold 0.65 --min-tokens 12` to compare every
-different language family, or use an explicit pair such as `--language-pair
-go,typescript` when only one family pairing matters. Never combine
-`--cross-language-only` with `--language-pair`. TypeScript and TSX belong to one
-family and do not count as cross-language. Raise `--min-tokens` when trivial
-wrappers or boilerplate dominate the report.
+For intentional cross-language discovery, choose exactly one filtering mode.
+Use this broad family selection:
+
+```sh
+mori scan \
+  --comparison-domain code \
+  --cross-language-only \
+  --threshold 0.65 \
+  --min-tokens 40 \
+  .
+```
+
+Use an explicit pair when only one family pairing matters:
+
+```sh
+mori scan \
+  --comparison-domain code \
+  --language-pair go,typescript \
+  --threshold 0.65 \
+  --min-tokens 40 \
+  .
+```
+
+Never combine
+`--cross-language-only` with `--same-language-only` or `--language-pair`.
+TypeScript and TSX belong to one family and do not count as cross-language.
+Lower `--min-tokens` toward 12 only when a deliberately broad exploratory pass
+is worth the additional callbacks, wrappers, and boilerplate.
 
 For SQL review, use a separate deliberate scan profile such as:
 
 ```sh
 mori scan \
   --format json \
+  --comparison-domain sql-query \
   --threshold 0.70 \
   --min-tokens 12 \
   --max-groups 250 \
@@ -131,7 +160,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `5`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `6`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while
