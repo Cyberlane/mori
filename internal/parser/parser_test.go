@@ -252,6 +252,79 @@ func TestSwiftMalformedFunctionProducesParseWarning(t *testing.T) {
 	}
 }
 
+func TestSwiftRepairsKnownValidSyntax(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"optional try await": `func refresh() async {
+  if let response = try? await request {
+    consume(response)
+  }
+}
+`,
+		"switch await": `func load() async {
+  switch await task {
+  case let .success(value):
+    consume(value)
+  case let .failure(error):
+    consume(error)
+  }
+}
+`,
+		"empty tuple argument": `func clear() async {
+  let result: Result<Void, Error> = .success(())
+  consume(result)
+}
+`,
+		"conditional cast with nil coalescing": `func version() -> String {
+  let info = Bundle.main.infoDictionary ?? [:]
+  let value = info["CFBundleVersion"] as? String ?? "?"
+  return value
+}
+`,
+	}
+	for name, content := range tests {
+		name, content := name, content
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "Valid.swift")
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatalf("WriteFile: %v", err)
+			}
+			spec, _ := language.Detect(path)
+			fragments, warnings := File(context.Background(), source.File{
+				Path: path, DisplayPath: "Valid.swift", Language: spec,
+			}, 1)
+			if len(warnings) != 0 || len(fragments) != 1 {
+				t.Fatalf("fragments/warnings = %#v/%#v, want one/none", fragments, warnings)
+			}
+		})
+	}
+}
+
+func TestSwiftRepairDoesNotHideMalformedNearbySyntax(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "Broken.swift")
+	content := `func broken() async {
+  if let response = try? await request {
+    consume(response
+  }
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "Broken.swift", Language: spec,
+	}, 1)
+	if len(fragments) != 0 || len(warnings) != 1 || warnings[0].Kind != "parse" ||
+		warnings[0].TotalDiagnostics == 0 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want visible malformed source", fragments, warnings)
+	}
+}
+
 func TestPostgreSQLExtractsQueriesAndIgnoresDialectDDL(t *testing.T) {
 	t.Parallel()
 
