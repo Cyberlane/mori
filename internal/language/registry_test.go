@@ -10,6 +10,7 @@ func TestEveryGrammarHasCompatibleABI(t *testing.T) {
 	t.Parallel()
 
 	expectedABI := map[string]uint32{
+		"bash":       15,
 		"go":         15,
 		"javascript": 15,
 		"python":     15,
@@ -17,6 +18,7 @@ func TestEveryGrammarHasCompatibleABI(t *testing.T) {
 		"sql":        14,
 		"tsx":        14,
 		"typescript": 14,
+		"zsh":        15,
 	}
 
 	for _, spec := range All() {
@@ -51,6 +53,8 @@ func TestDetect(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]string{
+		"build.bash":    "bash",
+		"install.SH":    "bash",
 		"main.go":       "go",
 		"view.JSX":      "javascript",
 		"worker.mts":    "typescript",
@@ -58,6 +62,7 @@ func TestDetect(t *testing.T) {
 		"module.pyi":    "python",
 		"lib.rs":        "rust",
 		"queries.SQL":   "sql",
+		"plugin.zsh":    "zsh",
 	}
 	for path, expected := range tests {
 		spec, ok := Detect(path)
@@ -74,15 +79,43 @@ func TestDetect(t *testing.T) {
 	}
 }
 
+func TestDetectShebang(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"#!/bin/sh":                  "bash",
+		"#!/usr/bin/env bash":        "bash",
+		"#!/usr/bin/env -S bash -eu": "bash",
+		"#!/usr/bin/env -- zsh":      "zsh",
+		"#!/opt/homebrew/bin/zsh -f": "zsh",
+		"#!/usr/bin/env node":        "javascript",
+		"#!/usr/bin/python3 -u":      "python",
+	}
+	for line, expected := range tests {
+		spec, ok := DetectShebang(line)
+		if !ok || spec.ID != expected {
+			t.Errorf("DetectShebang(%q) = %q/%t, want %q/true", line, spec.ID, ok, expected)
+		}
+	}
+
+	for _, line := range []string{"", "bin/zsh", "#!/bin/fish", "#!/usr/bin/env", "#!/bin/zsh\x00"} {
+		if _, ok := DetectShebang(line); ok {
+			t.Errorf("DetectShebang(%q) unexpectedly returned a language", line)
+		}
+	}
+}
+
 func TestAllReturnsIndependentSpecifications(t *testing.T) {
 	t.Parallel()
 
 	first := All()
 	first[0].Extensions[0] = ".mutated"
+	first[0].Shebangs[0] = "mutated"
 	first[0].fragmentKinds["mutated"] = struct{}{}
 
 	second := All()
-	if second[0].Extensions[0] == ".mutated" || second[0].IsFragmentBoundary("mutated") {
+	if second[0].Extensions[0] == ".mutated" || second[0].Shebangs[0] == "mutated" ||
+		second[0].IsFragmentBoundary("mutated") {
 		t.Fatal("mutating All result changed the registry")
 	}
 }

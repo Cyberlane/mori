@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -233,7 +234,8 @@ func addFile(
 	options Options,
 ) {
 	spec, supported := language.Detect(path)
-	if !supported {
+	needsShebang := !supported && filepath.Ext(path) == ""
+	if !supported && !needsShebang {
 		if explicit {
 			result.Warnings = append(result.Warnings, model.Warning{
 				Path:    displayPath(cwd, path),
@@ -242,7 +244,7 @@ func addFile(
 		}
 		return
 	}
-	if len(options.ComparisonDomains) > 0 {
+	if supported && len(options.ComparisonDomains) > 0 {
 		if _, selected := options.ComparisonDomains[spec.ComparisonDomain]; !selected {
 			return
 		}
@@ -269,6 +271,28 @@ func addFile(
 		}
 		return
 	}
+	if needsShebang {
+		firstLine, err := readShebangLine(path, info)
+		if err != nil {
+			result.Warnings = append(result.Warnings, warning(displayPath(cwd, path), err))
+			return
+		}
+		spec, supported = language.DetectShebang(firstLine)
+		if !supported {
+			if explicit {
+				result.Warnings = append(result.Warnings, model.Warning{
+					Path:    displayPath(cwd, path),
+					Message: "unsupported source extension or shebang",
+				})
+			}
+			return
+		}
+		if len(options.ComparisonDomains) > 0 {
+			if _, selected := options.ComparisonDomains[spec.ComparisonDomain]; !selected {
+				return
+			}
+		}
+	}
 	if options.MaxFileBytes > 0 && info.Size() > options.MaxFileBytes {
 		result.Warnings = append(result.Warnings, model.Warning{
 			Path: displayPath(cwd, path),
@@ -293,6 +317,37 @@ func addFile(
 		MaxBytes:    options.MaxFileBytes,
 		Info:        info,
 	})
+}
+
+const maxShebangBytes = 256
+
+func readShebangLine(path string, expected os.FileInfo) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	opened, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+	if !opened.Mode().IsRegular() || !os.SameFile(expected, opened) {
+		return "", errors.New("source changed during discovery")
+	}
+
+	content, err := io.ReadAll(io.LimitReader(file, maxShebangBytes+1))
+	if err != nil {
+		return "", err
+	}
+	lineEnd := len(content)
+	if index := strings.IndexByte(string(content), '\n'); index >= 0 {
+		lineEnd = index
+	}
+	if lineEnd > maxShebangBytes {
+		return "", nil
+	}
+	return strings.TrimSuffix(string(content[:lineEnd]), "\r"), nil
 }
 
 func hasSymlinkComponent(path string, boundary string) (bool, error) {

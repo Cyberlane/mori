@@ -33,6 +33,43 @@ func TestDiscoverSupportedFilesAndDefaultExcludes(t *testing.T) {
 	}
 }
 
+func TestDiscoverExtensionlessScriptsByShebang(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	zsh := filepath.Join(root, "syncpick")
+	bash := filepath.Join(root, "build")
+	unsupported := filepath.Join(root, "fish-tool")
+	writeFixture(t, zsh, "#!/bin/zsh\nrun() { print ok; }\n")
+	writeFixture(t, bash, "#!/usr/bin/env -S bash -eu\nrun() { printf '%s\\n' ok; }\n")
+	writeFixture(t, unsupported, "#!/usr/bin/env fish\nfunction run; echo ok; end\n")
+
+	result := Discover([]string{root}, Options{MaxFileBytes: 1024})
+	if len(result.Warnings) != 0 || len(result.Files) != 2 {
+		t.Fatalf("result = %#v, want two supported scripts and no warnings", result)
+	}
+	if result.Files[0].Language.ID != "bash" || result.Files[1].Language.ID != "zsh" {
+		t.Fatalf("languages = %s/%s, want bash/zsh", result.Files[0].Language.ID, result.Files[1].Language.ID)
+	}
+
+	explicit := Discover([]string{unsupported}, Options{})
+	if len(explicit.Files) != 0 || len(explicit.Warnings) != 1 ||
+		explicit.Warnings[0].Message != "unsupported source extension or shebang" {
+		t.Fatalf("explicit unsupported script result = %#v", explicit)
+	}
+}
+
+func TestDiscoverDoesNotUseShebangToOverrideExtension(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "script.py")
+	writeFixture(t, path, "#!/bin/zsh\ndef run():\n    return True\n")
+	result := Discover([]string{path}, Options{})
+	if len(result.Files) != 1 || result.Files[0].Language.ID != "python" || len(result.Warnings) != 0 {
+		t.Fatalf("result = %#v, want extension-selected Python", result)
+	}
+}
+
 func TestDiscoverCustomExcludeAndExplicitWarning(t *testing.T) {
 	t.Parallel()
 

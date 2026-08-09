@@ -14,7 +14,7 @@ import (
 // Version identifies the normalization contract used to build feature bags.
 // Bump it whenever the feature vocabulary, weights, canonical mappings, or
 // semantic-hint list changes.
-const Version = 3
+const Version = 4
 
 // Profile is a normalized, language-neutral view of one syntax fragment.
 // It is not the stable content identity exposed in reports.
@@ -290,6 +290,18 @@ var canonicalKinds = map[string]string{
 	"short_var_declaration": "binding",
 	"variable_declaration":  "binding",
 	"variable_declarator":   "binding",
+
+	// Shell grammars use different node names for the same variable expansion
+	// and word shapes. These aliases retain the surrounding command structure
+	// while preventing grammar vocabulary from dominating Bash/Zsh scores.
+	"simple_expansion":      "expression:variable",
+	"variable_ref":          "expression:variable",
+	"simple_variable_name":  "symbol",
+	"special_variable_name": "symbol",
+	"variable_name":         "symbol",
+	"glob_pattern":          "symbol",
+	"extglob_pattern":       "symbol",
+	"word":                  "symbol",
 
 	// Flow control.
 	"break_statement":    "flow:break",
