@@ -73,6 +73,20 @@ found no supported files or extracted no comparison fragments. The report is
 still written and contains a deterministic `coverage` warning; classify the
 scan as not applicable or insufficiently covered, never as a clean result.
 
+Schema-9 reports include `file_coverage`. Inspect every supported file with
+zero fragments, along with its skipped-fragment and parse-diagnostic counts,
+before describing coverage. A successful aggregate scan does not excuse a
+supported file that contributed no comparison units.
+
+Split production and tests before the first deep review when the repository
+contains both. Start with production-oriented exclusions that match the
+project's actual layout, then run a separate test profile when test similarity
+is relevant. For Go this commonly means adding `--exclude '**/*_test.go'` to
+the production scan. Do not apply guessed cross-language test globs without
+checking the repository. Use `--exclude-generated` when generated source is
+not part of the requested review; verify every `excluded_generated` entry in
+`file_coverage` rather than treating it as undiscovered.
+
 ## Produce structured evidence
 
 For a focused review, run:
@@ -87,6 +101,7 @@ mori scan \
   --min-tokens 40 \
   --max-groups 250 \
   --max-occurrences 10 \
+  --exclude-generated \
   .
 ```
 
@@ -216,7 +231,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `8`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `9`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while
@@ -228,6 +243,8 @@ official release binary when complete provenance is required; never infer a
 revision or date from the version string. Inspect:
 
 - `warnings`: disclose every incomplete or failed input;
+- `file_coverage`: inspect every zero-fragment file, generated classification,
+  exclusion status, skipped-fragment count, and parse-diagnostic count;
 - structured parse diagnostics: inspect the grammar, source range, node kind,
   and skipped-fragment count;
 - `truncated`: state when lower-ranked content identities are omitted;

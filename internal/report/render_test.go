@@ -144,6 +144,7 @@ func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
 		t.Fatalf("Text: %v", err)
 	}
 	for _, expected := range []string{
+		"nested function bodies are excluded from this score",
 		"outer body only",
 		"ERROR at 3:4-3:5",
 		"2 comparison fragment(s) containing parse errors skipped",

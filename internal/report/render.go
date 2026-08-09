@@ -167,6 +167,14 @@ func Text(writer io.Writer, report model.Report) error {
 		); err != nil {
 			return err
 		}
+		if groupHasNestedBoundaries(group) {
+			if _, err := fmt.Fprintln(
+				writer,
+				"   note: nested function bodies are excluded from this score and analyzed as separate fragments",
+			); err != nil {
+				return err
+			}
+		}
 		for profileIndex, profile := range group.Profiles {
 			label := string(rune('A' + profileIndex))
 			if len(group.Profiles) == 1 {
@@ -267,6 +275,17 @@ func Text(writer io.Writer, report model.Report) error {
 		"\nScores identify review candidates; they do not prove behavioral equivalence.",
 	)
 	return err
+}
+
+func groupHasNestedBoundaries(group model.MatchGroup) bool {
+	for _, profile := range group.Profiles {
+		for _, occurrence := range profile.Occurrences {
+			if occurrence.NestedCount > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func formatFragment(fragment model.FragmentSummary) string {

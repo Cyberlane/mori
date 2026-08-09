@@ -21,6 +21,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Machine-readable reports now use schema version 9. Text reports summarize
   files that produced no comparison fragments at the configured token floor.
   Normalization remains version 6 and existing baselines remain compatible.
+- Text results now place a group-level warning immediately below any score
+  whose retained occurrences exclude nested function bodies.
+- The bundled review skill now requires schema-9 per-file coverage inspection,
+  makes production/test separation a standard first step, and documents
+  generated-source classification and exclusion.
 
 ## [0.13.0] - 2026-08-09
 
