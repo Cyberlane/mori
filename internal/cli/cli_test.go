@@ -641,6 +641,19 @@ func TestRunRequireCoverageCanBeConfiguredAndOverridden(t *testing.T) {
 	}
 }
 
+func TestRunSkillHelp(t *testing.T) {
+	t.Parallel()
+
+	for _, argument := range []string{"help", "-h", "--help"} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		if code := Run(context.Background(), []string{"skill", argument}, &stdout, &stderr); code != exitSuccess ||
+			!strings.Contains(stdout.String(), "mori skill install") || stderr.Len() != 0 {
+			t.Fatalf("skill %s exit/stdout/stderr = %d/%q/%q", argument, code, stdout.String(), stderr.String())
+		}
+	}
+}
+
 func TestRunAppliesConfigAndIgnoreFilesEndToEnd(t *testing.T) {
 	t.Parallel()
 
@@ -825,6 +838,14 @@ func TestReadOnlyCommandsReportWriteFailures(t *testing.T) {
 		); code != exitError {
 			t.Errorf("Run(%v) exit = %d, want %d", args, code, exitError)
 		}
+	}
+	if code := Run(
+		context.Background(),
+		[]string{"skill", "--help"},
+		failingWriter{},
+		io.Discard,
+	); code != exitError {
+		t.Errorf("Run(skill --help) exit = %d, want %d", code, exitError)
 	}
 	if code := Run(
 		context.Background(),

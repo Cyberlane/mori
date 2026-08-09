@@ -918,6 +918,7 @@ func writeRootUsage(writer io.Writer) error {
 		"  mori baseline prune --baseline <path> [options] [path ...]\n",
 		"  mori languages\n",
 		"  mori skill install (--project <path> | --global | --target <path>)\n",
+		"  mori skill --help\n",
 		"  mori version\n",
 		"  mori help\n",
 	)
