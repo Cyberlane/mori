@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 8
+const SchemaVersion = 9
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -157,6 +157,18 @@ type Warning struct {
 	Diagnostics      []ParseDiagnostic `json:"diagnostics,omitempty"`
 }
 
+// FileCoverage records how much comparison evidence one supported source file
+// contributed at the configured token floor.
+type FileCoverage struct {
+	Path             string `json:"path"`
+	Language         string `json:"language"`
+	LanguageFamily   string `json:"language_family"`
+	ComparisonDomain string `json:"comparison_domain"`
+	FragmentCount    int    `json:"fragment_count"`
+	SkippedFragments int    `json:"skipped_fragments"`
+	ParseDiagnostics int    `json:"parse_diagnostics"`
+}
+
 // EffectiveConfig records the scan inputs needed to reproduce discovery and
 // pair selection.
 type EffectiveConfig struct {
@@ -194,5 +206,6 @@ type Report struct {
 	Truncated               bool            `json:"truncated"`
 	Groups                  []MatchGroup    `json:"groups"`
 	Warnings                []Warning       `json:"warnings"`
+	FileCoverage            []FileCoverage  `json:"file_coverage"`
 	Configuration           EffectiveConfig `json:"configuration"`
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/Cyberlane/mori/internal/model"
 )
 
+const maxTextCoverageFiles = 20
+
 // JSON writes an indented JSON report.
 func JSON(writer io.Writer, report model.Report) error {
 	encoder := json.NewEncoder(writer)
@@ -80,6 +82,51 @@ func Text(writer io.Writer, report model.Report) error {
 			terminalSafe(strings.Join(report.Configuration.IgnoreFiles, ", ")),
 		); err != nil {
 			return err
+		}
+	}
+
+	filesWithFragments := 0
+	zeroFragmentFiles := make([]model.FileCoverage, 0)
+	for _, coverage := range report.FileCoverage {
+		if coverage.FragmentCount > 0 {
+			filesWithFragments++
+		} else {
+			zeroFragmentFiles = append(zeroFragmentFiles, coverage)
+		}
+	}
+	if len(report.FileCoverage) > 0 {
+		if _, err := fmt.Fprintf(
+			writer,
+			"coverage: %d of %d analyzed file(s) produced comparison fragments at the current token floor\n",
+			filesWithFragments,
+			len(report.FileCoverage),
+		); err != nil {
+			return err
+		}
+	}
+	if len(zeroFragmentFiles) > 0 {
+		if _, err := fmt.Fprintf(writer, "files without comparison fragments (%d):\n", len(zeroFragmentFiles)); err != nil {
+			return err
+		}
+		for index, coverage := range zeroFragmentFiles {
+			if index == maxTextCoverageFiles {
+				if _, err := fmt.Fprintf(
+					writer,
+					"  - %d additional file(s) omitted; use --format json for the complete inventory\n",
+					len(zeroFragmentFiles)-index,
+				); err != nil {
+					return err
+				}
+				break
+			}
+			if _, err := fmt.Fprintf(
+				writer,
+				"  - %s [%s]\n",
+				terminalSafe(coverage.Path),
+				terminalSafe(coverage.Language),
+			); err != nil {
+				return err
+			}
 		}
 	}
 

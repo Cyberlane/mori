@@ -7,6 +7,18 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added deterministic per-file coverage inventories to JSON reports, including
+  fragment, skipped-fragment, and parse-diagnostic counts for every analyzed
+  supported file.
+
+### Changed
+
+- Machine-readable reports now use schema version 9. Text reports summarize
+  files that produced no comparison fragments at the configured token floor.
+  Normalization remains version 6 and existing baselines remain compatible.
+
 ## [0.13.0] - 2026-08-09
 
 ### Added

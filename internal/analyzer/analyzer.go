@@ -47,6 +47,7 @@ type parseResult struct {
 	index     int
 	fragments []model.Fragment
 	warnings  []model.Warning
+	coverage  model.FileCoverage
 }
 
 type profileAggregate struct {
@@ -89,6 +90,7 @@ func Analyze(
 		Files:         len(files),
 		Groups:        make([]model.MatchGroup, 0),
 		Warnings:      append(make([]model.Warning, 0, len(initialWarnings)), initialWarnings...),
+		FileCoverage:  make([]model.FileCoverage, 0, len(files)),
 		Configuration: model.EffectiveConfig{
 			IgnoreFiles:   make([]string, 0),
 			Excludes:      make([]string, 0),
@@ -135,6 +137,7 @@ func Analyze(
 					index:     job.index,
 					fragments: fragments,
 					warnings:  warnings,
+					coverage:  summarizeCoverage(job.file, fragments, warnings),
 				}
 			}
 		}()
@@ -168,6 +171,7 @@ func Analyze(
 	for _, result := range parsed {
 		fragments = append(fragments, result.fragments...)
 		report.Warnings = append(report.Warnings, result.warnings...)
+		report.FileCoverage = append(report.FileCoverage, result.coverage)
 	}
 	sortFragments(fragments)
 	if len(fragments) == 0 {
@@ -207,6 +211,25 @@ func Analyze(
 	collector.finish()
 
 	return report, nil
+}
+
+func summarizeCoverage(
+	file source.File,
+	fragments []model.Fragment,
+	warnings []model.Warning,
+) model.FileCoverage {
+	coverage := model.FileCoverage{
+		Path:             file.DisplayPath,
+		Language:         file.Language.ID,
+		LanguageFamily:   file.Language.Family,
+		ComparisonDomain: file.Language.ComparisonDomain,
+		FragmentCount:    len(fragments),
+	}
+	for _, warning := range warnings {
+		coverage.SkippedFragments += warning.SkippedFragments
+		coverage.ParseDiagnostics += warning.TotalDiagnostics
+	}
+	return coverage
 }
 
 func compareWithinFamilies(fragments []model.Fragment, collector *matchCollector) error {

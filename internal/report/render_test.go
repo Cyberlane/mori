@@ -153,3 +153,31 @@ func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
 		}
 	}
 }
+
+func TestTextDisclosesPerFileCoverage(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	if err := Text(&output, model.Report{
+		SchemaVersion: model.SchemaVersion,
+		Threshold:     0.85,
+		Files:         2,
+		Fragments:     3,
+		FileCoverage: []model.FileCoverage{
+			{Path: "functions.go", Language: "go", FragmentCount: 3},
+			{Path: "script.zsh", Language: "zsh"},
+		},
+	}); err != nil {
+		t.Fatalf("Text: %v", err)
+	}
+	rendered := output.String()
+	for _, expected := range []string{
+		"coverage: 1 of 2 analyzed file(s)",
+		"files without comparison fragments (1):",
+		"script.zsh [zsh]",
+	} {
+		if !strings.Contains(rendered, expected) {
+			t.Fatalf("output missing %q:\n%s", expected, rendered)
+		}
+	}
+}

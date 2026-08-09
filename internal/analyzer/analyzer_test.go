@@ -169,6 +169,12 @@ func TestAnalyzeReportsEmptyCoverage(t *testing.T) {
 		!strings.Contains(noFragments.Warnings[0].Message, "no comparison fragments") {
 		t.Fatalf("no-fragment report = %#v", noFragments)
 	}
+	if len(noFragments.FileCoverage) != 1 ||
+		noFragments.FileCoverage[0].Path != discovered.Files[0].DisplayPath ||
+		noFragments.FileCoverage[0].Language != "go" ||
+		noFragments.FileCoverage[0].FragmentCount != 0 {
+		t.Fatalf("file coverage = %#v, want one zero-fragment Go file", noFragments.FileCoverage)
+	}
 }
 
 func TestAnalyzeBoundsReportedMatches(t *testing.T) {
