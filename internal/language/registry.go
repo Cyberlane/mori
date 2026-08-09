@@ -52,6 +52,9 @@ func (s Spec) TopLevelFragmentKind(node *tree_sitter.Node) string {
 // this grammar.
 func (s Spec) FragmentKinds() []string {
 	kinds := []string{s.FragmentKind}
+	if s.ComparisonDomain == "code" {
+		kinds = append(kinds, "block")
+	}
 	if s.topLevelFragmentKind != "" && s.topLevelFragmentKind != s.FragmentKind {
 		kinds = append(kinds, s.topLevelFragmentKind)
 	}

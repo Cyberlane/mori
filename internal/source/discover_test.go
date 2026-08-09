@@ -177,6 +177,25 @@ func TestDiscoverFiltersComparisonDomainsBeforeFileChecks(t *testing.T) {
 	}
 }
 
+func TestDiscoverIncludesOnlyGoHostsForOptInEmbeddedSQL(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	goPath := filepath.Join(root, "queries.go")
+	tsPath := filepath.Join(root, "queries.ts")
+	sqlPath := filepath.Join(root, "queries.sql")
+	writeFixture(t, goPath, "package fixture\n")
+	writeFixture(t, tsPath, "export function query() {}\n")
+	writeFixture(t, sqlPath, "SELECT 1;\n")
+	result := Discover([]string{root}, Options{
+		ComparisonDomains: map[string]struct{}{"sql-query": {}}, EmbeddedSQL: true,
+	})
+	if len(result.Files) != 2 || result.Files[0].Path != goPath || result.Files[1].Path != sqlPath ||
+		result.Files[0].AnalysisDomain != "sql-query" {
+		t.Fatalf("embedded-SQL discovery = %#v", result)
+	}
+}
+
 func TestDiscoverSelectsPostgreSQLDialect(t *testing.T) {
 	t.Parallel()
 

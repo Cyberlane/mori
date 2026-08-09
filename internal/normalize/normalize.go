@@ -15,7 +15,7 @@ import (
 // Version identifies the normalization contract used to build feature bags.
 // Bump it whenever the selected comparison-unit contract, feature vocabulary,
 // weights, canonical mappings, or semantic-hint list changes.
-const Version = 7
+const Version = 8
 
 // Profile is a normalized, language-neutral view of one syntax fragment.
 // It is not the stable content identity exposed in reports.
@@ -92,6 +92,54 @@ func Build(
 		})
 	}
 
+	return profile, nil
+}
+
+// BuildSequence creates one bounded comparison profile from an ordered list
+// of statement roots. The synthetic block feature distinguishes these opt-in
+// partial-function units from independently extracted functions.
+func BuildSequence(
+	ctx context.Context,
+	roots []*tree_sitter.Node,
+	source []byte,
+	isBoundary func(string) bool,
+	excludeNestedBoundaries bool,
+) (Profile, error) {
+	return BuildCollection(
+		ctx, roots, source, isBoundary, excludeNestedBoundaries, "block",
+	)
+}
+
+// BuildCollection merges ordered syntax roots beneath one synthetic canonical
+// node. It is used only when an opt-in comparison unit has no single
+// Tree-sitter node spanning exactly the selected roots.
+func BuildCollection(
+	ctx context.Context,
+	roots []*tree_sitter.Node,
+	source []byte,
+	isBoundary func(string) bool,
+	excludeNestedBoundaries bool,
+	canonicalRoot string,
+) (Profile, error) {
+	profile := Profile{Features: make(model.FeatureBag)}
+	if len(roots) == 0 {
+		return profile, nil
+	}
+	if canonicalRoot != "" {
+		addFeature(profile.Features, "node:"+canonicalRoot, 1)
+		profile.TokenCount = 1
+	}
+	for _, root := range roots {
+		part, err := Build(ctx, root, source, isBoundary, excludeNestedBoundaries)
+		if err != nil {
+			return Profile{}, err
+		}
+		for feature, count := range part.Features {
+			addFeature(profile.Features, feature, count)
+		}
+		profile.TokenCount += part.TokenCount
+		profile.LiteralDigests = append(profile.LiteralDigests, part.LiteralDigests...)
+	}
 	return profile, nil
 }
 

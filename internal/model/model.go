@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 12
+const SchemaVersion = 13
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -208,6 +208,10 @@ type EffectiveConfig struct {
 	MaxFileBytes      int64              `json:"max_file_bytes"`
 	ComparisonDomain  string             `json:"comparison_domain"`
 	SQLDialect        string             `json:"sql_dialect"`
+	EmbeddedSQL       bool               `json:"embedded_sql"`
+	StatementBlocks   bool               `json:"statement_blocks"`
+	BlockStatements   int                `json:"block_statements"`
+	MaxBlocksPerFunc  int                `json:"max_blocks_per_function"`
 	Ranking           string             `json:"ranking"`
 	PriorityPaths     []PriorityPathRule `json:"priority_paths"`
 	SameLanguageOnly  bool               `json:"same_language_only"`
