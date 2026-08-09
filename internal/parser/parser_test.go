@@ -252,6 +252,31 @@ func TestSQLParseErrorDoesNotHideSeparateValidQuery(t *testing.T) {
 	}
 }
 
+func TestSQLDDLParseWarningDoesNotClaimFragmentsWereSkipped(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "schema.sql")
+	content := `PRAGMA foreign_keys = ON;
+CREATE TABLE documents (
+  metadata TEXT CHECK(json_valid(metadata))
+);
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "schema.sql", Language: spec,
+	}, 1)
+	if len(fragments) != 0 || len(warnings) != 1 || warnings[0].Kind != "parse" ||
+		warnings[0].TotalDiagnostics == 0 || warnings[0].SkippedFragments != 0 {
+		t.Fatalf("fragments/warnings = %#v/%#v", fragments, warnings)
+	}
+	if warnings[0].Message != "syntax tree contains parse errors; comparison coverage may be incomplete" {
+		t.Fatalf("warning message = %q", warnings[0].Message)
+	}
+}
+
 func TestFileRepairsSQLiteAndSQLCQueryForms(t *testing.T) {
 	t.Parallel()
 

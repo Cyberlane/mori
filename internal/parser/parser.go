@@ -90,7 +90,7 @@ func File(
 			Kind:             "parse",
 			Path:             file.DisplayPath,
 			Language:         file.Language.ID,
-			Message:          "syntax tree contains parse errors; invalid fragments were skipped",
+			Message:          "syntax tree contains parse errors; comparison coverage may be incomplete",
 			TotalDiagnostics: total,
 			SkippedFragments: skippedFragments,
 			Diagnostics:      diagnostics,

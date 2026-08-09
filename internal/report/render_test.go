@@ -135,7 +135,7 @@ func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
 			}},
 		}},
 		Warnings: []model.Warning{{
-			Kind: "parse", Path: "file.ts", Message: "parse error",
+			Kind: "parse", Path: "file.ts", Message: "parse error", SkippedFragments: 2,
 			Diagnostics: []model.ParseDiagnostic{{
 				NodeKind: "ERROR", StartLine: 3, StartColumn: 4, EndLine: 3, EndColumn: 5,
 			}},
@@ -143,7 +143,11 @@ func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Text: %v", err)
 	}
-	for _, expected := range []string{"outer body only", "ERROR at 3:4-3:5"} {
+	for _, expected := range []string{
+		"outer body only",
+		"ERROR at 3:4-3:5",
+		"2 comparison fragment(s) containing parse errors skipped",
+	} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("output missing %q:\n%s", expected, output.String())
 		}
