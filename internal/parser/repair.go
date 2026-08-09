@@ -15,7 +15,7 @@ var (
 	swiftOptionalTryAwait   = regexp.MustCompile(`\b(try\?[ \t]+await)[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]+\{`)
 	swiftSwitchAwait        = regexp.MustCompile(`\bswitch([ \t]+)await[ \t]+[A-Za-z_][A-Za-z0-9_]*([ \t]+)\{`)
 	swiftEmptyTupleArgument = regexp.MustCompile(`\.[A-Za-z_][A-Za-z0-9_]*\((\(\))\)`)
-	swiftCastNilCoalescing  = regexp.MustCompile(`=([ \t]+)[A-Za-z_][A-Za-z0-9_]*\[[^\]\r\n]+\][ \t]+as\?[ \t]+[A-Za-z_][A-Za-z0-9_.]*([ \t]+)\?\?`)
+	swiftCastNilCoalescing  = regexp.MustCompile(`(?:=|:|\?\?|\breturn)([ \t]+)\(*[A-Za-z_][A-Za-z0-9_]*\??(?:\[[^\]\r\n]+\])?[ \t]+as\?[ \t]+(?:[A-Za-z_][A-Za-z0-9_.]*|\[\[[A-Za-z_][A-Za-z0-9_.]*[ \t]*:[ \t]*[A-Za-z_][A-Za-z0-9_.]*\]\]|\[[A-Za-z_][A-Za-z0-9_.]*[ \t]*:[ \t]*[A-Za-z_][A-Za-z0-9_.]*\])([ \t]+)\?\?`)
 )
 
 // repairSQLParserInput adapts a small set of valid SQLite and SQLC forms that
@@ -89,7 +89,7 @@ func repairSwiftParserInput(content []byte) []byte {
 			clone()[start+1] = ']'
 		}
 	}
-	for _, match := range swiftCastNilCoalescing.FindAllSubmatchIndex(content, -1) {
+	for _, match := range overlappingSubmatchIndices(swiftCastNilCoalescing, content) {
 		leadingStart, trailingEnd := match[2], match[5]
 		if leadingStart >= 0 && trailingEnd > 0 {
 			clone()[leadingStart] = '('
@@ -97,6 +97,28 @@ func repairSwiftParserInput(content []byte) []byte {
 		}
 	}
 	return repaired
+}
+
+func overlappingSubmatchIndices(expression *regexp.Regexp, content []byte) [][]int {
+	matches := make([][]int, 0)
+	for searchStart := 0; searchStart < len(content); {
+		match := expression.FindSubmatchIndex(content[searchStart:])
+		if match == nil {
+			break
+		}
+		for index, offset := range match {
+			if offset >= 0 {
+				match[index] = searchStart + offset
+			}
+		}
+		matches = append(matches, match)
+		next := match[0] + 1
+		if next <= searchStart {
+			break
+		}
+		searchStart = next
+	}
+	return matches
 }
 
 // repairJSXParserInput works around the pinned TypeScript/JavaScript grammar's
