@@ -55,9 +55,13 @@ The registry binds:
 - one generated Tree-sitter grammar; and
 - grammar node predicates that identify comparison units.
 
-Grammar versions are pinned as a compatible ABI set. A table-driven test calls
-`Parser.SetLanguage` for every entry; compilation alone does not detect grammar
-ABI mismatches.
+Grammar versions are pinned as a compatible ABI set. Swift's upstream project
+publishes generated C sources as a workflow artifact, so Mori vendors the
+minimum generated sources and required headers under `internal/grammar/swift`.
+That package records the exact source commit, workflow artifact, license, ABI,
+and SHA-256 digests; ordinary builds never download or regenerate it. A
+table-driven test calls `Parser.SetLanguage` for every entry; compilation alone
+does not detect grammar ABI mismatches.
 
 ### `internal/parser`
 
@@ -75,11 +79,15 @@ Each worker:
 
 Tree-sitter can recover from malformed source. A root containing errors creates
 a structured warning with a bounded set of node ranges and the skipped-fragment
-count, while any comparison fragment containing an error is skipped.
+count, while any comparison fragment containing an error or nested below an
+explicit error node is skipped.
 Adaptations never change byte offsets: normalization and report locations still
 refer to the original source. Nearby malformed forms remain parser errors.
 
-Code languages extract function-like boundaries. SQL extracts only top-level
+Code languages extract function-like boundaries. Swift extracts implemented
+functions, initializers, deinitializers, and closures; bodyless protocol
+requirements, computed properties, accessors, and subscripts are not separate
+comparison units. SQL extracts only top-level
 `SELECT`/set-operation, `INSERT`, `UPDATE`, and `DELETE` statements. Exact,
 immediately adjacent SQLC name comments label query locations. DDL is ignored,
 and nested query structure remains inside its top-level query rather than
@@ -110,7 +118,9 @@ overlap.
 
 Operation families are intentionally small and curated. Bash/POSIX shell and
 Zsh additionally share canonical word, variable-reference, and glob aliases
-while retaining separate parsers. SQL additionally maps
+while retaining separate parsers. Swift maps its declarations, expressions,
+arguments, identifiers, and control transfers into existing language-neutral
+families. SQL additionally maps
 query clauses, relational structure, and data-manipulation operations. All are
 score hints, not semantic facts.
 

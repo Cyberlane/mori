@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	tree_sitter_swift "github.com/Cyberlane/mori/internal/grammar/swift"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tree_sitter_bash "github.com/tree-sitter/tree-sitter-bash/bindings/go"
 	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
@@ -163,6 +164,25 @@ var specs = []Spec{
 		excludeNestedBoundaries: true,
 	},
 	{
+		ID:               "swift",
+		Family:           "swift",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Swift",
+		Extensions:       []string{".swift"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_swift.Language())
+		},
+		fragmentKinds: kinds(
+			"deinit_declaration",
+			"function_declaration",
+			"init_declaration",
+			"lambda_literal",
+		),
+		acceptBoundary:          acceptsSwiftBoundary,
+		excludeNestedBoundaries: true,
+	},
+	{
 		ID:               "zsh",
 		Family:           "shell",
 		ComparisonDomain: "code",
@@ -189,6 +209,14 @@ var specs = []Spec{
 		fragmentKinds:  kinds("statement"),
 		acceptBoundary: isSQLQueryStatement,
 	},
+}
+
+func acceptsSwiftBoundary(node *tree_sitter.Node) bool {
+	if node.Kind() == "lambda_literal" {
+		parent := node.Parent()
+		return parent != nil && parent.Parent() != nil
+	}
+	return node.ChildByFieldName("body") != nil
 }
 
 func isSQLQueryStatement(node *tree_sitter.Node) bool {

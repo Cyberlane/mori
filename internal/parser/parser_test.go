@@ -89,6 +89,101 @@ function second { print -r -- "$1"; }
 	}
 }
 
+func TestSwiftExtractsImplementedFunctionsAndClosures(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "Functions.swift")
+	content := `protocol Worker {
+  func requirement(value: Int) -> Int
+}
+
+func topLevel(value: Int) -> Int {
+  return value + 1
+}
+
+final class Service {
+  init(value: Int) {
+    self.value = value
+  }
+
+  deinit {
+    print("done")
+  }
+
+  func method(value: Int) -> Int {
+    let transform = { (input: Int) -> Int in
+      return input + 1
+    }
+    return transform(value)
+  }
+
+  var doubled: Int {
+    value * 2
+  }
+
+  subscript(index: Int) -> Int {
+    return index
+  }
+
+  let value: Int
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.Detect(path)
+	if !ok {
+		t.Fatal("Swift grammar not detected")
+	}
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "Functions.swift", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 5 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want five/none", fragments, warnings)
+	}
+	names := make(map[string]bool)
+	for _, fragment := range fragments {
+		names[fragment.Location.Name] = true
+		if fragment.Location.LanguageFamily != "swift" {
+			t.Fatalf("Swift fragment = %#v", fragment.Location)
+		}
+	}
+	for _, name := range []string{"topLevel", "init", "deinit", "method"} {
+		if !names[name] {
+			t.Errorf("missing Swift fragment name %q in %#v", name, names)
+		}
+	}
+	if names["requirement"] {
+		t.Fatal("bodyless protocol requirement became a comparison fragment")
+	}
+	if names["doubled"] || names["subscript"] {
+		t.Fatal("computed property or subscript became a comparison fragment")
+	}
+	for _, fragment := range fragments {
+		if fragment.Location.Name == "transform" && (fragment.NestingDepth != 1 ||
+			fragment.Parent == nil || fragment.Parent.Name != "method") {
+			t.Fatalf("nested Swift closure = %#v", fragment)
+		}
+	}
+}
+
+func TestSwiftMalformedFunctionProducesParseWarning(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "Broken.swift")
+	if err := os.WriteFile(path, []byte("func broken(value: Int -> Int {\n  return value\n}\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "Broken.swift", Language: spec,
+	}, 1)
+	if len(fragments) != 0 || len(warnings) != 1 || warnings[0].Kind != "parse" ||
+		warnings[0].Language != "swift" || warnings[0].TotalDiagnostics == 0 {
+		t.Fatalf("fragments/warnings = %#v/%#v", fragments, warnings)
+	}
+}
+
 func TestFileWarnsAndSkipsInvalidFragment(t *testing.T) {
 	t.Parallel()
 

@@ -252,6 +252,7 @@ copy in a new file must appear for review. The conventional file name is
 | TSX | TypeScript | code | `.tsx` | — |
 | Python | Python | code | `.py`, `.pyi` | `python`, `python3` |
 | Rust | Rust | code | `.rs` | — |
+| Swift | Swift | code | `.swift` | — |
 | Zsh | Shell | code | `.zsh` | `zsh` |
 | SQL queries | SQL | sql-query | `.sql` | — |
 
@@ -265,7 +266,11 @@ version; `mori languages --help` describes the columns.
 
 Tree-sitter recovery is visible in report warnings as potentially incomplete
 comparison coverage, and any comparison fragment containing a parse error is
-skipped with an explicit count. SQL dialect extensions outside Mori's
+skipped with an explicit count. Swift support extracts implemented functions,
+initializers, deinitializers, and closures. Protocol requirements, computed
+properties, accessors, and subscripts are not independent comparison units;
+unsupported Swift syntax can still produce visible diagnostics. SQL dialect
+extensions outside Mori's
 pinned grammar and Mori's bounded SQLite/SQLC adaptations may therefore produce
 diagnostics or incomplete coverage. Mori also applies a bounded,
 byte-preserving repair for recognized cases of the

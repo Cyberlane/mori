@@ -18,6 +18,12 @@ Record the exact version and copyright in `THIRD_PARTY_NOTICES.md`. Do not
 upgrade one grammar independently if it changes the ABI expected by the shared
 binding.
 
+If an upstream does not distribute generated parser sources in its module or
+release, vendor only the generated files required for a clean offline build.
+Record the exact source commit, generator version, artifact or generation
+workflow, license, ABI, and file digests next to the adapter, and test those
+digests. Never download or regenerate a grammar during an ordinary build.
+
 ## 2. Register the grammar
 
 Add a `language.Spec` in `internal/language/registry.go` with:
