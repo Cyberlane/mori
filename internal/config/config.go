@@ -27,6 +27,8 @@ type Settings struct {
 	MaxFileBytes      *int64   `json:"max_file_bytes,omitempty"`
 	Workers           *int     `json:"workers,omitempty"`
 	Format            *string  `json:"format,omitempty"`
+	ComparisonDomain  string   `json:"comparison_domain,omitempty"`
+	SameLanguageOnly  *bool    `json:"same_language_only,omitempty"`
 	CrossLanguageOnly *bool    `json:"cross_language_only,omitempty"`
 	LanguagePairs     []string `json:"language_pairs,omitempty"`
 	FailOnMatch       *bool    `json:"fail_on_match,omitempty"`

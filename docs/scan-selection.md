@@ -20,10 +20,9 @@ similarity score evidence of semantic or behavioral equivalence.
 
 ## Command-line contract
 
-`--comparison-domain <domain>` is repeatable. Each value must exactly identify
-a domain shown by `mori languages`, currently `code` or `sql-query`. Repeating
-the flag selects the union of its values. Omitting it selects every registered
-domain.
+`--comparison-domain <domain>` accepts one case-insensitive domain identifier
+shown by `mori languages`, currently `code` or `sql-query`. Omitting it selects
+every registered domain.
 
 Examples:
 
@@ -49,8 +48,12 @@ The three language-selection modes are mutually exclusive:
 
 A comparison-domain filter can be combined with any one language-selection
 mode. Every explicit language pair must belong to a selected domain. Mori
-rejects contradictory options, such as `--comparison-domain sql-query
---language-pair go,go`, instead of returning a misleading empty report.
+rejects contradictory options such as the following instead of returning a
+misleading empty report:
+
+```sh
+mori scan --comparison-domain sql-query --language-pair go,go .
+```
 
 ## Project configuration
 
@@ -58,15 +61,15 @@ rejects contradictory options, such as `--comparison-domain sql-query
 
 ```json
 {
-  "comparison_domains": ["code"],
+  "comparison_domain": "code",
   "same_language_only": true
 }
 ```
 
-`comparison_domains` is additive with repeated command-line flags, matching
-the existing `language_pairs` and `exclude` behavior. Boolean command-line
-forms can explicitly override configured booleans, for example
-`--same-language-only=false`.
+The command-line domain overrides the configured domain, which permits a
+repository with a normal code profile to run a SQL-only scan without disabling
+its other configuration. Boolean command-line forms can explicitly override
+configured booleans, for example `--same-language-only=false`.
 
 ## Execution model
 
@@ -104,14 +107,14 @@ Schema version 6 adds these fields to `configuration`:
 
 ```json
 {
-  "comparison_domains": ["code"],
+  "comparison_domain": "code",
   "same_language_only": true
 }
 ```
 
-The domain list is normalized, deduplicated, and sorted. An empty list means
-that no domain restriction was requested. Consumers must continue to reject or
-explicitly handle unknown report schema versions.
+The domain is normalized to its registered lowercase identifier. An empty
+string means that no domain restriction was requested. Consumers must continue
+to reject or explicitly handle unknown report schema versions.
 
 Normalization remains version 3. This feature does not change fragment
 features, fingerprints, similarity scores, content-pair identities, or

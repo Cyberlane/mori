@@ -103,6 +103,15 @@ func TestComparisonDomainsAndFragmentKinds(t *testing.T) {
 	}
 }
 
+func TestComparisonDomainsAreUniqueAndSorted(t *testing.T) {
+	t.Parallel()
+
+	domains := ComparisonDomains()
+	if len(domains) != 2 || domains[0] != "code" || domains[1] != "sql-query" {
+		t.Fatalf("ComparisonDomains() = %#v", domains)
+	}
+}
+
 func TestTypeScriptSelectorsIncludeTSXFamily(t *testing.T) {
 	t.Parallel()
 

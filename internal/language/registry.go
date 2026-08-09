@@ -204,6 +204,21 @@ func ResolveSelector(selector string) ([]string, bool) {
 	return resolved, true
 }
 
+// ComparisonDomains returns the registered comparison domains in
+// deterministic order.
+func ComparisonDomains() []string {
+	domains := make(map[string]struct{})
+	for _, spec := range specs {
+		domains[spec.ComparisonDomain] = struct{}{}
+	}
+	result := make([]string, 0, len(domains))
+	for domain := range domains {
+		result = append(result, domain)
+	}
+	sort.Strings(result)
+	return result
+}
+
 // Detect returns the grammar associated with a file extension.
 func Detect(path string) (Spec, bool) {
 	extension := strings.ToLower(filepath.Ext(path))
