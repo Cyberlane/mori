@@ -79,6 +79,7 @@ type scanOptions struct {
 	languagePairs      stringList
 	comparisonDomain   string
 	sqlDialect         string
+	ranking            string
 	focusPaths         stringList
 	changedSince       string
 	changedWorktrees   stringList
@@ -117,6 +118,7 @@ func defaultScanOptions() scanOptions {
 		workers:        runtime.GOMAXPROCS(0),
 		format:         "text",
 		sqlDialect:     language.SQLDialectGeneric,
+		ranking:        analyzer.RankingStructural,
 		baselineScope:  string(baseline.ScopeContent),
 		respectIgnore:  true,
 	}
@@ -143,6 +145,12 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 		"sql-dialect",
 		options.sqlDialect,
 		"SQL parser dialect: generic or postgresql",
+	)
+	flags.StringVar(
+		&options.ranking,
+		"ranking",
+		options.ranking,
+		"group ordering: structural or review",
 	)
 	flags.BoolVar(
 		&options.sameLanguageOnly,
@@ -375,6 +383,9 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	if settings.SQLDialect != "" {
 		options.sqlDialect = settings.SQLDialect
 	}
+	if settings.Ranking != "" {
+		options.ranking = settings.Ranking
+	}
 	if settings.Baseline != "" {
 		options.baselinePath = resolveConfigPath(base, settings.Baseline)
 	}
@@ -409,6 +420,9 @@ func validateScanOptions(options scanOptions) error {
 		return errors.New("--format must be text or json")
 	}
 	if _, err := resolveSQLDialect(options.sqlDialect); err != nil {
+		return err
+	}
+	if _, err := resolveRanking(options.ranking); err != nil {
 		return err
 	}
 	selectionModes := 0
@@ -659,6 +673,10 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, err
 	}
+	ranking, err := resolveRanking(options.ranking)
+	if err != nil {
+		return model.Report{}, err
+	}
 	discovered, err := source.DiscoverContext(ctx, paths, source.Options{
 		Excludes:          options.excludes,
 		MaxFileBytes:      options.maxFileBytes,
@@ -707,6 +725,7 @@ func executeScan(
 		FocusActive:       focus != nil,
 		Suppress:          suppress,
 		ExcludedCoverage:  discovered.Excluded,
+		Ranking:           ranking,
 	})
 	if err != nil {
 		return result, err
@@ -724,6 +743,7 @@ func executeScan(
 		MaxFileBytes:      options.maxFileBytes,
 		ComparisonDomain:  domain,
 		SQLDialect:        sqlDialect,
+		Ranking:           ranking,
 		SameLanguageOnly:  options.sameLanguageOnly,
 		CrossLanguageOnly: options.crossLanguageOnly,
 		LanguagePairs:     append([]string{}, options.languagePairs...),
@@ -735,6 +755,19 @@ func executeScan(
 	sort.Strings(result.Configuration.Excludes)
 	sort.Strings(result.Configuration.LanguagePairs)
 	return result, nil
+}
+
+func resolveRanking(value string) (string, error) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch value {
+	case analyzer.RankingStructural, analyzer.RankingReview:
+		return value, nil
+	default:
+		return "", fmt.Errorf(
+			"unknown --ranking %q; expected structural or review",
+			value,
+		)
+	}
 }
 
 func resolveSQLDialect(value string) (string, error) {

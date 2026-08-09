@@ -719,6 +719,11 @@ func TestRunRejectsInvalidSelectionCombinations(t *testing.T) {
 			want: "unknown --sql-dialect",
 		},
 		{
+			name: "unknown ranking",
+			args: []string{"scan", "--ranking", "magic", "."},
+			want: "unknown --ranking",
+		},
+		{
 			name: "pair outside domain",
 			args: []string{
 				"scan", "--comparison-domain", "sql-query", "--language-pair", "go,go", ".",
@@ -750,6 +755,7 @@ func TestConfigLoadsBeforeCLIOverridesAndLanguagePairsExpand(t *testing.T) {
   "max_groups": 250,
   "comparison_domain": "sql-query",
   "sql_dialect": "postgresql",
+	"ranking": "review",
   "language_pairs": ["go,typescript"],
   "exclude": ["generated/**"],
 	"exclude_generated": true,
@@ -771,7 +777,8 @@ func TestConfigLoadsBeforeCLIOverridesAndLanguagePairsExpand(t *testing.T) {
 	}
 	if options.threshold != 0.9 || options.maxGroups != 250 || options.respectIgnore ||
 		len(options.languagePairs) != 1 || options.comparisonDomain != "CODE" ||
-		options.sqlDialect != "generic" || len(options.excludes) != 1 || !options.excludeGenerated ||
+		options.sqlDialect != "generic" || options.ranking != "review" ||
+		len(options.excludes) != 1 || !options.excludeGenerated ||
 		options.baselinePath != filepath.Join(root, "accepted.json") {
 		t.Fatalf("options = %#v", options)
 	}

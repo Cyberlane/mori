@@ -163,6 +163,13 @@ Groups sort by score, shared evidence mass, represented location-pair count,
 and stable identity. Shared shape and raw feature explanations are computed
 after aggregation.
 
+Opt-in review ranking derives a small integer priority from disclosed source
+location relationships: same names across directories, cross-directory and
+cross-file occurrences, and repeated location pairs. It orders by that value
+before the established structural comparator. This heuristic never changes
+scores, fingerprints, group membership, or baseline identities, and the
+default remains structural ordering.
+
 When focus is active, groups with at least one exact focused occurrence sort
 before other groups, while the comparator within both buckets is unchanged.
 Focus never restricts discovery or pair comparison and never changes scores,
@@ -212,7 +219,7 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-9 reports expose deterministic binary provenance, comparison selection,
+Schema-10 reports expose deterministic binary provenance, comparison selection,
 comparison domains, fragment kinds, optional exact focus metadata, grouped
 content-pair identities, fragment fingerprints, occurrence samples and exact
 counts, nesting metadata, structured parser

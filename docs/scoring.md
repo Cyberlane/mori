@@ -174,10 +174,10 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 8,
+  "schema_version": 10,
   "tool": {
     "name": "mori",
-    "version": "0.13.0",
+    "version": "<version>",
     "revision": "<full source revision>",
     "source_date": "<RFC3339 commit time>",
     "modified": false,
@@ -198,6 +198,7 @@ The top-level shape is:
   "truncated": false,
   "groups": [],
   "warnings": [],
+  "file_coverage": [],
   "configuration": {
     "ignore_files": [],
     "respect_ignore": true,
@@ -209,6 +210,7 @@ The top-level shape is:
     "max_file_bytes": 2097152,
     "comparison_domain": "code",
     "sql_dialect": "generic",
+    "ranking": "structural",
     "same_language_only": true,
     "cross_language_only": false,
     "language_pairs": []
@@ -228,7 +230,20 @@ include bounded parser node ranges and skipped-fragment counts.
 Suppression fields separate affected source pairs from content identities.
 Consumers should reject or explicitly handle unknown schema versions.
 
-Schema 9 adds a deterministic `file_coverage` array with one entry per analyzed
+Schema 10 adds `review_priority` and `review_signals` to every group and records
+the effective `configuration.ranking`. `--ranking review` uses these explicit
+location-level signals before the established structural ordering. Identifiers
+are used only for the disclosed same-name signal; they remain absent from
+fingerprints and similarity scores. Focused groups always remain first.
+
+Review priority is the sum of disclosed, overlapping signals: 4 for a
+same-named pair across directories, 2 for any cross-directory pair, 2 for a
+same-named pair across files, 1 for any cross-file pair, and 1 when the content
+identity represents multiple location pairs. The existing structural
+comparator breaks ties. This is a shortlist-ordering heuristic, not semantic
+or refactoring confidence.
+
+Schema 9 added a deterministic `file_coverage` array with one entry per analyzed
 or generated-excluded supported file. Each entry records its language, review
 family, comparison domain, analysis status, generated-source classification,
 fragment count, skipped-fragment count, and parse-diagnostic count. Consumers

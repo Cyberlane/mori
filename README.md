@@ -180,7 +180,9 @@ Store repeatable project settings in `.mori.json`:
   "min_tokens": 40,
   "max_groups": 250,
   "comparison_domain": "code",
+  "ranking": "review",
   "same_language_only": true,
+  "exclude_generated": true,
   "exclude": ["**/*_test.go"]
 }
 ```
@@ -208,6 +210,16 @@ Write results as JSON for a script or CI system:
 mori scan --format json .
 ```
 
+For a human review shortlist, opt into explainable source-location ranking:
+
+```sh
+mori scan --ranking review .
+```
+
+This prioritizes disclosed same-name, cross-directory, cross-file, and repeated
+location-pair signals before the ordinary structural ordering. It does not
+change similarity scores, fingerprints, or which groups qualify.
+
 Mori emits a `coverage` warning when a scan discovers no supported files or
 extracts no comparison fragments. Such a result is not evidence that the
 repository has no duplication. Use `--require-coverage` in automation to write
@@ -217,7 +229,7 @@ the report and exit with status `4` when either condition occurs:
 mori scan --format json --require-coverage .
 ```
 
-Schema-9 reports embed deterministic `tool` build provenance, comparison
+Schema-10 reports embed deterministic `tool` build provenance, comparison
 selection, domain and fragment-kind metadata, exact focus metadata, and a
 per-file coverage inventory including generated-source classification. They do
 not include a scan timestamp, hostname, username, source body, diff, or Git
@@ -261,7 +273,7 @@ mori scan \
 `--changed-worktree PATH=REVISION` values describe the other worktrees. Mori
 requires every discovered file to belong to a resolved root, never inherits a
 parent revision for a nested repository, and records each root's requested
-base, full resolved commits, changed paths, and deleted paths in schema-8 JSON.
+base, full resolved commits, changed paths, and deleted paths in schema-10 JSON.
 Use only repeated `--changed-worktree` values when every scanned root should be
 explicit. Excluding and scanning a nested worktree separately remains valid;
 never interpret an excluded repository as unchanged. Mori bounds one scan to

@@ -138,6 +138,82 @@ func TestAnalyzeRejectsConflictingLanguageSelectionModes(t *testing.T) {
 	}
 }
 
+func TestReviewPriorityUsesOnlyExplainableLocationSignals(t *testing.T) {
+	t.Parallel()
+
+	candidate := &groupCandidate{
+		locationPairs: 2,
+		pathPairs: map[string]model.LocationPair{
+			"pair": {
+				Left:  model.Location{Path: "internal/config/config.go", Name: "trackerKind"},
+				Right: model.Location{Path: "internal/secrets/secrets.go", Name: "trackerKind"},
+			},
+		},
+	}
+	priority, signals := reviewPriority(candidate)
+	if priority != 10 {
+		t.Fatalf("priority = %d, want 10", priority)
+	}
+	want := []string{
+		"same-name-cross-directory",
+		"cross-directory",
+		"same-name-cross-file",
+		"cross-file",
+		"repeated-location-pairs",
+	}
+	if !reflect.DeepEqual(signals, want) {
+		t.Fatalf("signals = %#v, want %#v", signals, want)
+	}
+}
+
+func TestReviewRankingPrecedesStructuralScoreWhenRequested(t *testing.T) {
+	t.Parallel()
+
+	highReview := &groupCandidate{
+		similarity: 0.9,
+		id:         "high-review",
+		left:       model.Fragment{FeatureCount: 10, Features: model.FeatureBag{}},
+		right:      model.Fragment{FeatureCount: 10, Features: model.FeatureBag{}},
+		profiles:   map[string]*profileAggregate{},
+		pathPairs: map[string]model.LocationPair{
+			"pair": {
+				Left:  model.Location{Path: "config/a.go", Name: "kind"},
+				Right: model.Location{Path: "secrets/b.go", Name: "kind"},
+			},
+		},
+		focused: map[string]struct{}{},
+	}
+	structural := &groupCandidate{
+		similarity: 1,
+		id:         "structural",
+		left:       model.Fragment{FeatureCount: 20, Features: model.FeatureBag{}},
+		right:      model.Fragment{FeatureCount: 20, Features: model.FeatureBag{}},
+		profiles:   map[string]*profileAggregate{},
+		pathPairs: map[string]model.LocationPair{
+			"pair": {
+				Left:  model.Location{Path: "store.go", Name: "first"},
+				Right: model.Location{Path: "store.go", Name: "second"},
+			},
+		},
+		focused: map[string]struct{}{},
+	}
+	report := model.Report{}
+	collector := matchCollector{
+		options: Options{Ranking: RankingReview},
+		report:  &report,
+		groups: map[string]*groupCandidate{
+			highReview.id: highReview,
+			structural.id: structural,
+		},
+		suppressedGroups: map[string]struct{}{},
+	}
+	collector.finish()
+	if len(report.Groups) != 2 || report.Groups[0].ID != highReview.id ||
+		report.Groups[0].ReviewPriority <= report.Groups[1].ReviewPriority {
+		t.Fatalf("review-ranked groups = %#v", report.Groups)
+	}
+}
+
 func TestAnalyzeReportsEmptyCoverage(t *testing.T) {
 	t.Parallel()
 
