@@ -42,6 +42,15 @@ mori scan --comparison-domain sql-query --min-tokens 12 .
 every discovered `.sql` file. It does not infer a dialect from source content.
 Run separate profiles when a repository contains multiple SQL dialects.
 
+`--embedded-sql` explicitly adds direct Go database-method string arguments to
+a `sql-query` scan. It requires `--comparison-domain sql-query`, uses the chosen
+dialect, and does not infer SQL from arbitrary strings or variables.
+
+`--statement-blocks` adds bounded fixed-size `block` units to code scans.
+`--block-statements` selects 2 through 10 statements per window, while
+`--max-blocks-per-function` selects a cap from 1 through 256. These options are
+incompatible with embedded-SQL mode and the `sql-query` domain.
+
 `--same-language-only` compares fragments only when their review families are
 the same. A family can contain multiple parser grammars, so TypeScript and TSX
 remain comparable in `typescript`, while Bash/POSIX shell and Zsh remain
@@ -75,6 +84,10 @@ mori scan --comparison-domain sql-query --language-pair go,go .
 {
   "comparison_domain": "code",
   "sql_dialect": "generic",
+	"embedded_sql": false,
+	"statement_blocks": false,
+	"block_statements": 3,
+	"max_blocks_per_function": 64,
   "same_language_only": true
 }
 ```
@@ -116,14 +129,18 @@ source constructs that are not comparison units, such as SQL DDL.
 
 ## Report and compatibility contract
 
-Schema version 11 retains the effective SQL parser and selection fields under
-`configuration` and adds the selected named profile when one was used:
+Schema version 13 retains the effective parser and selection fields under
+`configuration`, including every opt-in extraction bound:
 
 ```json
 {
   "profile": "review",
   "comparison_domain": "code",
   "sql_dialect": "generic",
+	"embedded_sql": false,
+	"statement_blocks": false,
+	"block_statements": 3,
+	"max_blocks_per_function": 64,
   "same_language_only": true
 }
 ```
@@ -134,10 +151,10 @@ to reject or explicitly handle unknown report schema versions.
 
 Domain and family selection do not change fragment features. SQL dialect
 selection chooses a different parser and is therefore recorded explicitly.
-Earlier schemas introduced explicit multi-worktree Git focus; schema 11 does
-not change normalization or baseline identities. The current normalization version is 7
-because shell top-level `script` comparison units extend the selected fragment
-set while excluding named function bodies. Baselines created with an older
+Earlier schemas introduced explicit multi-worktree Git focus and review
+evidence. The current normalization version is 8 because the selected
+comparison-unit contract now includes opt-in embedded queries and statement
+blocks in addition to shell top-level scripts. Baselines created with an older
 normalization version must be reviewed and regenerated. Changing a selection
 profile still requires the ordinary human review expected for any baseline
 scope change.
