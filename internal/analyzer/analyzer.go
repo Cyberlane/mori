@@ -66,16 +66,17 @@ type profileAggregate struct {
 }
 
 type groupCandidate struct {
-	similarity     float64
-	id             string
-	left           model.Fragment
-	right          model.Fragment
-	locationPairs  int
-	profiles       map[string]*profileAggregate
-	pathPairs      map[string]model.LocationPair
-	focused        map[string]struct{}
-	reviewPriority int
-	reviewSignals  []string
+	similarity      float64
+	id              string
+	left            model.Fragment
+	right           model.Fragment
+	locationPairs   int
+	profiles        map[string]*profileAggregate
+	pathPairs       map[string]model.LocationPair
+	focused         map[string]struct{}
+	reviewPriority  int
+	reviewSignals   []string
+	literalEvidence model.LiteralEvidence
 }
 
 type matchCollector struct {
@@ -502,6 +503,7 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 		collector.groups[id] = group
 	}
 	group.locationPairs++
+	group.addLiteralEvidence(left, right)
 	group.addPathPair(left.Location, right.Location)
 	if candidateBetter(left, right, group.left, group.right) {
 		group.left = left
@@ -545,19 +547,60 @@ func (collector *matchCollector) finish() {
 	collector.report.Groups = make([]model.MatchGroup, 0, len(candidates))
 	for _, candidate := range candidates {
 		collector.report.Groups = append(collector.report.Groups, model.MatchGroup{
-			ID:             candidate.id,
-			Similarity:     candidate.similarity,
-			LocationPairs:  candidate.locationPairs,
-			Focused:        len(candidate.focused) > 0,
-			FocusedCount:   len(candidate.focused),
-			Profiles:       publicProfiles(candidate.profiles, collector.options.MaxOccurrences),
-			ShapeSummary:   similarity.Shape(candidate.left.Features, candidate.right.Features),
-			SharedFeatures: similarity.Shared(candidate.left.Features, candidate.right.Features, 8),
-			ReviewPriority: candidate.reviewPriority,
-			ReviewSignals:  append([]string{}, candidate.reviewSignals...),
-			PathPairs:      publicPathPairs(candidate.pathPairs),
+			ID:              candidate.id,
+			Similarity:      candidate.similarity,
+			LocationPairs:   candidate.locationPairs,
+			Focused:         len(candidate.focused) > 0,
+			FocusedCount:    len(candidate.focused),
+			Profiles:        publicProfiles(candidate.profiles, collector.options.MaxOccurrences),
+			ShapeSummary:    similarity.Shape(candidate.left.Features, candidate.right.Features),
+			SharedFeatures:  similarity.Shared(candidate.left.Features, candidate.right.Features, 8),
+			ReviewPriority:  candidate.reviewPriority,
+			ReviewSignals:   append([]string{}, candidate.reviewSignals...),
+			LiteralEvidence: publicLiteralEvidence(candidate.literalEvidence),
+			PathPairs:       publicPathPairs(candidate.pathPairs),
 		})
 	}
+}
+
+func (group *groupCandidate) addLiteralEvidence(left model.Fragment, right model.Fragment) {
+	if len(left.LiteralDigests) == 0 && len(right.LiteralDigests) == 0 {
+		return
+	}
+	group.literalEvidence.ComparedPairs++
+	differing := 0
+	shared := min(len(left.LiteralDigests), len(right.LiteralDigests))
+	for index := 0; index < shared; index++ {
+		if left.LiteralDigests[index] != right.LiteralDigests[index] {
+			differing++
+		}
+	}
+	if len(left.LiteralDigests) != len(right.LiteralDigests) {
+		group.literalEvidence.LiteralCountMismatchPairs++
+		differing += abs(len(left.LiteralDigests) - len(right.LiteralDigests))
+	}
+	if differing > 0 {
+		group.literalEvidence.PairsWithDifferences++
+		group.literalEvidence.MaxDifferingPositions = max(
+			group.literalEvidence.MaxDifferingPositions,
+			differing,
+		)
+	}
+}
+
+func publicLiteralEvidence(evidence model.LiteralEvidence) *model.LiteralEvidence {
+	if evidence.ComparedPairs == 0 {
+		return nil
+	}
+	copy := evidence
+	return &copy
+}
+
+func abs(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func reviewPriority(candidate *groupCandidate) (int, []string) {

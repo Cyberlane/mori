@@ -487,6 +487,38 @@ func TestCollectorGroupsEquivalentLocationPairs(t *testing.T) {
 	}
 }
 
+func TestCollectorReportsSourceFreeLiteralDrift(t *testing.T) {
+	t.Parallel()
+
+	report := model.Report{}
+	collector := matchCollector{
+		ctx: context.Background(),
+		options: Options{
+			Threshold: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10,
+		},
+		report:           &report,
+		groups:           make(map[string]*groupCandidate),
+		suppressedGroups: make(map[string]struct{}),
+	}
+	left := groupingFragment("left.go", 1)
+	left.LiteralDigests = []string{"same", "jpeg"}
+	right := groupingFragment("right.go", 1)
+	right.LiteralDigests = []string{"same", "avif", "fallback"}
+	if err := collector.score(left, right); err != nil {
+		t.Fatalf("score: %v", err)
+	}
+	collector.finish()
+
+	if len(report.Groups) != 1 || report.Groups[0].LiteralEvidence == nil {
+		t.Fatalf("groups = %#v, want literal evidence", report.Groups)
+	}
+	evidence := report.Groups[0].LiteralEvidence
+	if evidence.ComparedPairs != 1 || evidence.PairsWithDifferences != 1 ||
+		evidence.MaxDifferingPositions != 2 || evidence.LiteralCountMismatchPairs != 1 {
+		t.Fatalf("literal evidence = %#v", evidence)
+	}
+}
+
 func TestCollectorPrioritizesFocusedGroupsBeforeRetention(t *testing.T) {
 	t.Parallel()
 

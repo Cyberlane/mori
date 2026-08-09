@@ -109,6 +109,30 @@ func TestTextAnnotatesFocusedGroups(t *testing.T) {
 	}
 }
 
+func TestTextDisclosesLiteralDriftWithoutValues(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	if err := Text(&output, model.Report{
+		SchemaVersion:      model.SchemaVersion,
+		Threshold:          1,
+		TotalMatchGroups:   1,
+		TotalLocationPairs: 2,
+		Groups: []model.MatchGroup{{
+			ID: "group", Similarity: 1, LocationPairs: 2,
+			LiteralEvidence: &model.LiteralEvidence{
+				ComparedPairs: 2, PairsWithDifferences: 1, MaxDifferingPositions: 3,
+			},
+		}},
+	}); err != nil {
+		t.Fatalf("Text: %v", err)
+	}
+	rendered := output.String()
+	if !strings.Contains(rendered, "1 of 2 location pair(s) differ at up to 3 position(s); values omitted") {
+		t.Fatalf("output does not disclose source-free literal drift:\n%s", rendered)
+	}
+}
+
 func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
 	t.Parallel()
 

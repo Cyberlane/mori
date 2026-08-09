@@ -3,6 +3,7 @@ package normalize
 
 import (
 	"context"
+	"crypto/sha256"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -19,8 +20,9 @@ const Version = 7
 // Profile is a normalized, language-neutral view of one syntax fragment.
 // It is not the stable content identity exposed in reports.
 type Profile struct {
-	Features   model.FeatureBag
-	TokenCount int
+	Features       model.FeatureBag
+	TokenCount     int
+	LiteralDigests []string
 }
 
 // Build creates a fingerprint and excludes nested function bodies. Nested
@@ -142,6 +144,10 @@ func enterNode(
 			addFeature(profile.Features, "role:"+role+">"+canonical, 1)
 		}
 		nextParent = canonical
+		if strings.HasPrefix(canonical, "literal:") {
+			digest := sha256.Sum256(append([]byte(canonical+"\x00"), node.Utf8Text(source)...))
+			profile.LiteralDigests = append(profile.LiteralDigests, string(digest[:]))
+		}
 	}
 
 	if operation := semanticOperation(node, source); operation != "" {

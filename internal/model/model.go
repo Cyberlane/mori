@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 11
+const SchemaVersion = 12
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -23,17 +23,18 @@ type Location struct {
 
 // Fragment is one normalized source syntax tree.
 type Fragment struct {
-	Location     Location   `json:"location"`
-	StartByte    uint       `json:"-"`
-	EndByte      uint       `json:"-"`
-	TokenCount   int        `json:"token_count"`
-	FeatureCount int        `json:"feature_count"`
-	Fingerprint  string     `json:"fingerprint"`
-	NestingDepth int        `json:"nesting_depth"`
-	Parent       *Location  `json:"parent,omitempty"`
-	ParentID     string     `json:"parent_fingerprint,omitempty"`
-	NestedCount  int        `json:"nested_function_count"`
-	Features     FeatureBag `json:"-"`
+	Location       Location   `json:"location"`
+	StartByte      uint       `json:"-"`
+	EndByte        uint       `json:"-"`
+	TokenCount     int        `json:"token_count"`
+	FeatureCount   int        `json:"feature_count"`
+	Fingerprint    string     `json:"fingerprint"`
+	NestingDepth   int        `json:"nesting_depth"`
+	Parent         *Location  `json:"parent,omitempty"`
+	ParentID       string     `json:"parent_fingerprint,omitempty"`
+	NestedCount    int        `json:"nested_function_count"`
+	Features       FeatureBag `json:"-"`
+	LiteralDigests []string   `json:"-"`
 }
 
 // FragmentSummary is the public portion of a fragment in a report.
@@ -96,17 +97,27 @@ type LocationPair struct {
 // MatchGroup is one content-pair identity at or above the configured
 // similarity threshold. One group can represent many source-location pairs.
 type MatchGroup struct {
-	ID             string            `json:"content_pair_id"`
-	Similarity     float64           `json:"similarity"`
-	LocationPairs  int               `json:"location_pairs"`
-	Focused        bool              `json:"focused"`
-	FocusedCount   int               `json:"focused_occurrences"`
-	Profiles       []FragmentProfile `json:"profiles"`
-	ShapeSummary   []string          `json:"shape_summary"`
-	SharedFeatures []SharedFeature   `json:"shared_features"`
-	ReviewPriority int               `json:"review_priority"`
-	ReviewSignals  []string          `json:"review_signals"`
-	PathPairs      []LocationPair    `json:"-"`
+	ID              string            `json:"content_pair_id"`
+	Similarity      float64           `json:"similarity"`
+	LocationPairs   int               `json:"location_pairs"`
+	Focused         bool              `json:"focused"`
+	FocusedCount    int               `json:"focused_occurrences"`
+	Profiles        []FragmentProfile `json:"profiles"`
+	ShapeSummary    []string          `json:"shape_summary"`
+	SharedFeatures  []SharedFeature   `json:"shared_features"`
+	ReviewPriority  int               `json:"review_priority"`
+	ReviewSignals   []string          `json:"review_signals"`
+	LiteralEvidence *LiteralEvidence  `json:"literal_evidence,omitempty"`
+	PathPairs       []LocationPair    `json:"-"`
+}
+
+// LiteralEvidence summarizes source-free literal-position comparisons for a
+// match group. Literal values and their digests are never serialized.
+type LiteralEvidence struct {
+	ComparedPairs             int `json:"compared_location_pairs"`
+	PairsWithDifferences      int `json:"pairs_with_differences"`
+	MaxDifferingPositions     int `json:"max_differing_positions"`
+	LiteralCountMismatchPairs int `json:"literal_count_mismatch_pairs"`
 }
 
 // WorktreeFocusConfig records one explicitly resolved Git worktree and keeps
