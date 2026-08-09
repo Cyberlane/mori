@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-09
+
 ### Added
 
 - Added Swift function similarity for `.swift` files, covering implemented
@@ -232,7 +234,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/Cyberlane/mori/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Cyberlane/mori/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Cyberlane/mori/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Cyberlane/mori/compare/v0.7.0...v0.8.0
