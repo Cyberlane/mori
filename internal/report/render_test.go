@@ -144,12 +144,43 @@ func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
 		t.Fatalf("Text: %v", err)
 	}
 	for _, expected := range []string{
+		"nested function bodies are excluded from this score",
 		"outer body only",
 		"ERROR at 3:4-3:5",
 		"2 comparison fragment(s) containing parse errors skipped",
 	} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("output missing %q:\n%s", expected, output.String())
+		}
+	}
+}
+
+func TestTextDisclosesPerFileCoverage(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	if err := Text(&output, model.Report{
+		SchemaVersion: model.SchemaVersion,
+		Threshold:     0.85,
+		Files:         2,
+		Fragments:     3,
+		FileCoverage: []model.FileCoverage{
+			{Path: "functions.go", Language: "go", Status: "analyzed", FragmentCount: 3},
+			{Path: "script.zsh", Language: "zsh", Status: "analyzed"},
+			{Path: "sqlc.go", Language: "go", Status: "excluded_generated", Generated: true},
+		},
+	}); err != nil {
+		t.Fatalf("Text: %v", err)
+	}
+	rendered := output.String()
+	for _, expected := range []string{
+		"coverage: 1 of 2 analyzed file(s)",
+		"files without comparison fragments (1):",
+		"script.zsh [zsh]",
+		"generated sources: 0 analyzed, 1 excluded",
+	} {
+		if !strings.Contains(rendered, expected) {
+			t.Fatalf("output missing %q:\n%s", expected, rendered)
 		}
 	}
 }

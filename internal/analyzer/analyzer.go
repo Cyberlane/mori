@@ -30,6 +30,7 @@ type Options struct {
 	FocusPaths        map[string]struct{}
 	FocusActive       bool
 	Suppress          func(id string, left model.Location, right model.Location) bool
+	ExcludedCoverage  []model.FileCoverage
 }
 
 // LanguagePair selects one concrete grammar-ID pair for comparison.
@@ -47,6 +48,7 @@ type parseResult struct {
 	index     int
 	fragments []model.Fragment
 	warnings  []model.Warning
+	coverage  model.FileCoverage
 }
 
 type profileAggregate struct {
@@ -89,6 +91,10 @@ func Analyze(
 		Files:         len(files),
 		Groups:        make([]model.MatchGroup, 0),
 		Warnings:      append(make([]model.Warning, 0, len(initialWarnings)), initialWarnings...),
+		FileCoverage: append(
+			make([]model.FileCoverage, 0, len(files)+len(options.ExcludedCoverage)),
+			options.ExcludedCoverage...,
+		),
 		Configuration: model.EffectiveConfig{
 			IgnoreFiles:   make([]string, 0),
 			Excludes:      make([]string, 0),
@@ -102,9 +108,16 @@ func Analyze(
 		return report, err
 	}
 	if len(files) == 0 {
+		message := "no supported source files were discovered; no similarity assessment was performed"
+		if len(options.ExcludedCoverage) > 0 {
+			message = fmt.Sprintf(
+				"all %d supported source file(s) were classified as generated and excluded; no similarity assessment was performed",
+				len(options.ExcludedCoverage),
+			)
+		}
 		report.Warnings = append(report.Warnings, model.Warning{
 			Kind:    "coverage",
-			Message: "no supported source files were discovered; no similarity assessment was performed",
+			Message: message,
 		})
 		sortWarnings(report.Warnings)
 		return report, nil
@@ -135,6 +148,7 @@ func Analyze(
 					index:     job.index,
 					fragments: fragments,
 					warnings:  warnings,
+					coverage:  summarizeCoverage(job.file, fragments, warnings),
 				}
 			}
 		}()
@@ -168,7 +182,11 @@ func Analyze(
 	for _, result := range parsed {
 		fragments = append(fragments, result.fragments...)
 		report.Warnings = append(report.Warnings, result.warnings...)
+		report.FileCoverage = append(report.FileCoverage, result.coverage)
 	}
+	sort.Slice(report.FileCoverage, func(i, j int) bool {
+		return report.FileCoverage[i].Path < report.FileCoverage[j].Path
+	})
 	sortFragments(fragments)
 	if len(fragments) == 0 {
 		report.Warnings = append(report.Warnings, model.Warning{
@@ -207,6 +225,28 @@ func Analyze(
 	collector.finish()
 
 	return report, nil
+}
+
+func summarizeCoverage(
+	file source.File,
+	fragments []model.Fragment,
+	warnings []model.Warning,
+) model.FileCoverage {
+	coverage := model.FileCoverage{
+		Path:             file.DisplayPath,
+		Language:         file.Language.ID,
+		LanguageFamily:   file.Language.Family,
+		ComparisonDomain: file.Language.ComparisonDomain,
+		Status:           "analyzed",
+		Generated:        file.Generated,
+		GeneratedMarker:  file.Marker,
+		FragmentCount:    len(fragments),
+	}
+	for _, warning := range warnings {
+		coverage.SkippedFragments += warning.SkippedFragments
+		coverage.ParseDiagnostics += warning.TotalDiagnostics
+	}
+	return coverage
 }
 
 func compareWithinFamilies(fragments []model.Fragment, collector *matchCollector) error {

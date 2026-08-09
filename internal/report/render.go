@@ -11,6 +11,8 @@ import (
 	"github.com/Cyberlane/mori/internal/model"
 )
 
+const maxTextCoverageFiles = 20
+
 // JSON writes an indented JSON report.
 func JSON(writer io.Writer, report model.Report) error {
 	encoder := json.NewEncoder(writer)
@@ -83,6 +85,72 @@ func Text(writer io.Writer, report model.Report) error {
 		}
 	}
 
+	filesWithFragments := 0
+	analyzedFiles := 0
+	generatedAnalyzed := 0
+	generatedExcluded := 0
+	zeroFragmentFiles := make([]model.FileCoverage, 0)
+	for _, coverage := range report.FileCoverage {
+		if coverage.Status == "excluded_generated" {
+			generatedExcluded++
+			continue
+		}
+		analyzedFiles++
+		if coverage.Generated {
+			generatedAnalyzed++
+		}
+		if coverage.FragmentCount > 0 {
+			filesWithFragments++
+		} else {
+			zeroFragmentFiles = append(zeroFragmentFiles, coverage)
+		}
+	}
+	if analyzedFiles > 0 {
+		if _, err := fmt.Fprintf(
+			writer,
+			"coverage: %d of %d analyzed file(s) produced comparison fragments at the current token floor\n",
+			filesWithFragments,
+			analyzedFiles,
+		); err != nil {
+			return err
+		}
+	}
+	if generatedAnalyzed > 0 || generatedExcluded > 0 {
+		if _, err := fmt.Fprintf(
+			writer,
+			"generated sources: %d analyzed, %d excluded\n",
+			generatedAnalyzed,
+			generatedExcluded,
+		); err != nil {
+			return err
+		}
+	}
+	if len(zeroFragmentFiles) > 0 {
+		if _, err := fmt.Fprintf(writer, "files without comparison fragments (%d):\n", len(zeroFragmentFiles)); err != nil {
+			return err
+		}
+		for index, coverage := range zeroFragmentFiles {
+			if index == maxTextCoverageFiles {
+				if _, err := fmt.Fprintf(
+					writer,
+					"  - %d additional file(s) omitted; use --format json for the complete inventory\n",
+					len(zeroFragmentFiles)-index,
+				); err != nil {
+					return err
+				}
+				break
+			}
+			if _, err := fmt.Fprintf(
+				writer,
+				"  - %s [%s]\n",
+				terminalSafe(coverage.Path),
+				terminalSafe(coverage.Language),
+			); err != nil {
+				return err
+			}
+		}
+	}
+
 	for index, group := range report.Groups {
 		focusLabel := ""
 		if group.Focused {
@@ -98,6 +166,14 @@ func Text(writer io.Writer, report model.Report) error {
 			terminalSafe(group.ID),
 		); err != nil {
 			return err
+		}
+		if groupHasNestedBoundaries(group) {
+			if _, err := fmt.Fprintln(
+				writer,
+				"   note: nested function bodies are excluded from this score and analyzed as separate fragments",
+			); err != nil {
+				return err
+			}
 		}
 		for profileIndex, profile := range group.Profiles {
 			label := string(rune('A' + profileIndex))
@@ -199,6 +275,17 @@ func Text(writer io.Writer, report model.Report) error {
 		"\nScores identify review candidates; they do not prove behavioral equivalence.",
 	)
 	return err
+}
+
+func groupHasNestedBoundaries(group model.MatchGroup) bool {
+	for _, profile := range group.Profiles {
+		for _, occurrence := range profile.Occurrences {
+			if occurrence.NestedCount > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func formatFragment(fragment model.FragmentSummary) string {

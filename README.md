@@ -163,6 +163,15 @@ additional policy:
 mori scan --exclude '**/*_test.go' --exclude '**/*.test.ts' .
 ```
 
+Mori also classifies conservative generated-source header markers without
+changing the default scan. Use `--exclude-generated` to omit recognized
+generated files while retaining them as `excluded_generated` entries in the
+JSON `file_coverage` inventory:
+
+```sh
+mori scan --exclude-generated .
+```
+
 Store repeatable project settings in `.mori.json`:
 
 ```json
@@ -208,8 +217,9 @@ the report and exit with status `4` when either condition occurs:
 mori scan --format json --require-coverage .
 ```
 
-Schema-8 reports embed deterministic `tool` build provenance, comparison
-selection, domain and fragment-kind metadata, and exact focus metadata. They do
+Schema-9 reports embed deterministic `tool` build provenance, comparison
+selection, domain and fragment-kind metadata, exact focus metadata, and a
+per-file coverage inventory including generated-source classification. They do
 not include a scan timestamp, hostname, username, source body, diff, or Git
 remote.
 

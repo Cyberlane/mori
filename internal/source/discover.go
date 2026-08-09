@@ -24,6 +24,8 @@ type File struct {
 	Path        string
 	DisplayPath string
 	Language    language.Spec
+	Generated   bool
+	Marker      string
 	MaxBytes    int64
 	Info        os.FileInfo
 }
@@ -35,6 +37,7 @@ type Options struct {
 	IgnoreFiles       bool
 	ComparisonDomains map[string]struct{}
 	SQLDialect        string
+	ExcludeGenerated  bool
 }
 
 // Result contains deterministic discovery output and recoverable warnings.
@@ -42,6 +45,7 @@ type Result struct {
 	Files       []File
 	Warnings    []model.Warning
 	IgnoreFiles []string
+	Excluded    []model.FileCoverage
 }
 
 var defaultExcludedDirectories = map[string]struct{}{
@@ -79,6 +83,7 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 	result := Result{
 		Files:    make([]File, 0),
 		Warnings: make([]model.Warning, 0),
+		Excluded: make([]model.FileCoverage, 0),
 	}
 	seen := make(map[string]struct{})
 	ignores := newIgnoreMatcher(cwd)
@@ -213,6 +218,9 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 		}
 		return result.Warnings[i].Path < result.Warnings[j].Path
 	})
+	sort.Slice(result.Excluded, func(i, j int) bool {
+		return result.Excluded[i].Path < result.Excluded[j].Path
+	})
 	return result, nil
 }
 
@@ -305,19 +313,91 @@ func addFile(
 		})
 		return
 	}
+	generated, marker, err := detectGeneratedHeader(path, info)
+	if err != nil {
+		result.Warnings = append(result.Warnings, warning(displayPath(cwd, path), err))
+		return
+	}
 
 	cleanPath := filepath.Clean(path)
 	if _, exists := seen[cleanPath]; exists {
 		return
 	}
 	seen[cleanPath] = struct{}{}
+	if generated && options.ExcludeGenerated {
+		result.Excluded = append(result.Excluded, model.FileCoverage{
+			Path:             displayPath(cwd, cleanPath),
+			Language:         spec.ID,
+			LanguageFamily:   spec.Family,
+			ComparisonDomain: spec.ComparisonDomain,
+			Status:           "excluded_generated",
+			Generated:        true,
+			GeneratedMarker:  marker,
+		})
+		return
+	}
 	result.Files = append(result.Files, File{
 		Path:        cleanPath,
 		DisplayPath: displayPath(cwd, cleanPath),
 		Language:    spec,
+		Generated:   generated,
+		Marker:      marker,
 		MaxBytes:    options.MaxFileBytes,
 		Info:        info,
 	})
+}
+
+const maxGeneratedHeaderBytes = 8192
+
+func detectGeneratedHeader(path string, expected os.FileInfo) (bool, string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return false, "", err
+	}
+	defer file.Close()
+
+	opened, err := file.Stat()
+	if err != nil {
+		return false, "", err
+	}
+	if !opened.Mode().IsRegular() || !os.SameFile(expected, opened) {
+		return false, "", errors.New("source changed during generated-file inspection")
+	}
+
+	content, err := io.ReadAll(io.LimitReader(file, maxGeneratedHeaderBytes))
+	if err != nil {
+		return false, "", err
+	}
+	for _, line := range strings.Split(string(content), "\n") {
+		comment, ok := generatedComment(line)
+		if !ok {
+			continue
+		}
+		lower := strings.ToLower(comment)
+		switch {
+		case strings.Contains(lower, "code generated") && strings.Contains(lower, "do not edit"):
+			return true, "code-generated-do-not-edit", nil
+		case strings.Contains(lower, "this file was automatically generated"):
+			return true, "automatically-generated", nil
+		case strings.Contains(lower, "this file is generated") && strings.Contains(lower, "do not edit"):
+			return true, "generated-do-not-edit", nil
+		case strings.Contains(lower, "auto-generated") && strings.Contains(lower, "do not edit"):
+			return true, "auto-generated-do-not-edit", nil
+		case strings.Contains(lower, "@generated"):
+			return true, "at-generated", nil
+		}
+	}
+	return false, "", nil
+}
+
+func generatedComment(line string) (string, bool) {
+	trimmed := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+	for _, prefix := range []string{"//", "#", "/*", "*", "--", "<!--"} {
+		if strings.HasPrefix(trimmed, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(trimmed, prefix)), true
+		}
+	}
+	return "", false
 }
 
 const maxShebangBytes = 256

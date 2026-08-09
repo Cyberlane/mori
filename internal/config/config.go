@@ -34,6 +34,7 @@ type Settings struct {
 	LanguagePairs     []string `json:"language_pairs,omitempty"`
 	FailOnMatch       *bool    `json:"fail_on_match,omitempty"`
 	RequireCoverage   *bool    `json:"require_coverage,omitempty"`
+	ExcludeGenerated  *bool    `json:"exclude_generated,omitempty"`
 	Baseline          string   `json:"baseline,omitempty"`
 	BaselineScope     string   `json:"baseline_scope,omitempty"`
 	Excludes          []string `json:"exclude,omitempty"`

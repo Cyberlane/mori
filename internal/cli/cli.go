@@ -95,6 +95,7 @@ type scanOptions struct {
 	failOnMatch        bool
 	failOnFocusedMatch bool
 	requireCoverage    bool
+	excludeGenerated   bool
 	baselinePath       string
 	baselineScope      string
 	respectIgnore      bool
@@ -189,6 +190,12 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 		"require-coverage",
 		options.requireCoverage,
 		"exit with status 4 unless at least one supported file and comparison fragment are analyzed",
+	)
+	flags.BoolVar(
+		&options.excludeGenerated,
+		"exclude-generated",
+		options.excludeGenerated,
+		"exclude files with recognized generated-source header markers",
 	)
 	flags.StringVar(&options.baselinePath, "baseline", options.baselinePath, "baseline file to load or write")
 	flags.StringVar(
@@ -352,6 +359,9 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	}
 	if settings.RequireCoverage != nil {
 		options.requireCoverage = *settings.RequireCoverage
+	}
+	if settings.ExcludeGenerated != nil {
+		options.excludeGenerated = *settings.ExcludeGenerated
 	}
 	if settings.RespectIgnore != nil {
 		options.respectIgnore = *settings.RespectIgnore
@@ -655,6 +665,7 @@ func executeScan(
 		IgnoreFiles:       options.respectIgnore,
 		ComparisonDomains: domainSet,
 		SQLDialect:        sqlDialect,
+		ExcludeGenerated:  options.excludeGenerated,
 	})
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
@@ -695,6 +706,7 @@ func executeScan(
 		FocusPaths:        focusSet,
 		FocusActive:       focus != nil,
 		Suppress:          suppress,
+		ExcludedCoverage:  discovered.Excluded,
 	})
 	if err != nil {
 		return result, err
@@ -703,6 +715,7 @@ func executeScan(
 		ConfigPath:        options.configPath,
 		IgnoreFiles:       discovered.IgnoreFiles,
 		RespectIgnore:     options.respectIgnore,
+		ExcludeGenerated:  options.excludeGenerated,
 		Excludes:          append([]string{}, options.excludes...),
 		MinTokens:         options.minTokens,
 		MaxGroups:         options.maxGroups,

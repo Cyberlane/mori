@@ -31,6 +31,9 @@ overlap without claiming behavioral equivalence.
 - Loads nested `.gitignore` and `.moriignore` rules for directory scans.
 - Applies repeatable doublestar exclude globs.
 - Applies selected comparison domains before file-size checks and parsing.
+- Conservatively classifies generated-source comment markers in a bounded
+  header read and optionally excludes those files while retaining coverage
+  evidence.
 - Rejects discovered symlinks and symlinked components below trusted scan
   roots.
 - Enforces a file-size limit before and during reads.
@@ -209,12 +212,14 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-8 reports expose deterministic binary provenance, comparison selection,
+Schema-9 reports expose deterministic binary provenance, comparison selection,
 comparison domains, fragment kinds, optional exact focus metadata, grouped
 content-pair identities, fragment fingerprints, occurrence samples and exact
 counts, nesting metadata, structured parser
 diagnostics, effective configuration, ignore sources, and separate baseline
 suppression counts for identities and source-location pairs.
+They also include a deterministic per-file coverage inventory so supported
+files with no comparison fragments remain visible.
 Multi-worktree focus adds a deterministic `configuration.focus.worktrees`
 array with a display root and full Git resolution for every worktree. The
 legacy scalar Git focus fields remain unchanged for a single

@@ -228,7 +228,14 @@ include bounded parser node ranges and skipped-fragment counts.
 Suppression fields separate affected source pairs from content identities.
 Consumers should reject or explicitly handle unknown schema versions.
 
-Schema 8 adds `configuration.focus.worktrees` for explicit multi-worktree Git
+Schema 9 adds a deterministic `file_coverage` array with one entry per analyzed
+or generated-excluded supported file. Each entry records its language, review
+family, comparison domain, analysis status, generated-source classification,
+fragment count, skipped-fragment count, and parse-diagnostic count. Consumers
+must inspect zero-fragment and excluded entries instead of inferring per-file
+coverage from the aggregate `files` and `fragments` totals.
+
+Schema 8 added `configuration.focus.worktrees` for explicit multi-worktree Git
 focus. Each entry contains `root`, `requested_base`, full `base_commit`,
 `merge_base`, and `head_commit` values, working-tree and untracked inclusion
 flags, plus changed and deleted paths relative to that root. A single
