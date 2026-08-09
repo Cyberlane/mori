@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 10
+const SchemaVersion = 11
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -177,6 +177,7 @@ type FileCoverage struct {
 // EffectiveConfig records the scan inputs needed to reproduce discovery and
 // pair selection.
 type EffectiveConfig struct {
+	Profile           string       `json:"profile,omitempty"`
 	ConfigPath        string       `json:"config_path,omitempty"`
 	IgnoreFiles       []string     `json:"ignore_files"`
 	RespectIgnore     bool         `json:"respect_ignore"`

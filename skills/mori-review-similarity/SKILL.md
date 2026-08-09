@@ -73,7 +73,7 @@ found no supported files or extracted no comparison fragments. The report is
 still written and contains a deterministic `coverage` warning; classify the
 scan as not applicable or insufficiently covered, never as a clean result.
 
-Schema-10 reports include `file_coverage`. Inspect every supported file with
+Schema-11 reports include `file_coverage`. Inspect every supported file with
 zero fragments, along with its skipped-fragment and parse-diagnostic counts,
 before describing coverage. A successful aggregate scan does not excuse a
 supported file that contributed no comparison units.
@@ -93,16 +93,9 @@ For a focused review, run:
 
 ```sh
 mori scan \
+  --profile review \
   --format json \
-  --require-coverage \
-  --comparison-domain code \
-  --same-language-only \
-  --threshold 0.85 \
-  --min-tokens 40 \
-  --max-groups 250 \
   --max-occurrences 10 \
-  --exclude-generated \
-  --ranking review \
   .
 ```
 
@@ -111,16 +104,9 @@ exists locally, use Mori's native focus mode instead of filtering the scan:
 
 ```sh
 mori scan \
+  --profile review \
   --format json \
-  --require-coverage \
-  --comparison-domain code \
-  --same-language-only \
-  --threshold 0.85 \
-  --min-tokens 40 \
-  --max-groups 250 \
   --max-occurrences 10 \
-  --exclude-generated \
-  --ranking review \
   --changed-since origin/main \
   .
 ```
@@ -203,12 +189,8 @@ For SQL review, use a separate deliberate scan profile such as:
 
 ```sh
 mori scan \
+  --profile sql \
   --format json \
-  --require-coverage \
-  --comparison-domain sql-query \
-  --threshold 0.70 \
-  --min-tokens 12 \
-  --max-groups 250 \
   --max-occurrences 10 \
   path/to/queries
 ```
@@ -239,7 +221,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `10`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `11`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while
@@ -265,6 +247,8 @@ revision or date from the version string. Inspect:
   and how many focused files were actually discovered. In multi-worktree mode,
   verify every `worktrees` entry and its independent requested base and full
   commits; do not infer nested-repository coverage from the parent entry;
+- `configuration.profile`: record the selected named defaults and verify the
+  neighboring effective fields rather than assuming the profile was unmodified;
 - `focused` and `focused_occurrences`: use these exact group fields rather than
   inferring focus from sampled occurrences;
 - suppression counts: distinguish suppressed location pairs from baseline

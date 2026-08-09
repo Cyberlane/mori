@@ -31,6 +31,7 @@ func TestLoadStrictConfig(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), FileName)
 	writeConfig(t, path, `{
+	"profile": "review",
   "threshold": 0.85,
   "max_groups": 250,
   "comparison_domain": "code",
@@ -47,7 +48,7 @@ func TestLoadStrictConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if settings.Threshold == nil || *settings.Threshold != 0.85 ||
+	if settings.Profile != "review" || settings.Threshold == nil || *settings.Threshold != 0.85 ||
 		settings.MaxGroups == nil || *settings.MaxGroups != 250 ||
 		settings.ComparisonDomain != "code" ||
 		settings.SQLDialect != "postgresql" ||

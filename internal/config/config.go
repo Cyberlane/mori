@@ -19,6 +19,7 @@ const maxBytes = 1024 * 1024
 // Settings contains optional scan values. Pointer fields distinguish omitted
 // values from explicit zero or false values.
 type Settings struct {
+	Profile           string   `json:"profile,omitempty"`
 	Threshold         *float64 `json:"threshold,omitempty"`
 	MinTokens         *int     `json:"min_tokens,omitempty"`
 	MaxGroups         *int     `json:"max_groups,omitempty"`

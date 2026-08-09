@@ -174,7 +174,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 10,
+  "schema_version": 11,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -186,7 +186,7 @@ The top-level shape is:
     "goarch": "<target architecture>",
     "normalization_version": 7
   },
-  "threshold": 0.7,
+  "threshold": 0.85,
   "files": 4,
   "fragments": 4,
   "candidate_pairs": 0,
@@ -200,17 +200,18 @@ The top-level shape is:
   "warnings": [],
   "file_coverage": [],
   "configuration": {
+    "profile": "review",
     "ignore_files": [],
     "respect_ignore": true,
     "excludes": [],
-    "min_tokens": 12,
-    "max_groups": 100,
-    "max_occurrences": 20,
+    "min_tokens": 40,
+    "max_groups": 250,
+    "max_occurrences": 10,
     "max_pairs": 5000000,
     "max_file_bytes": 2097152,
     "comparison_domain": "code",
     "sql_dialect": "generic",
-    "ranking": "structural",
+    "ranking": "review",
     "same_language_only": true,
     "cross_language_only": false,
     "language_pairs": []
