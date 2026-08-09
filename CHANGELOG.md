@@ -7,6 +7,13 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Corrected the schema-6 example, clarified release source-date formatting,
+  labeled abridged output, and linked the scan-selection contract directly.
+- Added the recommended 40-token starting floor to the scoring guide's
+  cross-language calibration guidance.
+
 ## [0.8.0] - 2026-08-09
 
 ### Added

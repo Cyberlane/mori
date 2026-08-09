@@ -99,7 +99,10 @@ Typical starting points:
 - `0.70`–`0.85`: structurally close rewrites;
 - `0.60`–`0.70`: cross-language exploration.
 
-These are starting ranges, not universal quality levels.
+These are starting ranges, not universal quality levels. Start cross-language
+repository scans at `--min-tokens 40` so small callbacks and wrappers do not
+dominate, and lower the floor toward 12 only for deliberately broad
+exploration.
 
 ## Candidate pruning
 
@@ -157,7 +160,7 @@ The top-level shape is:
     "name": "mori",
     "version": "0.8.0",
     "revision": "<full source revision>",
-    "source_date": "<UTC commit time>",
+    "source_date": "<RFC3339 commit time>",
     "modified": false,
     "go_version": "<Go version>",
     "goos": "<target OS>",
@@ -167,9 +170,10 @@ The top-level shape is:
   "threshold": 0.7,
   "files": 4,
   "fragments": 4,
-  "candidate_pairs": 6,
+  "candidate_pairs": 0,
   "total_location_pairs": 0,
   "total_match_groups": 0,
+  "total_focused_match_groups": 0,
   "suppressed_location_pairs": 0,
   "suppressed_match_groups": 0,
   "truncated": false,
