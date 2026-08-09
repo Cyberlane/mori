@@ -184,3 +184,28 @@ func TestTextDisclosesPerFileCoverage(t *testing.T) {
 		}
 	}
 }
+
+func TestTextExplainsReviewRanking(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	if err := Text(&output, model.Report{
+		Threshold: 0.85,
+		Groups: []model.MatchGroup{{
+			ID: "group", Similarity: 1, ReviewPriority: 9,
+			ReviewSignals: []string{"same-name-cross-directory", "cross-directory"},
+		}},
+		Configuration: model.EffectiveConfig{Ranking: "review"},
+	}); err != nil {
+		t.Fatalf("Text: %v", err)
+	}
+	rendered := output.String()
+	for _, expected := range []string{
+		"ranking: explainable review signals before structural score",
+		"review priority 9 · same-name-cross-directory, cross-directory",
+	} {
+		if !strings.Contains(rendered, expected) {
+			t.Fatalf("output missing %q:\n%s", expected, rendered)
+		}
+	}
+}

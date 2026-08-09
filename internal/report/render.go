@@ -84,6 +84,14 @@ func Text(writer io.Writer, report model.Report) error {
 			return err
 		}
 	}
+	if report.Configuration.Ranking == "review" {
+		if _, err := fmt.Fprintln(
+			writer,
+			"ranking: explainable review signals before structural score",
+		); err != nil {
+			return err
+		}
+	}
 
 	filesWithFragments := 0
 	analyzedFiles := 0
@@ -171,6 +179,20 @@ func Text(writer io.Writer, report model.Report) error {
 			if _, err := fmt.Fprintln(
 				writer,
 				"   note: nested function bodies are excluded from this score and analyzed as separate fragments",
+			); err != nil {
+				return err
+			}
+		}
+		if report.Configuration.Ranking == "review" {
+			signals := "none"
+			if len(group.ReviewSignals) > 0 {
+				signals = strings.Join(group.ReviewSignals, ", ")
+			}
+			if _, err := fmt.Fprintf(
+				writer,
+				"   review priority %d · %s\n",
+				group.ReviewPriority,
+				signals,
 			); err != nil {
 				return err
 			}

@@ -7,6 +7,18 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added opt-in `--ranking review` / `ranking: "review"` ordering with explicit
+  `review_priority` and `review_signals` for cross-file, cross-directory,
+  same-name, and repeated-location evidence.
+
+### Changed
+
+- Machine-readable reports now use schema version 10 and record the effective
+  ranking mode. Review ranking changes presentation order only; structural
+  scores, normalization version 6, fingerprints, and baselines are unchanged.
+
 ## [0.14.0] - 2026-08-09
 
 ### Added

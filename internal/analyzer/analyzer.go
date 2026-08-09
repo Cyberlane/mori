@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path/filepath"
 	"sort"
 	"sync"
 
@@ -14,6 +15,11 @@ import (
 	"github.com/Cyberlane/mori/internal/parser"
 	"github.com/Cyberlane/mori/internal/similarity"
 	"github.com/Cyberlane/mori/internal/source"
+)
+
+const (
+	RankingStructural = "structural"
+	RankingReview     = "review"
 )
 
 // Options controls parsing concurrency and pair selection.
@@ -31,6 +37,7 @@ type Options struct {
 	FocusActive       bool
 	Suppress          func(id string, left model.Location, right model.Location) bool
 	ExcludedCoverage  []model.FileCoverage
+	Ranking           string
 }
 
 // LanguagePair selects one concrete grammar-ID pair for comparison.
@@ -59,14 +66,16 @@ type profileAggregate struct {
 }
 
 type groupCandidate struct {
-	similarity    float64
-	id            string
-	left          model.Fragment
-	right         model.Fragment
-	locationPairs int
-	profiles      map[string]*profileAggregate
-	pathPairs     map[string]model.LocationPair
-	focused       map[string]struct{}
+	similarity     float64
+	id             string
+	left           model.Fragment
+	right          model.Fragment
+	locationPairs  int
+	profiles       map[string]*profileAggregate
+	pathPairs      map[string]model.LocationPair
+	focused        map[string]struct{}
+	reviewPriority int
+	reviewSignals  []string
 }
 
 type matchCollector struct {
@@ -501,11 +510,16 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 func (collector *matchCollector) finish() {
 	candidates := make([]*groupCandidate, 0, len(collector.groups))
 	for _, candidate := range collector.groups {
+		candidate.reviewPriority, candidate.reviewSignals = reviewPriority(candidate)
 		candidates = append(candidates, candidate)
 	}
 	sort.Slice(candidates, func(i, j int) bool {
 		if collector.options.FocusActive && (len(candidates[i].focused) > 0) != (len(candidates[j].focused) > 0) {
 			return len(candidates[i].focused) > 0
+		}
+		if collector.options.Ranking == RankingReview &&
+			candidates[i].reviewPriority != candidates[j].reviewPriority {
+			return candidates[i].reviewPriority > candidates[j].reviewPriority
 		}
 		return groupBetter(candidates[i], candidates[j])
 	})
@@ -532,9 +546,58 @@ func (collector *matchCollector) finish() {
 			Profiles:       publicProfiles(candidate.profiles, collector.options.MaxOccurrences),
 			ShapeSummary:   similarity.Shape(candidate.left.Features, candidate.right.Features),
 			SharedFeatures: similarity.Shared(candidate.left.Features, candidate.right.Features, 8),
+			ReviewPriority: candidate.reviewPriority,
+			ReviewSignals:  append([]string{}, candidate.reviewSignals...),
 			PathPairs:      publicPathPairs(candidate.pathPairs),
 		})
 	}
+}
+
+func reviewPriority(candidate *groupCandidate) (int, []string) {
+	sameNameCrossDirectory := false
+	crossDirectory := false
+	sameNameCrossFile := false
+	crossFile := false
+	for _, pair := range candidate.pathPairs {
+		if pair.Left.Path == pair.Right.Path {
+			continue
+		}
+		crossFile = true
+		sameName := pair.Left.Name != "" && pair.Left.Name == pair.Right.Name
+		if sameName {
+			sameNameCrossFile = true
+		}
+		if filepath.Dir(pair.Left.Path) != filepath.Dir(pair.Right.Path) {
+			crossDirectory = true
+			if sameName {
+				sameNameCrossDirectory = true
+			}
+		}
+	}
+
+	priority := 0
+	signals := make([]string, 0, 5)
+	if sameNameCrossDirectory {
+		priority += 4
+		signals = append(signals, "same-name-cross-directory")
+	}
+	if crossDirectory {
+		priority += 2
+		signals = append(signals, "cross-directory")
+	}
+	if sameNameCrossFile {
+		priority += 2
+		signals = append(signals, "same-name-cross-file")
+	}
+	if crossFile {
+		priority++
+		signals = append(signals, "cross-file")
+	}
+	if candidate.locationPairs > 1 {
+		priority++
+		signals = append(signals, "repeated-location-pairs")
+	}
+	return priority, signals
 }
 
 func (group *groupCandidate) addFocusedOccurrence(location model.Location, paths map[string]struct{}) {

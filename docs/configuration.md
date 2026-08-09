@@ -25,12 +25,13 @@ overrides the configured SQL parser dialect.
   "format": "json",
   "comparison_domain": "code",
   "sql_dialect": "generic",
+  "ranking": "review",
   "same_language_only": true,
   "cross_language_only": false,
   "language_pairs": [],
   "fail_on_match": false,
   "require_coverage": true,
-	"exclude_generated": true,
+  "exclude_generated": true,
   "baseline": "mori-baseline.json",
   "baseline_scope": "content",
   "exclude": ["**/*_test.go"],
@@ -47,6 +48,15 @@ omitted value selects every registered domain.
 It selects the parser for every discovered `.sql` file and does not affect
 non-SQL files. Use separate scans when one repository contains multiple SQL
 dialects.
+
+`ranking` accepts `structural` or `review` and defaults to `structural`.
+Structural ordering sorts by similarity score, shared evidence mass,
+represented location-pair count, and stable identity. Review ordering first
+uses explicit location signals, then the existing structural order. It favors
+same-named candidates across directories, other cross-directory and cross-file
+candidates, and identities representing repeated location pairs. It does not
+change scores, fingerprints, candidate membership, focus priority, or baseline
+suppression. The equivalent command-line form is `--ranking review`.
 
 `same_language_only` compares within review families. TypeScript and TSX are
 one family and remain comparable. It is mutually exclusive with
@@ -94,7 +104,7 @@ Ignore files affect directory traversal only. A file passed explicitly remains
 visible. Repeated `--exclude` globs remain additive and continue to exclude an
 explicitly requested file. Use `--no-ignore` to disable both ignore-file types.
 
-Schema-8 JSON reports record the effective options and every loaded ignore
+Schema-10 JSON reports record the effective options and every loaded ignore
 file under `configuration` so a scan can be reproduced. Review focus remains
 CLI-only: `--focus-path` is repeatable, `--changed-since` always requires an
 explicit locally available Git revision, and repeatable

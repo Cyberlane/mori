@@ -73,7 +73,7 @@ found no supported files or extracted no comparison fragments. The report is
 still written and contains a deterministic `coverage` warning; classify the
 scan as not applicable or insufficiently covered, never as a clean result.
 
-Schema-9 reports include `file_coverage`. Inspect every supported file with
+Schema-10 reports include `file_coverage`. Inspect every supported file with
 zero fragments, along with its skipped-fragment and parse-diagnostic counts,
 before describing coverage. A successful aggregate scan does not excuse a
 supported file that contributed no comparison units.
@@ -102,6 +102,7 @@ mori scan \
   --max-groups 250 \
   --max-occurrences 10 \
   --exclude-generated \
+  --ranking review \
   .
 ```
 
@@ -118,6 +119,8 @@ mori scan \
   --min-tokens 40 \
   --max-groups 250 \
   --max-occurrences 10 \
+  --exclude-generated \
+  --ranking review \
   --changed-since origin/main \
   .
 ```
@@ -231,7 +234,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `9`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `10`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while
@@ -269,6 +272,9 @@ revision or date from the version string. Inspect:
 - `similarity`: report it as structural similarity only; and
 - `shape_summary` and `shared_features`: use them to explain why a group ranked
   highly without treating the summary as behavioral evidence.
+- `review_priority` and `review_signals`: when review ranking is selected,
+  explain the source-location reasons for ordering and never present the
+  priority as semantic confidence.
 
 Treat an operational error or an unexpected schema as a failed scan. Exit
 status `3` means policy findings were found with `--fail-on-match` or
