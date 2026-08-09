@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-09
+
 ### Added
 
 - Added repeatable `--changed-worktree PATH=REVISION` focus for nested and
