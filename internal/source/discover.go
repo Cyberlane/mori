@@ -28,9 +28,10 @@ type File struct {
 
 // Options controls file discovery.
 type Options struct {
-	Excludes     []string
-	MaxFileBytes int64
-	IgnoreFiles  bool
+	Excludes          []string
+	MaxFileBytes      int64
+	IgnoreFiles       bool
+	ComparisonDomains map[string]struct{}
 }
 
 // Result contains deterministic discovery output and recoverable warnings.
@@ -239,6 +240,11 @@ func addFile(
 			})
 		}
 		return
+	}
+	if len(options.ComparisonDomains) > 0 {
+		if _, selected := options.ComparisonDomains[spec.ComparisonDomain]; !selected {
+			return
+		}
 	}
 
 	info, err := os.Lstat(path)

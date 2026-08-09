@@ -73,6 +73,26 @@ func TestDiscoverExcludesExplicitFile(t *testing.T) {
 	}
 }
 
+func TestDiscoverFiltersComparisonDomainsBeforeFileChecks(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	code := filepath.Join(root, "main.go")
+	sql := filepath.Join(root, "schema.sql")
+	writeFixture(t, code, "package fixture\n")
+	writeFixture(t, sql, strings.Repeat("-", 2048))
+
+	result := Discover([]string{root, sql}, Options{
+		MaxFileBytes: 1024,
+		ComparisonDomains: map[string]struct{}{
+			"code": {},
+		},
+	})
+	if len(result.Files) != 1 || result.Files[0].Path != code || len(result.Warnings) != 0 {
+		t.Fatalf("domain-filtered result = %#v", result)
+	}
+}
+
 func TestDiscoverContextStopsBeforeWalking(t *testing.T) {
 	t.Parallel()
 

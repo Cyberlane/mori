@@ -33,6 +33,8 @@ func TestLoadStrictConfig(t *testing.T) {
 	writeConfig(t, path, `{
   "threshold": 0.85,
   "max_groups": 250,
+  "comparison_domain": "code",
+  "same_language_only": false,
   "language_pairs": ["go,typescript"],
   "exclude": ["**/*_test.go"],
   "respect_ignore": true
@@ -43,6 +45,8 @@ func TestLoadStrictConfig(t *testing.T) {
 	}
 	if settings.Threshold == nil || *settings.Threshold != 0.85 ||
 		settings.MaxGroups == nil || *settings.MaxGroups != 250 ||
+		settings.ComparisonDomain != "code" ||
+		settings.SameLanguageOnly == nil || *settings.SameLanguageOnly ||
 		len(settings.LanguagePairs) != 1 || settings.RespectIgnore == nil || !*settings.RespectIgnore {
 		t.Fatalf("settings = %#v", settings)
 	}

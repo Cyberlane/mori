@@ -7,6 +7,30 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-09
+
+### Added
+
+- Direct `--comparison-domain` filtering, applied before parsing and recorded
+  in schema-6 reports and project configuration.
+- `--same-language-only` review-family filtering, including TypeScript-to-TSX
+  comparisons within their shared family.
+- A detailed scan-selection contract covering validation, execution,
+  compatibility, diagnostics, and verification.
+
+### Changed
+
+- The bundled review skill now starts with code-only same-language scans and a
+  40-token cross-language floor, while reserving 12 tokens for broad
+  exploration.
+- Parse warnings now describe potentially incomplete comparison coverage
+  without claiming that non-comparison DDL fragments were invalid or skipped.
+
+### Fixed
+
+- Code and SQL findings no longer need to share one root ranking when a
+  comparison domain is selected.
+
 ## [0.7.0] - 2026-08-09
 
 ### Added
@@ -139,7 +163,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Cyberlane/mori/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/Cyberlane/mori/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/Cyberlane/mori/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/Cyberlane/mori/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Cyberlane/mori/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/Cyberlane/mori/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Cyberlane/mori/compare/v0.3.0...v0.4.0

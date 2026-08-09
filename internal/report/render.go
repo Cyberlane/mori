@@ -185,7 +185,7 @@ func Text(writer io.Writer, report model.Report) error {
 			if warning.SkippedFragments > 0 {
 				if _, err := fmt.Fprintf(
 					writer,
-					"      %d invalid source fragment(s) skipped\n",
+					"      %d comparison fragment(s) containing parse errors skipped\n",
 					warning.SkippedFragments,
 				); err != nil {
 					return err

@@ -72,6 +72,70 @@ func TestRunScanSQLQueries(t *testing.T) {
 	}
 }
 
+func TestRunFiltersDomainsBeforeParsingAndReportsSelection(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		"left.go":   "package sample\nfunc Left(value string) string { return value }\n",
+		"right.go":  "package sample\nfunc Right(input string) string { return input }\n",
+		"left.sql":  "SELECT id FROM users WHERE active = TRUE;\n",
+		"right.sql": "SELECT id FROM members WHERE active = TRUE;\n",
+		"schema.sql": "PRAGMA foreign_keys = ON;\n" +
+			"CREATE TABLE documents (metadata TEXT CHECK(json_valid(metadata)));\n",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+
+	args := []string{
+		"scan", "--format", "json", "--threshold", "1", "--min-tokens", "1",
+		"--comparison-domain", "code", root,
+	}
+	var first bytes.Buffer
+	var stderr bytes.Buffer
+	if code := Run(context.Background(), args, &first, &stderr); code != exitSuccess {
+		t.Fatalf("code scan exit = %d, stderr = %q", code, stderr.String())
+	}
+	var codeReport model.Report
+	if err := json.Unmarshal(first.Bytes(), &codeReport); err != nil {
+		t.Fatalf("decode code report: %v", err)
+	}
+	if codeReport.Files != 2 || codeReport.Fragments != 2 ||
+		codeReport.TotalMatchGroups != 1 || len(codeReport.Warnings) != 0 ||
+		codeReport.Configuration.ComparisonDomain != "code" {
+		t.Fatalf("code report = %+v", codeReport)
+	}
+
+	var second bytes.Buffer
+	stderr.Reset()
+	if code := Run(context.Background(), args, &second, &stderr); code != exitSuccess {
+		t.Fatalf("repeated code scan exit = %d, stderr = %q", code, stderr.String())
+	}
+	if !bytes.Equal(first.Bytes(), second.Bytes()) {
+		t.Fatal("repeated domain-filtered JSON was not byte-identical")
+	}
+
+	var sqlOutput bytes.Buffer
+	stderr.Reset()
+	if code := Run(context.Background(), []string{
+		"scan", "--format", "json", "--threshold", "1", "--min-tokens", "1",
+		"--comparison-domain", "sql-query", root,
+	}, &sqlOutput, &stderr); code != exitSuccess {
+		t.Fatalf("SQL scan exit = %d, stderr = %q", code, stderr.String())
+	}
+	var sqlReport model.Report
+	if err := json.Unmarshal(sqlOutput.Bytes(), &sqlReport); err != nil {
+		t.Fatalf("decode SQL report: %v", err)
+	}
+	if sqlReport.Files != 3 || sqlReport.Fragments != 2 ||
+		sqlReport.TotalMatchGroups != 1 || len(sqlReport.Warnings) != 1 ||
+		sqlReport.Configuration.ComparisonDomain != "sql-query" {
+		t.Fatalf("SQL report = %+v", sqlReport)
+	}
+}
+
 func TestRunScanJSONAndFailOnMatch(t *testing.T) {
 	t.Parallel()
 
@@ -364,6 +428,51 @@ func TestRunRejectsIncompatibleLanguageDomains(t *testing.T) {
 	}
 }
 
+func TestRunRejectsInvalidSelectionCombinations(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "same and cross",
+			args: []string{"scan", "--same-language-only", "--cross-language-only", "."},
+			want: "mutually exclusive",
+		},
+		{
+			name: "same and pair",
+			args: []string{"scan", "--same-language-only", "--language-pair", "go,go", "."},
+			want: "mutually exclusive",
+		},
+		{
+			name: "unknown domain",
+			args: []string{"scan", "--comparison-domain", "unknown", "."},
+			want: "unknown --comparison-domain",
+		},
+		{
+			name: "pair outside domain",
+			args: []string{
+				"scan", "--comparison-domain", "sql-query", "--language-pair", "go,go", ".",
+			},
+			want: "unselected comparison domain code",
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			if code := Run(context.Background(), test.args, &stdout, &stderr); code != exitUsage ||
+				!strings.Contains(stderr.String(), test.want) {
+				t.Fatalf("exit/stderr = %d/%q, want %q", code, stderr.String(), test.want)
+			}
+		})
+	}
+}
+
 func TestConfigLoadsBeforeCLIOverridesAndLanguagePairsExpand(t *testing.T) {
 	t.Parallel()
 
@@ -372,6 +481,7 @@ func TestConfigLoadsBeforeCLIOverridesAndLanguagePairsExpand(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte(`{
   "threshold": 0.5,
   "max_groups": 250,
+  "comparison_domain": "sql-query",
   "language_pairs": ["go,typescript"],
   "exclude": ["generated/**"],
   "respect_ignore": true,
@@ -383,13 +493,14 @@ func TestConfigLoadsBeforeCLIOverridesAndLanguagePairsExpand(t *testing.T) {
 	options, _, code, ok := parseScanOptions("scan", []string{
 		"--config", configPath,
 		"--threshold", "0.9",
+		"--comparison-domain", "CODE",
 		"--no-ignore",
 	}, &stderr, false)
 	if !ok || code != exitSuccess {
 		t.Fatalf("parse = %t/%d, stderr = %q", ok, code, stderr.String())
 	}
 	if options.threshold != 0.9 || options.maxGroups != 250 || options.respectIgnore ||
-		len(options.languagePairs) != 1 || len(options.excludes) != 1 ||
+		len(options.languagePairs) != 1 || options.comparisonDomain != "CODE" || len(options.excludes) != 1 ||
 		options.baselinePath != filepath.Join(root, "accepted.json") {
 		t.Fatalf("options = %#v", options)
 	}
@@ -399,6 +510,51 @@ func TestConfigLoadsBeforeCLIOverridesAndLanguagePairsExpand(t *testing.T) {
 	}
 	if len(pairs) != 2 {
 		t.Fatalf("expanded pairs = %#v, want Go paired with TS and TSX", pairs)
+	}
+	domain, _, err := resolveComparisonDomain(options.comparisonDomain)
+	if err != nil {
+		t.Fatalf("resolveComparisonDomain: %v", err)
+	}
+	if domain != "code" {
+		t.Fatalf("resolved domain = %q", domain)
+	}
+}
+
+func TestRunAppliesSameLanguageConfig(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(root, ".mori.json"),
+		[]byte(`{"threshold":1,"min_tokens":1,"same_language_only":true}`),
+		0o600,
+	); err != nil {
+		t.Fatalf("WriteFile config: %v", err)
+	}
+	for name, content := range map[string]string{
+		"left.ts":   "export const check = (value: string) => { return value.trim(); };\n",
+		"right.tsx": "export const check = (value: string) => { return value.trim(); };\n",
+		"other.go":  "package sample\nfunc check(value string) string { return value }\n",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := Run(context.Background(), []string{
+		"scan", "--format", "json", "--config", filepath.Join(root, ".mori.json"), root,
+	}, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("scan exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	if !result.Configuration.SameLanguageOnly || result.CandidatePairs != 1 ||
+		result.TotalMatchGroups != 1 {
+		t.Fatalf("same-language report = %+v", result)
 	}
 }
 

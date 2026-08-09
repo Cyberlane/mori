@@ -24,6 +24,7 @@ type Options struct {
 	MaxOccurrences    int
 	MaxPairs          int
 	Workers           int
+	SameLanguageOnly  bool
 	CrossLanguageOnly bool
 	LanguagePairs     []LanguagePair
 	FocusPaths        map[string]struct{}
@@ -182,6 +183,8 @@ func Analyze(
 	var compareErr error
 	if len(options.LanguagePairs) > 0 {
 		compareErr = compareSelectedLanguagePairs(ordered, options.LanguagePairs, &collector)
+	} else if options.SameLanguageOnly {
+		compareErr = compareWithinFamilies(ordered, &collector)
 	} else if options.CrossLanguageOnly {
 		compareErr = compareAcrossFamilies(ordered, &collector)
 	} else {
@@ -193,6 +196,25 @@ func Analyze(
 	collector.finish()
 
 	return report, nil
+}
+
+func compareWithinFamilies(fragments []model.Fragment, collector *matchCollector) error {
+	byDomainAndFamily := make(map[string][]model.Fragment)
+	for _, fragment := range fragments {
+		key := fragment.Location.ComparisonDomain + "\x00" + fragment.Location.LanguageFamily
+		byDomainAndFamily[key] = append(byDomainAndFamily[key], fragment)
+	}
+	partitions := make([]string, 0, len(byDomainAndFamily))
+	for partition := range byDomainAndFamily {
+		partitions = append(partitions, partition)
+	}
+	sort.Strings(partitions)
+	for _, partition := range partitions {
+		if err := compareAll(byDomainAndFamily[partition], collector); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func compareCompatibleDomains(fragments []model.Fragment, collector *matchCollector) error {
@@ -226,6 +248,19 @@ func validateOptions(options Options) error {
 	}
 	if options.MaxGroups < 0 || options.MaxOccurrences < 0 || options.MaxPairs < 0 {
 		return errors.New("maximum values cannot be negative")
+	}
+	selectionModes := 0
+	if options.SameLanguageOnly {
+		selectionModes++
+	}
+	if options.CrossLanguageOnly {
+		selectionModes++
+	}
+	if len(options.LanguagePairs) > 0 {
+		selectionModes++
+	}
+	if selectionModes > 1 {
+		return errors.New("language selection modes are mutually exclusive")
 	}
 	return nil
 }

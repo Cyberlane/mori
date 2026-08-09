@@ -88,7 +88,28 @@ func TestCrossLanguageUsesFamiliesAndExplicitPairsUseGrammarIDs(t *testing.T) {
 		t.Fatalf("Analyze cross-family: %v", err)
 	}
 	if crossFamily.CandidatePairs != 0 || crossFamily.TotalMatchGroups != 0 {
-		t.Fatalf("TS/TSX appeared cross-family: %+v", crossFamily)
+		t.Fatalf("cross-family result = %+v", crossFamily)
+	}
+
+	if err := os.WriteFile(
+		filepath.Join(root, "other.go"),
+		[]byte("package sample\nfunc check(value string) string { return value }\n"),
+		0o600,
+	); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	discovered = source.Discover([]string{root}, source.Options{})
+
+	sameFamily, err := Analyze(context.Background(), discovered.Files, nil, Options{
+		Threshold: 1, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10,
+		MaxPairs: 10, Workers: 1, SameLanguageOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("Analyze same-family: %v", err)
+	}
+	if sameFamily.CandidatePairs != 1 || sameFamily.TotalMatchGroups != 1 ||
+		sameFamily.TotalLocationPairs != 1 {
+		t.Fatalf("same-family result = %+v", sameFamily)
 	}
 
 	explicit, err := Analyze(context.Background(), discovered.Files, nil, Options{
@@ -101,6 +122,18 @@ func TestCrossLanguageUsesFamiliesAndExplicitPairsUseGrammarIDs(t *testing.T) {
 	}
 	if explicit.TotalMatchGroups != 1 || explicit.TotalLocationPairs != 1 {
 		t.Fatalf("explicit TS/TSX result = %+v", explicit)
+	}
+}
+
+func TestAnalyzeRejectsConflictingLanguageSelectionModes(t *testing.T) {
+	t.Parallel()
+
+	_, err := Analyze(context.Background(), nil, nil, Options{
+		Threshold: 1, MinTokens: 1, Workers: 1,
+		SameLanguageOnly: true, CrossLanguageOnly: true,
+	})
+	if err == nil {
+		t.Fatal("Analyze accepted conflicting language selection modes")
 	}
 }
 

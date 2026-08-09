@@ -73,6 +73,7 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 type scanOptions struct {
 	excludes           stringList
 	languagePairs      stringList
+	comparisonDomain   string
 	focusPaths         stringList
 	changedSince       string
 	threshold          float64
@@ -83,6 +84,7 @@ type scanOptions struct {
 	maxFileBytes       int64
 	workers            int
 	format             string
+	sameLanguageOnly   bool
 	crossLanguageOnly  bool
 	failOnMatch        bool
 	failOnFocusedMatch bool
@@ -121,6 +123,18 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 	flags.Int64Var(&options.maxFileBytes, "max-file-bytes", options.maxFileBytes, "maximum source file size; 0 is unlimited")
 	flags.IntVar(&options.workers, "workers", options.workers, "parallel parser workers")
 	flags.StringVar(&options.format, "format", options.format, "output format: text or json")
+	flags.StringVar(
+		&options.comparisonDomain,
+		"comparison-domain",
+		options.comparisonDomain,
+		"scan one comparison domain, such as code or sql-query",
+	)
+	flags.BoolVar(
+		&options.sameLanguageOnly,
+		"same-language-only",
+		options.sameLanguageOnly,
+		"compare fragments only when their language families match",
+	)
 	flags.BoolVar(
 		&options.crossLanguageOnly,
 		"cross-language-only",
@@ -305,6 +319,9 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	if settings.CrossLanguageOnly != nil {
 		options.crossLanguageOnly = *settings.CrossLanguageOnly
 	}
+	if settings.SameLanguageOnly != nil {
+		options.sameLanguageOnly = *settings.SameLanguageOnly
+	}
 	if settings.FailOnMatch != nil {
 		options.failOnMatch = *settings.FailOnMatch
 	}
@@ -314,6 +331,9 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	options.noIgnore = !options.respectIgnore
 	options.excludes = append(options.excludes, settings.Excludes...)
 	options.languagePairs = append(options.languagePairs, settings.LanguagePairs...)
+	if settings.ComparisonDomain != "" {
+		options.comparisonDomain = settings.ComparisonDomain
+	}
 	if settings.Baseline != "" {
 		options.baselinePath = resolveConfigPath(base, settings.Baseline)
 	}
@@ -347,8 +367,18 @@ func validateScanOptions(options scanOptions) error {
 	if options.format != "text" && options.format != "json" {
 		return errors.New("--format must be text or json")
 	}
-	if options.crossLanguageOnly && len(options.languagePairs) > 0 {
-		return errors.New("--cross-language-only and --language-pair cannot be used together")
+	selectionModes := 0
+	if options.sameLanguageOnly {
+		selectionModes++
+	}
+	if options.crossLanguageOnly {
+		selectionModes++
+	}
+	if len(options.languagePairs) > 0 {
+		selectionModes++
+	}
+	if selectionModes > 1 {
+		return errors.New("--same-language-only, --cross-language-only, and --language-pair are mutually exclusive")
 	}
 	if options.failOnMatch && options.failOnFocusedMatch {
 		return errors.New("--fail-on-match and --fail-on-focused-match cannot be used together")
@@ -356,7 +386,15 @@ func validateScanOptions(options scanOptions) error {
 	if options.failOnFocusedMatch && len(options.focusPaths) == 0 && options.changedSince == "" {
 		return errors.New("--fail-on-focused-match requires --focus-path or --changed-since")
 	}
-	if _, err := expandLanguagePairs(options.languagePairs); err != nil {
+	pairs, err := expandLanguagePairs(options.languagePairs)
+	if err != nil {
+		return err
+	}
+	domain, _, err := resolveComparisonDomain(options.comparisonDomain)
+	if err != nil {
+		return err
+	}
+	if err := validatePairDomain(pairs, domain); err != nil {
 		return err
 	}
 	if err := baseline.ValidateScope(baseline.Scope(options.baselineScope)); err != nil {
@@ -539,10 +577,15 @@ func executeScan(
 	options scanOptions,
 	suppress func(string, model.Location, model.Location) bool,
 ) (model.Report, error) {
+	domain, domainSet, err := resolveComparisonDomain(options.comparisonDomain)
+	if err != nil {
+		return model.Report{}, err
+	}
 	discovered, err := source.DiscoverContext(ctx, paths, source.Options{
-		Excludes:     options.excludes,
-		MaxFileBytes: options.maxFileBytes,
-		IgnoreFiles:  options.respectIgnore,
+		Excludes:          options.excludes,
+		MaxFileBytes:      options.maxFileBytes,
+		IgnoreFiles:       options.respectIgnore,
+		ComparisonDomains: domainSet,
 	})
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
@@ -575,6 +618,7 @@ func executeScan(
 		MaxOccurrences:    options.maxOccurrences,
 		MaxPairs:          options.maxPairs,
 		Workers:           options.workers,
+		SameLanguageOnly:  options.sameLanguageOnly,
 		CrossLanguageOnly: options.crossLanguageOnly,
 		LanguagePairs:     pairs,
 		FocusPaths:        focusSet,
@@ -594,6 +638,8 @@ func executeScan(
 		MaxOccurrences:    options.maxOccurrences,
 		MaxPairs:          options.maxPairs,
 		MaxFileBytes:      options.maxFileBytes,
+		ComparisonDomain:  domain,
+		SameLanguageOnly:  options.sameLanguageOnly,
 		CrossLanguageOnly: options.crossLanguageOnly,
 		LanguagePairs:     append([]string{}, options.languagePairs...),
 		BaselinePath:      displayOptionalPath(options.baselinePath),
@@ -738,6 +784,44 @@ func expandLanguagePairs(values []string) ([]analyzer.LanguagePair, error) {
 		}
 	}
 	return result, nil
+}
+
+func resolveComparisonDomain(value string) (string, map[string]struct{}, error) {
+	registered := language.ComparisonDomains()
+	known := make(map[string]struct{}, len(registered))
+	for _, domain := range registered {
+		known[domain] = struct{}{}
+	}
+	domain := strings.ToLower(strings.TrimSpace(value))
+	if domain == "" {
+		return "", nil, nil
+	}
+	if _, ok := known[domain]; !ok {
+		return "", nil, fmt.Errorf(
+			"unknown --comparison-domain %q; expected one of %s",
+			value,
+			strings.Join(registered, ", "),
+		)
+	}
+	return domain, map[string]struct{}{domain: {}}, nil
+}
+
+func validatePairDomain(pairs []analyzer.LanguagePair, domain string) error {
+	if len(pairs) == 0 || domain == "" {
+		return nil
+	}
+	for _, pair := range pairs {
+		left, _ := language.Lookup(pair.Left)
+		if left.ComparisonDomain != domain {
+			return fmt.Errorf(
+				"--language-pair %s,%s belongs to unselected comparison domain %s",
+				pair.Left,
+				pair.Right,
+				left.ComparisonDomain,
+			)
+		}
+	}
+	return nil
 }
 
 func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
