@@ -4,11 +4,14 @@ GO ?= go
 ACTIONLINT_VERSION := v1.7.12
 GOVULNCHECK_VERSION := v1.6.0
 
-.PHONY: actionlint build check fmt fmt-check policy-test scan-example test tidy-check vet vuln
+.PHONY: actionlint build check dogfood fmt fmt-check policy-test scan-example test tidy-check vet vuln
 
 build:
 	mkdir -p bin
 	$(GO) build -trimpath -o bin/mori ./cmd/mori
+
+dogfood: build
+	./bin/mori scan --config configs/self-review.mori.json .
 
 fmt:
 	gofmt -w cmd internal examples

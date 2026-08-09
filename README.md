@@ -270,6 +270,17 @@ mori skill install --global
 make check
 ```
 
+Run Mori's explicit production-code self-review profile with:
+
+```sh
+make dogfood
+```
+
+The profile in `configs/self-review.mori.json` is not auto-discovered. It scans
+same-language code at the 0.85 threshold and 40-token floor while excluding
+tests and examples, so normal development and cross-language example commands
+keep their own selection settings.
+
 ## License
 
 Mori is available under the [MIT License](LICENSE).

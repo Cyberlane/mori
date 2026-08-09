@@ -13,6 +13,10 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   labeled abridged output, and linked the scan-selection contract directly.
 - Added the recommended 40-token starting floor to the scoring guide's
   cross-language calibration guidance.
+- Consolidated deterministic analyzer partitioning and lexical path
+  containment without changing comparison behavior.
+- Added an explicit, non-discovered self-review profile and `make dogfood`
+  workflow for production-code dogfooding.
 
 ## [0.8.0] - 2026-08-09
 
