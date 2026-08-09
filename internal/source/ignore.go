@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Cyberlane/mori/internal/pathutil"
 	"github.com/bmatcuk/doublestar/v4"
 )
 
@@ -84,11 +85,11 @@ func (matcher *ignoreMatcher) loadDirectory(directory string) error {
 func (matcher *ignoreMatcher) loadAncestors(boundary string, root string) error {
 	boundary = filepath.Clean(boundary)
 	root = filepath.Clean(root)
-	if !pathWithin(boundary, root) {
+	if !pathutil.Within(boundary, root) {
 		return nil
 	}
 	directories := make([]string, 0)
-	for current := filepath.Dir(root); pathWithin(boundary, current); current = filepath.Dir(current) {
+	for current := filepath.Dir(root); pathutil.Within(boundary, current); current = filepath.Dir(current) {
 		directories = append(directories, current)
 		if current == boundary {
 			break
@@ -202,7 +203,7 @@ func parseIgnoreRule(base string, line string) (ignoreRule, bool, error) {
 func (matcher *ignoreMatcher) ignored(path string, directory bool) bool {
 	ignored := false
 	for _, rule := range matcher.rules {
-		if !pathWithin(rule.base, path) {
+		if !pathutil.Within(rule.base, path) {
 			continue
 		}
 		relative := relativeSlash(rule.base, path)
@@ -236,7 +237,7 @@ func (rule ignoreRule) matches(relative string, directory bool) bool {
 
 func (matcher *ignoreMatcher) mayReinclude(path string) bool {
 	for _, rule := range matcher.rules {
-		if rule.negated && pathWithin(rule.base, path) {
+		if rule.negated && pathutil.Within(rule.base, path) {
 			return true
 		}
 	}

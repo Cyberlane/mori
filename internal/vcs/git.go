@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/Cyberlane/mori/internal/pathutil"
 )
 
 const (
@@ -95,7 +97,7 @@ func resolveChanged(
 		if canonicalErr != nil {
 			return Changes{}, fmt.Errorf("canonicalize discovered path: %w", canonicalErr)
 		}
-		if !pathWithin(root, canonicalPath) {
+		if !pathutil.Within(root, canonicalPath) {
 			return Changes{}, fmt.Errorf("scan spans multiple Git worktrees: %s", filepath.Base(filePath))
 		}
 		nested, boundaryErr := hasNestedGitBoundary(root, filepath.Dir(canonicalPath))
@@ -321,14 +323,9 @@ func isFullSHA(value string) bool {
 	return true
 }
 
-func pathWithin(root string, path string) bool {
-	relative, err := filepath.Rel(root, path)
-	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
-}
-
 func hasNestedGitBoundary(root string, directory string) (bool, error) {
 	for current := filepath.Clean(directory); current != root; current = filepath.Dir(current) {
-		if !pathWithin(root, current) {
+		if !pathutil.Within(root, current) {
 			return false, errors.New("discovered path is outside the Git worktree")
 		}
 		_, err := os.Lstat(filepath.Join(current, ".git"))
