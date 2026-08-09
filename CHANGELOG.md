@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-09
+
 ### Added
 
 - Added opt-in `--ranking review` / `ranking: "review"` ordering with explicit
