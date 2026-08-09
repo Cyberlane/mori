@@ -7,6 +7,22 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-09
+
+### Added
+
+- Added source-free literal-position evidence to match groups. Reports disclose
+  bounded difference counts without serializing literal values or digests and
+  without changing scores, fingerprints, ordering, or baselines.
+- Added repeatable `--priority-path GLOB=WEIGHT` and `priority_paths`
+  configuration for deterministic, presentation-only project review priority.
+
+### Changed
+
+- Machine-readable reports now use schema version 12 for literal evidence and
+  effective priority-path rules. Normalization remains version 7 and baseline
+  schema remains version 2.
+
 ## [0.17.1] - 2026-08-09
 
 ### Fixed
