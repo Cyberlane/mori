@@ -7,6 +7,18 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-08-09
+
+### Fixed
+
+- Recognized the standard SwiftProtobuf generated-source header so
+  `--exclude-generated` omits compiler-generated `.pb.swift` files without
+  broadening classification to arbitrary generator comments.
+- Extended bounded, byte-preserving Swift parser compatibility to valid
+  conditional-cast and nil-coalescing chains with optional dictionary bases,
+  collection types, labels, returns, and repeated fallbacks. Repaired trees
+  are still accepted only when they reduce parser diagnostics.
+
 ## [0.19.0] - 2026-08-09
 
 ### Added
@@ -390,7 +402,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.19.1...HEAD
+[0.19.1]: https://github.com/Cyberlane/mori/compare/v0.19.0...v0.19.1
+[0.19.0]: https://github.com/Cyberlane/mori/compare/v0.18.0...v0.19.0
+[0.18.0]: https://github.com/Cyberlane/mori/compare/v0.17.1...v0.18.0
+[0.17.1]: https://github.com/Cyberlane/mori/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/Cyberlane/mori/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Cyberlane/mori/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Cyberlane/mori/compare/v0.14.0...v0.15.0
