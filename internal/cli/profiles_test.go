@@ -107,7 +107,7 @@ func TestScanProfilePrecedenceAndSelectionOverrides(t *testing.T) {
 	}
 }
 
-func TestRunScanReportsSelectedProfileInSchemaEleven(t *testing.T) {
+func TestRunScanReportsSelectedProfileInCurrentSchema(t *testing.T) {
 	t.Parallel()
 
 	var stdout bytes.Buffer
@@ -123,7 +123,7 @@ func TestRunScanReportsSelectedProfileInSchemaEleven(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("decode report: %v", err)
 	}
-	if result.SchemaVersion != 11 || result.Configuration.Profile != profileSQL ||
+	if result.SchemaVersion != model.SchemaVersion || result.Configuration.Profile != profileSQL ||
 		result.Configuration.ComparisonDomain != "sql-query" ||
 		result.Configuration.Ranking != "review" {
 		t.Fatalf("profile report = %#v", result)

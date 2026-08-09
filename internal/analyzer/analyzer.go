@@ -15,6 +15,7 @@ import (
 	"github.com/Cyberlane/mori/internal/parser"
 	"github.com/Cyberlane/mori/internal/similarity"
 	"github.com/Cyberlane/mori/internal/source"
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 const (
@@ -38,6 +39,7 @@ type Options struct {
 	Suppress          func(id string, left model.Location, right model.Location) bool
 	ExcludedCoverage  []model.FileCoverage
 	Ranking           string
+	PriorityPaths     []model.PriorityPathRule
 }
 
 // LanguagePair selects one concrete grammar-ID pair for comparison.
@@ -66,16 +68,17 @@ type profileAggregate struct {
 }
 
 type groupCandidate struct {
-	similarity     float64
-	id             string
-	left           model.Fragment
-	right          model.Fragment
-	locationPairs  int
-	profiles       map[string]*profileAggregate
-	pathPairs      map[string]model.LocationPair
-	focused        map[string]struct{}
-	reviewPriority int
-	reviewSignals  []string
+	similarity      float64
+	id              string
+	left            model.Fragment
+	right           model.Fragment
+	locationPairs   int
+	profiles        map[string]*profileAggregate
+	pathPairs       map[string]model.LocationPair
+	focused         map[string]struct{}
+	reviewPriority  int
+	reviewSignals   []string
+	literalEvidence model.LiteralEvidence
 }
 
 type matchCollector struct {
@@ -502,6 +505,7 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 		collector.groups[id] = group
 	}
 	group.locationPairs++
+	group.addLiteralEvidence(left, right)
 	group.addPathPair(left.Location, right.Location)
 	if candidateBetter(left, right, group.left, group.right) {
 		group.left = left
@@ -517,7 +521,7 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 func (collector *matchCollector) finish() {
 	candidates := make([]*groupCandidate, 0, len(collector.groups))
 	for _, candidate := range collector.groups {
-		candidate.reviewPriority, candidate.reviewSignals = reviewPriority(candidate)
+		candidate.reviewPriority, candidate.reviewSignals = reviewPriority(candidate, collector.options.PriorityPaths)
 		candidates = append(candidates, candidate)
 	}
 	sort.Slice(candidates, func(i, j int) bool {
@@ -545,22 +549,63 @@ func (collector *matchCollector) finish() {
 	collector.report.Groups = make([]model.MatchGroup, 0, len(candidates))
 	for _, candidate := range candidates {
 		collector.report.Groups = append(collector.report.Groups, model.MatchGroup{
-			ID:             candidate.id,
-			Similarity:     candidate.similarity,
-			LocationPairs:  candidate.locationPairs,
-			Focused:        len(candidate.focused) > 0,
-			FocusedCount:   len(candidate.focused),
-			Profiles:       publicProfiles(candidate.profiles, collector.options.MaxOccurrences),
-			ShapeSummary:   similarity.Shape(candidate.left.Features, candidate.right.Features),
-			SharedFeatures: similarity.Shared(candidate.left.Features, candidate.right.Features, 8),
-			ReviewPriority: candidate.reviewPriority,
-			ReviewSignals:  append([]string{}, candidate.reviewSignals...),
-			PathPairs:      publicPathPairs(candidate.pathPairs),
+			ID:              candidate.id,
+			Similarity:      candidate.similarity,
+			LocationPairs:   candidate.locationPairs,
+			Focused:         len(candidate.focused) > 0,
+			FocusedCount:    len(candidate.focused),
+			Profiles:        publicProfiles(candidate.profiles, collector.options.MaxOccurrences),
+			ShapeSummary:    similarity.Shape(candidate.left.Features, candidate.right.Features),
+			SharedFeatures:  similarity.Shared(candidate.left.Features, candidate.right.Features, 8),
+			ReviewPriority:  candidate.reviewPriority,
+			ReviewSignals:   append([]string{}, candidate.reviewSignals...),
+			LiteralEvidence: publicLiteralEvidence(candidate.literalEvidence),
+			PathPairs:       publicPathPairs(candidate.pathPairs),
 		})
 	}
 }
 
-func reviewPriority(candidate *groupCandidate) (int, []string) {
+func (group *groupCandidate) addLiteralEvidence(left model.Fragment, right model.Fragment) {
+	if len(left.LiteralDigests) == 0 && len(right.LiteralDigests) == 0 {
+		return
+	}
+	group.literalEvidence.ComparedPairs++
+	differing := 0
+	shared := min(len(left.LiteralDigests), len(right.LiteralDigests))
+	for index := 0; index < shared; index++ {
+		if left.LiteralDigests[index] != right.LiteralDigests[index] {
+			differing++
+		}
+	}
+	if len(left.LiteralDigests) != len(right.LiteralDigests) {
+		group.literalEvidence.LiteralCountMismatchPairs++
+		differing += abs(len(left.LiteralDigests) - len(right.LiteralDigests))
+	}
+	if differing > 0 {
+		group.literalEvidence.PairsWithDifferences++
+		group.literalEvidence.MaxDifferingPositions = max(
+			group.literalEvidence.MaxDifferingPositions,
+			differing,
+		)
+	}
+}
+
+func publicLiteralEvidence(evidence model.LiteralEvidence) *model.LiteralEvidence {
+	if evidence.ComparedPairs == 0 {
+		return nil
+	}
+	copy := evidence
+	return &copy
+}
+
+func abs(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
+func reviewPriority(candidate *groupCandidate, priorityPaths []model.PriorityPathRule) (int, []string) {
 	sameNameCrossDirectory := false
 	crossDirectory := false
 	sameNameCrossFile := false
@@ -603,6 +648,21 @@ func reviewPriority(candidate *groupCandidate) (int, []string) {
 	if candidate.locationPairs > 1 {
 		priority++
 		signals = append(signals, "repeated-location-pairs")
+	}
+	for _, rule := range priorityPaths {
+		matched := false
+		for _, pair := range candidate.pathPairs {
+			leftMatch, _ := doublestar.Match(rule.Pattern, filepath.ToSlash(pair.Left.Path))
+			rightMatch, _ := doublestar.Match(rule.Pattern, filepath.ToSlash(pair.Right.Path))
+			if leftMatch || rightMatch {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			priority += rule.Priority
+			signals = append(signals, fmt.Sprintf("priority-path:%s(+%d)", rule.Pattern, rule.Priority))
+		}
 	}
 	return priority, signals
 }

@@ -230,13 +230,14 @@ func appendFragment(
 			StartLine:        int(start.Row) + 1,
 			EndLine:          endLine,
 		},
-		StartByte:    node.StartByte(),
-		EndByte:      node.EndByte(),
-		TokenCount:   profile.TokenCount,
-		FeatureCount: featureCount(profile.Features),
-		Fingerprint:  fingerprint.Bag(profile.Features),
-		NestedCount:  profile.Features["node:function:nested"],
-		Features:     profile.Features,
+		StartByte:      node.StartByte(),
+		EndByte:        node.EndByte(),
+		TokenCount:     profile.TokenCount,
+		FeatureCount:   featureCount(profile.Features),
+		Fingerprint:    fingerprint.Bag(profile.Features),
+		NestedCount:    profile.Features["node:function:nested"],
+		Features:       profile.Features,
+		LiteralDigests: append([]string(nil), profile.LiteralDigests...),
 	})
 	return true, nil
 }

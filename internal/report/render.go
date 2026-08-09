@@ -183,6 +183,26 @@ func Text(writer io.Writer, report model.Report) error {
 				return err
 			}
 		}
+		if group.LiteralEvidence != nil {
+			evidence := group.LiteralEvidence
+			if evidence.PairsWithDifferences == 0 {
+				if _, err := fmt.Fprintf(
+					writer,
+					"   literal evidence: %d location pair(s) compared with no positional differences; values omitted\n",
+					evidence.ComparedPairs,
+				); err != nil {
+					return err
+				}
+			} else if _, err := fmt.Fprintf(
+				writer,
+				"   literal evidence: %d of %d location pair(s) differ at up to %d position(s); values omitted\n",
+				evidence.PairsWithDifferences,
+				evidence.ComparedPairs,
+				evidence.MaxDifferingPositions,
+			); err != nil {
+				return err
+			}
+		}
 		if report.Configuration.Ranking == "review" {
 			signals := "none"
 			if len(group.ReviewSignals) > 0 {
@@ -192,7 +212,7 @@ func Text(writer io.Writer, report model.Report) error {
 				writer,
 				"   review priority %d · %s\n",
 				group.ReviewPriority,
-				signals,
+				terminalSafe(signals),
 			); err != nil {
 				return err
 			}

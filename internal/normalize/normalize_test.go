@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -74,6 +75,32 @@ function total(values) {
 	)
 	if unrelatedScore >= 0.60 {
 		t.Fatalf("unrelated score = %.3f, want below 0.60", unrelatedScore)
+	}
+}
+
+func TestLiteralDigestsExposeDriftWithoutChangingFingerprint(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "literals.js")
+	content := `function first() { return "jpeg"; }
+function second() { return "avif"; }
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := parser.File(context.Background(), source.File{
+		Path: path, DisplayPath: "literals.js", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 2 {
+		t.Fatalf("fragments/warnings = %#v/%#v", fragments, warnings)
+	}
+	if fragments[0].Fingerprint != fragments[1].Fingerprint {
+		t.Fatalf("literal values changed fingerprint: %s != %s", fragments[0].Fingerprint, fragments[1].Fingerprint)
+	}
+	if len(fragments[0].LiteralDigests) != 1 || len(fragments[1].LiteralDigests) != 1 ||
+		reflect.DeepEqual(fragments[0].LiteralDigests, fragments[1].LiteralDigests) {
+		t.Fatalf("literal digests = %#v/%#v, want one differing position", fragments[0].LiteralDigests, fragments[1].LiteralDigests)
 	}
 }
 

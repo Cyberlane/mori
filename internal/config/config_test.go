@@ -37,6 +37,7 @@ func TestLoadStrictConfig(t *testing.T) {
   "comparison_domain": "code",
   "sql_dialect": "postgresql",
 	"ranking": "review",
+	"priority_paths": ["**/auth/**=25"],
   "same_language_only": false,
   "language_pairs": ["go,typescript"],
   "require_coverage": true,
@@ -53,6 +54,7 @@ func TestLoadStrictConfig(t *testing.T) {
 		settings.ComparisonDomain != "code" ||
 		settings.SQLDialect != "postgresql" ||
 		settings.Ranking != "review" ||
+		len(settings.PriorityPaths) != 1 || settings.PriorityPaths[0] != "**/auth/**=25" ||
 		settings.SameLanguageOnly == nil || *settings.SameLanguageOnly ||
 		len(settings.LanguagePairs) != 1 || settings.RequireCoverage == nil || !*settings.RequireCoverage ||
 		settings.ExcludeGenerated == nil || !*settings.ExcludeGenerated ||

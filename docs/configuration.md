@@ -37,7 +37,7 @@ Profiles deliberately do not guess project-specific test, migration, generated
 router, or framework exclusions. Add those only after auditing the repository's
 source categories and the first report.
 
-The selected profile is recorded in schema-11 reports. Omitting `profile`
+The selected profile is recorded in schema-12 reports. Omitting `profile`
 retains the legacy defaults. A CLI `--profile` replaces a configured profile;
 explicit fields from the config are then applied, followed by explicit CLI
 flags. An explicit language-selection mode replaces the profile's mode, so
@@ -60,6 +60,7 @@ flags. An explicit language-selection mode replaces the profile's mode, so
   "comparison_domain": "code",
   "sql_dialect": "generic",
   "ranking": "review",
+  "priority_paths": ["**/auth/**=25", "**/security/**=25"],
   "same_language_only": true,
   "cross_language_only": false,
   "language_pairs": [],
@@ -91,6 +92,15 @@ same-named candidates across directories, other cross-directory and cross-file
 candidates, and identities representing repeated location pairs. It does not
 change scores, fingerprints, candidate membership, focus priority, or baseline
 suppression. The equivalent command-line form is `--ranking review`.
+
+`priority_paths` contains at most 32 deterministic `GLOB=WEIGHT` rules. Each
+weight must be an integer from 1 to 100. When review ranking is selected, a
+group receives a rule's weight once if either side of any retained location
+pair matches the doublestar glob. Repeat the equivalent `--priority-path`
+option for command-line use. Rules change presentation order only: they do not
+change similarity, fingerprints, baselines, or whether a group qualifies.
+Use them for reviewed project categories such as authorization or security
+paths; a matching path is not evidence that a finding is risky or actionable.
 
 `same_language_only` compares within review families. TypeScript and TSX are
 one family and remain comparable. It is mutually exclusive with

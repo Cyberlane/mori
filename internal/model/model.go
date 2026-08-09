@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 11
+const SchemaVersion = 12
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -23,17 +23,18 @@ type Location struct {
 
 // Fragment is one normalized source syntax tree.
 type Fragment struct {
-	Location     Location   `json:"location"`
-	StartByte    uint       `json:"-"`
-	EndByte      uint       `json:"-"`
-	TokenCount   int        `json:"token_count"`
-	FeatureCount int        `json:"feature_count"`
-	Fingerprint  string     `json:"fingerprint"`
-	NestingDepth int        `json:"nesting_depth"`
-	Parent       *Location  `json:"parent,omitempty"`
-	ParentID     string     `json:"parent_fingerprint,omitempty"`
-	NestedCount  int        `json:"nested_function_count"`
-	Features     FeatureBag `json:"-"`
+	Location       Location   `json:"location"`
+	StartByte      uint       `json:"-"`
+	EndByte        uint       `json:"-"`
+	TokenCount     int        `json:"token_count"`
+	FeatureCount   int        `json:"feature_count"`
+	Fingerprint    string     `json:"fingerprint"`
+	NestingDepth   int        `json:"nesting_depth"`
+	Parent         *Location  `json:"parent,omitempty"`
+	ParentID       string     `json:"parent_fingerprint,omitempty"`
+	NestedCount    int        `json:"nested_function_count"`
+	Features       FeatureBag `json:"-"`
+	LiteralDigests []string   `json:"-"`
 }
 
 // FragmentSummary is the public portion of a fragment in a report.
@@ -96,17 +97,34 @@ type LocationPair struct {
 // MatchGroup is one content-pair identity at or above the configured
 // similarity threshold. One group can represent many source-location pairs.
 type MatchGroup struct {
-	ID             string            `json:"content_pair_id"`
-	Similarity     float64           `json:"similarity"`
-	LocationPairs  int               `json:"location_pairs"`
-	Focused        bool              `json:"focused"`
-	FocusedCount   int               `json:"focused_occurrences"`
-	Profiles       []FragmentProfile `json:"profiles"`
-	ShapeSummary   []string          `json:"shape_summary"`
-	SharedFeatures []SharedFeature   `json:"shared_features"`
-	ReviewPriority int               `json:"review_priority"`
-	ReviewSignals  []string          `json:"review_signals"`
-	PathPairs      []LocationPair    `json:"-"`
+	ID              string            `json:"content_pair_id"`
+	Similarity      float64           `json:"similarity"`
+	LocationPairs   int               `json:"location_pairs"`
+	Focused         bool              `json:"focused"`
+	FocusedCount    int               `json:"focused_occurrences"`
+	Profiles        []FragmentProfile `json:"profiles"`
+	ShapeSummary    []string          `json:"shape_summary"`
+	SharedFeatures  []SharedFeature   `json:"shared_features"`
+	ReviewPriority  int               `json:"review_priority"`
+	ReviewSignals   []string          `json:"review_signals"`
+	LiteralEvidence *LiteralEvidence  `json:"literal_evidence,omitempty"`
+	PathPairs       []LocationPair    `json:"-"`
+}
+
+// LiteralEvidence summarizes source-free literal-position comparisons for a
+// match group. Literal values and their digests are never serialized.
+type LiteralEvidence struct {
+	ComparedPairs             int `json:"compared_location_pairs"`
+	PairsWithDifferences      int `json:"pairs_with_differences"`
+	MaxDifferingPositions     int `json:"max_differing_positions"`
+	LiteralCountMismatchPairs int `json:"literal_count_mismatch_pairs"`
+}
+
+// PriorityPathRule is one deterministic presentation-only review-priority
+// rule. It never changes structural scores or content identities.
+type PriorityPathRule struct {
+	Pattern  string `json:"pattern"`
+	Priority int    `json:"priority"`
 }
 
 // WorktreeFocusConfig records one explicitly resolved Git worktree and keeps
@@ -177,25 +195,26 @@ type FileCoverage struct {
 // EffectiveConfig records the scan inputs needed to reproduce discovery and
 // pair selection.
 type EffectiveConfig struct {
-	Profile           string       `json:"profile,omitempty"`
-	ConfigPath        string       `json:"config_path,omitempty"`
-	IgnoreFiles       []string     `json:"ignore_files"`
-	RespectIgnore     bool         `json:"respect_ignore"`
-	ExcludeGenerated  bool         `json:"exclude_generated"`
-	Excludes          []string     `json:"excludes"`
-	MinTokens         int          `json:"min_tokens"`
-	MaxGroups         int          `json:"max_groups"`
-	MaxOccurrences    int          `json:"max_occurrences"`
-	MaxPairs          int          `json:"max_pairs"`
-	MaxFileBytes      int64        `json:"max_file_bytes"`
-	ComparisonDomain  string       `json:"comparison_domain"`
-	SQLDialect        string       `json:"sql_dialect"`
-	Ranking           string       `json:"ranking"`
-	SameLanguageOnly  bool         `json:"same_language_only"`
-	CrossLanguageOnly bool         `json:"cross_language_only"`
-	LanguagePairs     []string     `json:"language_pairs"`
-	BaselinePath      string       `json:"baseline_path,omitempty"`
-	Focus             *FocusConfig `json:"focus,omitempty"`
+	Profile           string             `json:"profile,omitempty"`
+	ConfigPath        string             `json:"config_path,omitempty"`
+	IgnoreFiles       []string           `json:"ignore_files"`
+	RespectIgnore     bool               `json:"respect_ignore"`
+	ExcludeGenerated  bool               `json:"exclude_generated"`
+	Excludes          []string           `json:"excludes"`
+	MinTokens         int                `json:"min_tokens"`
+	MaxGroups         int                `json:"max_groups"`
+	MaxOccurrences    int                `json:"max_occurrences"`
+	MaxPairs          int                `json:"max_pairs"`
+	MaxFileBytes      int64              `json:"max_file_bytes"`
+	ComparisonDomain  string             `json:"comparison_domain"`
+	SQLDialect        string             `json:"sql_dialect"`
+	Ranking           string             `json:"ranking"`
+	PriorityPaths     []PriorityPathRule `json:"priority_paths"`
+	SameLanguageOnly  bool               `json:"same_language_only"`
+	CrossLanguageOnly bool               `json:"cross_language_only"`
+	LanguagePairs     []string           `json:"language_pairs"`
+	BaselinePath      string             `json:"baseline_path,omitempty"`
+	Focus             *FocusConfig       `json:"focus,omitempty"`
 }
 
 // Report is the stable JSON and text reporting model.

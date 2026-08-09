@@ -224,7 +224,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `11`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `12`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while
@@ -238,6 +238,9 @@ revision or date from the version string. Inspect:
 - `warnings`: disclose every incomplete or failed input;
 - `file_coverage`: inspect every zero-fragment file, generated classification,
   exclusion status, skipped-fragment count, and parse-diagnostic count;
+- `literal_evidence`: when present, disclose positional literal drift while
+  inspecting source; values are intentionally omitted and the signal does not
+  alter structural similarity;
 - structured parse diagnostics: inspect the grammar, source range, node kind,
   and skipped-fragment count;
 - `truncated`: state when lower-ranked content identities are omitted;
@@ -261,6 +264,9 @@ revision or date from the version string. Inspect:
   when occurrence sampling is truncated;
 - `comparison_domain` and `fragment_kind`: require compatible domains and use
   the kind to describe functions versus queries accurately;
+- `configuration.priority_paths`: disclose every project-supplied path weight
+  and treat matching `priority-path:` signals as presentation policy only, not
+  inferred security or refactoring confidence;
 - `similarity`: report it as structural similarity only; and
 - `shape_summary` and `shared_features`: use them to explain why a group ranked
   highly without treating the summary as behavioral evidence.

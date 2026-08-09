@@ -174,7 +174,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 11,
+  "schema_version": 12,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -212,6 +212,7 @@ The top-level shape is:
     "comparison_domain": "code",
     "sql_dialect": "generic",
     "ranking": "review",
+    "priority_paths": [],
     "same_language_only": true,
     "cross_language_only": false,
     "language_pairs": []
@@ -221,7 +222,12 @@ The top-level shape is:
 
 Group objects include `content_pair_id`, `location_pairs`, one or two content
 profiles, occurrence counts and locations, a shape summary, and raw shared
-features. Fragment occurrences expose language family, `comparison_domain`,
+features. Schema 12 adds bounded `literal_evidence` when at least one compared
+location pair contains literals. It reports compared pairs, pairs with
+differences, the maximum differing positions, and literal-count mismatches.
+Literal values and their internal digests are never serialized; this evidence
+does not affect scores, fingerprints, ordering, or baselines. Fragment
+occurrences expose language family, `comparison_domain`,
 `fragment_kind`, nesting depth, parent identity, and the number of excluded
 nested functions. The current domains are `code` with `function` and shell
 `script` fragments, and `sql-query` with `query` fragments. Cross-domain and
@@ -244,6 +250,12 @@ same-named pair across files, 1 for any cross-file pair, and 1 when the content
 identity represents multiple location pairs. The existing structural
 comparator breaks ties. This is a shortlist-ordering heuristic, not semantic
 or refactoring confidence.
+
+Schema 12 also records effective `priority_paths`. Each matching configured
+rule adds its declared weight once per group and emits a
+`priority-path:GLOB(+WEIGHT)` signal. These rules are deterministic,
+presentation-only project policy; Mori does not infer security, reachability,
+or domain risk from source names.
 
 Schema 9 added a deterministic `file_coverage` array with one entry per analyzed
 or generated-excluded supported file. Each entry records its language, review

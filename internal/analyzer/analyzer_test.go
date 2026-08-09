@@ -199,7 +199,7 @@ func TestReviewPriorityUsesOnlyExplainableLocationSignals(t *testing.T) {
 			},
 		},
 	}
-	priority, signals := reviewPriority(candidate)
+	priority, signals := reviewPriority(candidate, nil)
 	if priority != 10 {
 		t.Fatalf("priority = %d, want 10", priority)
 	}
@@ -212,6 +212,33 @@ func TestReviewPriorityUsesOnlyExplainableLocationSignals(t *testing.T) {
 	}
 	if !reflect.DeepEqual(signals, want) {
 		t.Fatalf("signals = %#v, want %#v", signals, want)
+	}
+}
+
+func TestReviewPriorityAddsConfiguredPathRulesOnce(t *testing.T) {
+	t.Parallel()
+
+	candidate := &groupCandidate{
+		locationPairs: 2,
+		pathPairs: map[string]model.LocationPair{
+			"one": {
+				Left:  model.Location{Path: "internal/auth/file.go", Name: "authorize"},
+				Right: model.Location{Path: "internal/store/file.go", Name: "authorize"},
+			},
+			"two": {
+				Left:  model.Location{Path: "internal/auth/other.go", Name: "authorize"},
+				Right: model.Location{Path: "internal/store/other.go", Name: "authorize"},
+			},
+		},
+	}
+	priority, signals := reviewPriority(candidate, []model.PriorityPathRule{{
+		Pattern: "**/auth/**", Priority: 25,
+	}})
+	if priority != 35 {
+		t.Fatalf("priority = %d, want base 10 plus configured 25", priority)
+	}
+	if signals[len(signals)-1] != "priority-path:**/auth/**(+25)" {
+		t.Fatalf("signals = %#v", signals)
 	}
 }
 
@@ -484,6 +511,38 @@ func TestCollectorGroupsEquivalentLocationPairs(t *testing.T) {
 	if group.LocationPairs != 3 || len(group.Profiles) != 1 ||
 		group.Profiles[0].OccurrenceCount != 3 || len(group.Profiles[0].Occurrences) != 3 {
 		t.Fatalf("group = %+v", group)
+	}
+}
+
+func TestCollectorReportsSourceFreeLiteralDrift(t *testing.T) {
+	t.Parallel()
+
+	report := model.Report{}
+	collector := matchCollector{
+		ctx: context.Background(),
+		options: Options{
+			Threshold: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10,
+		},
+		report:           &report,
+		groups:           make(map[string]*groupCandidate),
+		suppressedGroups: make(map[string]struct{}),
+	}
+	left := groupingFragment("left.go", 1)
+	left.LiteralDigests = []string{"same", "jpeg"}
+	right := groupingFragment("right.go", 1)
+	right.LiteralDigests = []string{"same", "avif", "fallback"}
+	if err := collector.score(left, right); err != nil {
+		t.Fatalf("score: %v", err)
+	}
+	collector.finish()
+
+	if len(report.Groups) != 1 || report.Groups[0].LiteralEvidence == nil {
+		t.Fatalf("groups = %#v, want literal evidence", report.Groups)
+	}
+	evidence := report.Groups[0].LiteralEvidence
+	if evidence.ComparedPairs != 1 || evidence.PairsWithDifferences != 1 ||
+		evidence.MaxDifferingPositions != 2 || evidence.LiteralCountMismatchPairs != 1 {
+		t.Fatalf("literal evidence = %#v", evidence)
 	}
 }
 
