@@ -152,10 +152,10 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "tool": {
     "name": "mori",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "revision": "<full source revision>",
     "source_date": "<UTC commit time>",
     "modified": false,
@@ -184,6 +184,8 @@ The top-level shape is:
     "max_occurrences": 20,
     "max_pairs": 5000000,
     "max_file_bytes": 2097152,
+    "comparison_domain": "code",
+    "same_language_only": true,
     "cross_language_only": false,
     "language_pairs": []
   }
@@ -196,7 +198,9 @@ features. Fragment occurrences expose language family, `comparison_domain`,
 `fragment_kind`, nesting depth, parent identity, and the number of excluded
 nested functions. The current domains are `code` with `function` fragments and
 `sql-query` with `query` fragments. Cross-domain pairs are never candidates.
-Warnings can include bounded parser node ranges and skipped-fragment counts.
+Selected comparison domains are applied before parsing. Same-language mode
+compares within review families, including TypeScript with TSX. Warnings can
+include bounded parser node ranges and skipped-fragment counts.
 Suppression fields separate affected source pairs from content identities.
 Consumers should reject or explicitly handle unknown schema versions.
 

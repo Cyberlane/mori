@@ -51,18 +51,32 @@ binary when a report needs complete, independently verifiable provenance.
 Run this from the root of a project:
 
 ```sh
-mori scan --threshold 0.85 --min-tokens 40 .
+mori scan \
+  --comparison-domain code \
+  --same-language-only \
+  --threshold 0.85 \
+  --min-tokens 40 \
+  .
 ```
 
-This looks for reasonably sized functions that are very similar. Start at
-`0.85` to reduce noise. If you want more possible matches, lower the threshold
-gradually.
+This looks for reasonably sized functions that are very similar without
+letting SQL or cross-language scaffolding compete in the result ranking. Start
+at `0.85` to reduce noise. If you want more possible matches, lower the
+threshold gradually.
 
 To look only for matches between different languages:
 
 ```sh
-mori scan --cross-language-only --threshold 0.65 .
+mori scan \
+  --comparison-domain code \
+  --cross-language-only \
+  --threshold 0.65 \
+  --min-tokens 40 \
+  .
 ```
+
+Lower `--min-tokens` toward 12 only for a deliberately broad exploratory pass;
+small callbacks and wrappers commonly dominate at that floor.
 
 TypeScript and TSX are one language family. To compare only Go with that
 family, use:
@@ -95,7 +109,11 @@ language-specific behavior.
 To review structurally similar SQL queries:
 
 ```sh
-mori scan --threshold 0.70 --min-tokens 12 examples/sql-queries
+mori scan \
+  --comparison-domain sql-query \
+  --threshold 0.70 \
+  --min-tokens 12 \
+  examples/sql-queries
 ```
 
 SQL queries are compared only with SQL queries, never with code functions.
@@ -124,7 +142,8 @@ Store repeatable project settings in `.mori.json`:
   "threshold": 0.85,
   "min_tokens": 40,
   "max_groups": 250,
-  "language_pairs": ["go,typescript"],
+  "comparison_domain": "code",
+  "same_language_only": true,
   "exclude": ["**/*_test.go"]
 }
 ```
@@ -139,9 +158,10 @@ Write results as JSON for a script or CI system:
 mori scan --format json .
 ```
 
-Schema-5 reports embed deterministic `tool` build provenance, comparison
-domain and fragment-kind metadata, and exact focus metadata. They do not
-include a scan timestamp, hostname, username, source body, diff, or Git remote.
+Schema-6 reports embed deterministic `tool` build provenance, comparison
+selection, domain and fragment-kind metadata, and exact focus metadata. They do
+not include a scan timestamp, hostname, username, source body, diff, or Git
+remote.
 
 Fail a CI job when Mori finds a match at your threshold:
 
@@ -197,8 +217,9 @@ Run `mori languages` to see the languages in your installed version.
 
 ## Known Parser Limits
 
-Tree-sitter recovery is visible in report warnings, and any comparison fragment
-containing a parse error is skipped. SQL dialect extensions outside Mori's
+Tree-sitter recovery is visible in report warnings as potentially incomplete
+comparison coverage, and any comparison fragment containing a parse error is
+skipped with an explicit count. SQL dialect extensions outside Mori's
 pinned grammar and Mori's bounded SQLite/SQLC adaptations may therefore produce
 diagnostics or incomplete coverage. Mori also applies a bounded,
 byte-preserving repair for recognized cases of the

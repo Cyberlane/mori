@@ -7,7 +7,8 @@ different file or `--no-config` to disable configuration loading.
 Unknown fields, malformed JSON, non-regular files, and files larger than one
 MiB are errors. Relative `baseline` paths resolve from the configuration
 file's directory. Command-line values override configured values; repeated
-`--exclude` and `--language-pair` values are additive.
+`--exclude` and `--language-pair` values are additive. A command-line
+`--comparison-domain` overrides the configured domain.
 
 ## Fields
 
@@ -21,8 +22,10 @@ file's directory. Command-line values override configured values; repeated
   "max_file_bytes": 2097152,
   "workers": 8,
   "format": "json",
+  "comparison_domain": "code",
+  "same_language_only": true,
   "cross_language_only": false,
-  "language_pairs": ["go,typescript"],
+  "language_pairs": [],
   "fail_on_match": false,
   "baseline": "mori-baseline.json",
   "baseline_scope": "content",
@@ -31,9 +34,16 @@ file's directory. Command-line values override configured values; repeated
 }
 ```
 
-`language_pairs` accepts language IDs or families. The `typescript` selector
-includes both TypeScript and TSX. It cannot be combined with
-`cross_language_only`.
+`comparison_domain` accepts one case-insensitive domain ID printed by
+`mori languages`. The selected domain is applied before parsing, so other
+domains do not affect file counts, warnings, focus, or pair limits. An empty or
+omitted value selects every registered domain.
+
+`same_language_only` compares within review families. TypeScript and TSX are
+one family and remain comparable. It is mutually exclusive with
+`cross_language_only` and `language_pairs`. `language_pairs` accepts language
+IDs or families; the `typescript` selector includes both TypeScript and TSX.
+Explicit pairs must belong to a selected comparison domain.
 
 `max_groups` bounds distinct content-pair identities. `max_occurrences` bounds
 the locations shown for each fingerprint while retaining the exact occurrence
@@ -58,7 +68,10 @@ Ignore files affect directory traversal only. A file passed explicitly remains
 visible. Repeated `--exclude` globs remain additive and continue to exclude an
 explicitly requested file. Use `--no-ignore` to disable both ignore-file types.
 
-Schema-5 JSON reports record the effective options and every loaded ignore
+Schema-6 JSON reports record the effective options and every loaded ignore
 file under `configuration` so a scan can be reproduced. Review focus remains
 CLI-only: `--focus-path` is repeatable, and `--changed-since` always requires
 an explicit locally available Git revision.
+
+See [Scan selection controls](scan-selection.md) for the complete validation,
+execution, compatibility, and reporting contract.

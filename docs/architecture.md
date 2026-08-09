@@ -28,6 +28,7 @@ overlap without claiming behavioral equivalence.
 - Skips dependency, VCS, and build-output directories.
 - Loads nested `.gitignore` and `.moriignore` rules for directory scans.
 - Applies repeatable doublestar exclude globs.
+- Applies selected comparison domains before file-size checks and parsing.
 - Rejects discovered symlinks and symlinked components below trusted scan
   roots.
 - Enforces a file-size limit before and during reads.
@@ -123,12 +124,13 @@ bag \(B\), weighted Jaccard cannot exceed:
 
 Pairs whose upper bound is below the threshold are never scored. Fragments are
 first partitioned by comparison domain, so SQL queries are never compared with
-code functions. Cross-language scans then group fragments by review family, so
-TypeScript and TSX are not treated as different languages. Explicit
-language-pair selectors expand families into concrete grammar-ID pairs within
-one compatible domain without enumerating unrelated combinations. The
-`--max-pairs` cap bounds the remaining scored pairs and fails with an
-actionable error rather than returning an incomplete report.
+code functions. Same-language scans score within each review family, while
+cross-language scans score across review families. TypeScript and TSX therefore
+remain same-family comparisons. Explicit language-pair selectors expand
+families into concrete grammar-ID pairs within one compatible domain without
+enumerating unrelated combinations. The `--max-pairs` cap bounds the remaining
+scored pairs and fails with an actionable error rather than returning an
+incomplete report.
 
 Qualifying location pairs are aggregated by their stable content-pair ID. The
 default report retains the best 100 distinct groups and at most 20 locations
@@ -183,10 +185,10 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-5 reports expose deterministic binary provenance, comparison domains,
-fragment kinds, optional exact focus metadata, grouped content-pair identities,
-fragment fingerprints,
-occurrence samples and exact counts, nesting metadata, structured parser
+Schema-6 reports expose deterministic binary provenance, comparison selection,
+comparison domains, fragment kinds, optional exact focus metadata, grouped
+content-pair identities, fragment fingerprints, occurrence samples and exact
+counts, nesting metadata, structured parser
 diagnostics, effective configuration, ignore sources, and separate baseline
 suppression counts for identities and source-location pairs.
 
