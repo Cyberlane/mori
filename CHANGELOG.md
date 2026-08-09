@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-09
+
 ### Added
 
 - Added `review`, `explore`, and `sql` scan profiles with deterministic
@@ -340,7 +342,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/Cyberlane/mori/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Cyberlane/mori/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Cyberlane/mori/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Cyberlane/mori/compare/v0.13.0...v0.14.0
