@@ -144,7 +144,7 @@ func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
 		t.Fatalf("Text: %v", err)
 	}
 	for _, expected := range []string{
-		"nested function bodies are excluded from this score",
+		"function bodies are excluded from this score",
 		"outer body only",
 		"ERROR at 3:4-3:5",
 		"2 comparison fragment(s) containing parse errors skipped",
@@ -152,6 +152,22 @@ func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("output missing %q:\n%s", expected, output.String())
 		}
+	}
+}
+
+func TestFormatFragmentDistinguishesShellTopLevelBody(t *testing.T) {
+	t.Parallel()
+
+	rendered := formatFragment(model.FragmentSummary{
+		Location: model.Location{
+			Path: "script.zsh", Language: "zsh", LanguageFamily: "shell",
+			ComparisonDomain: "code", FragmentKind: "script", Name: "top-level",
+			StartLine: 1, EndLine: 20,
+		},
+		NestedCount: 2,
+	})
+	if !strings.Contains(rendered, "top-level body only, 2 function(s) evaluated separately") {
+		t.Fatalf("script fragment = %q", rendered)
 	}
 }
 

@@ -69,6 +69,25 @@ func File(
 	warnings := make([]model.Warning, 0, 1)
 	fragments := make([]model.Fragment, 0)
 	skippedFragments := 0
+	if fragmentKind := file.Language.TopLevelFragmentKind(root); fragmentKind != "" {
+		if root.HasError() {
+			skippedFragments++
+		} else if _, err := appendFragment(
+			ctx,
+			root,
+			content,
+			file,
+			minTokens,
+			fragmentKind,
+			"top-level",
+			&fragments,
+		); err != nil {
+			return nil, []model.Warning{{
+				Path:    file.DisplayPath,
+				Message: diagnostic.Message(err),
+			}}
+		}
+	}
 	if err := collect(
 		ctx,
 		root,
@@ -124,43 +143,17 @@ func collect(
 			(current.HasError() || hasInvalidAncestor(current)) {
 			(*skippedFragments)++
 		} else if file.Language.AcceptsFragmentBoundary(current) {
-			profile, err := normalize.Build(
+			if _, err := appendFragment(
 				ctx,
 				current,
 				content,
-				file.Language.IsFragmentBoundary,
-				file.Language.ExcludesNestedBoundaries(),
-			)
-			if err != nil {
+				file,
+				minTokens,
+				file.Language.FragmentKind,
+				"",
+				fragments,
+			); err != nil {
 				return err
-			}
-			if profile.TokenCount >= minTokens {
-				start := current.StartPosition()
-				end := current.EndPosition()
-				endLine := int(end.Row) + 1
-				if end.Column == 0 && end.Row > start.Row {
-					endLine = int(end.Row)
-				}
-
-				*fragments = append(*fragments, model.Fragment{
-					Location: model.Location{
-						Path:             file.DisplayPath,
-						Language:         file.Language.ID,
-						LanguageFamily:   file.Language.Family,
-						ComparisonDomain: file.Language.ComparisonDomain,
-						FragmentKind:     file.Language.FragmentKind,
-						Name:             fragmentName(current, content, file.Language.FragmentKind),
-						StartLine:        int(start.Row) + 1,
-						EndLine:          endLine,
-					},
-					StartByte:    current.StartByte(),
-					EndByte:      current.EndByte(),
-					TokenCount:   profile.TokenCount,
-					FeatureCount: featureCount(profile.Features),
-					Fingerprint:  fingerprint.Bag(profile.Features),
-					NestedCount:  profile.Features["node:function:nested"],
-					Features:     profile.Features,
-				})
 			}
 		}
 
@@ -176,6 +169,61 @@ func collect(
 			}
 		}
 	}
+}
+
+func appendFragment(
+	ctx context.Context,
+	node *tree_sitter.Node,
+	content []byte,
+	file source.File,
+	minTokens int,
+	fragmentKind string,
+	name string,
+	fragments *[]model.Fragment,
+) (bool, error) {
+	profile, err := normalize.Build(
+		ctx,
+		node,
+		content,
+		file.Language.IsFragmentBoundary,
+		file.Language.ExcludesNestedBoundaries(),
+	)
+	if err != nil {
+		return false, err
+	}
+	if profile.TokenCount < minTokens {
+		return false, nil
+	}
+	start := node.StartPosition()
+	end := node.EndPosition()
+	endLine := int(end.Row) + 1
+	if end.Column == 0 && end.Row > start.Row {
+		endLine = int(end.Row)
+	}
+	if name == "" {
+		name = fragmentName(node, content, fragmentKind)
+	}
+
+	*fragments = append(*fragments, model.Fragment{
+		Location: model.Location{
+			Path:             file.DisplayPath,
+			Language:         file.Language.ID,
+			LanguageFamily:   file.Language.Family,
+			ComparisonDomain: file.Language.ComparisonDomain,
+			FragmentKind:     fragmentKind,
+			Name:             name,
+			StartLine:        int(start.Row) + 1,
+			EndLine:          endLine,
+		},
+		StartByte:    node.StartByte(),
+		EndByte:      node.EndByte(),
+		TokenCount:   profile.TokenCount,
+		FeatureCount: featureCount(profile.Features),
+		Fingerprint:  fingerprint.Bag(profile.Features),
+		NestedCount:  profile.Features["node:function:nested"],
+		Features:     profile.Features,
+	})
+	return true, nil
 }
 
 func hasInvalidAncestor(node *tree_sitter.Node) bool {

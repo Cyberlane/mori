@@ -126,6 +126,55 @@ func TestCrossLanguageUsesFamiliesAndExplicitPairsUseGrammarIDs(t *testing.T) {
 	}
 }
 
+func TestAnalyzeNeverComparesShellScriptsWithFunctions(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "script.zsh")
+	content := "print_value() { print -r -- \"$1\"; }\nprint -r -- \"$1\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	discovered := source.Discover([]string{root}, source.Options{})
+	result, err := Analyze(context.Background(), discovered.Files, nil, Options{
+		Threshold: 0.5, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10,
+		MaxPairs: 10, Workers: 1, SameLanguageOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if result.Fragments != 2 || result.CandidatePairs != 0 || result.TotalMatchGroups != 0 {
+		t.Fatalf("script/function partition result = %+v", result)
+	}
+
+	if err := os.WriteFile(
+		filepath.Join(root, "script.sh"),
+		[]byte("printf '%s\\n' \"$1\"\n"),
+		0o600,
+	); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	discovered = source.Discover([]string{root}, source.Options{})
+	explicit, err := Analyze(context.Background(), discovered.Files, nil, Options{
+		Threshold: 0.5, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10,
+		MaxPairs: 10, Workers: 1,
+		LanguagePairs: []LanguagePair{{Left: "bash", Right: "zsh"}},
+	})
+	if err != nil {
+		t.Fatalf("Analyze explicit pair: %v", err)
+	}
+	if explicit.CandidatePairs != 1 {
+		t.Fatalf("explicit script/function partition result = %+v", explicit)
+	}
+	for _, group := range explicit.Groups {
+		for _, pair := range group.PathPairs {
+			if pair.Left.FragmentKind != pair.Right.FragmentKind {
+				t.Fatalf("cross-kind explicit match = %#v", pair)
+			}
+		}
+	}
+}
+
 func TestAnalyzeRejectsConflictingLanguageSelectionModes(t *testing.T) {
 	t.Parallel()
 

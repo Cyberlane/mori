@@ -30,8 +30,33 @@ type Spec struct {
 	Shebangs                []string
 	newLanguage             func() *tree_sitter.Language
 	fragmentKinds           map[string]struct{}
+	topLevelKinds           map[string]struct{}
+	topLevelFragmentKind    string
 	acceptBoundary          func(*tree_sitter.Node) bool
 	excludeNestedBoundaries bool
+}
+
+// TopLevelFragmentKind returns the separate comparison kind for a recognized
+// whole-file boundary, or an empty string when the grammar has none.
+func (s Spec) TopLevelFragmentKind(node *tree_sitter.Node) string {
+	if node == nil {
+		return ""
+	}
+	if _, ok := s.topLevelKinds[node.Kind()]; !ok {
+		return ""
+	}
+	return s.topLevelFragmentKind
+}
+
+// FragmentKinds returns the independently compared fragment kinds emitted by
+// this grammar.
+func (s Spec) FragmentKinds() []string {
+	kinds := []string{s.FragmentKind}
+	if s.topLevelFragmentKind != "" && s.topLevelFragmentKind != s.FragmentKind {
+		kinds = append(kinds, s.topLevelFragmentKind)
+	}
+	sort.Strings(kinds)
+	return kinds
 }
 
 // NewLanguage returns a Tree-sitter language wrapper for this grammar.
@@ -87,6 +112,8 @@ var specs = []Spec{
 			return tree_sitter.NewLanguage(tree_sitter_bash.Language())
 		},
 		fragmentKinds:           kinds("function_definition"),
+		topLevelKinds:           kinds("program"),
+		topLevelFragmentKind:    "script",
 		excludeNestedBoundaries: true,
 	},
 	{
@@ -200,6 +227,8 @@ var specs = []Spec{
 			return tree_sitter.NewLanguage(tree_sitter_zsh.Language())
 		},
 		fragmentKinds:           kinds("function_definition"),
+		topLevelKinds:           kinds("program"),
+		topLevelFragmentKind:    "script",
 		excludeNestedBoundaries: true,
 	},
 	{
@@ -399,6 +428,7 @@ func All() []Spec {
 		spec.Extensions = append([]string(nil), spec.Extensions...)
 		spec.Shebangs = append([]string(nil), spec.Shebangs...)
 		spec.fragmentKinds = cloneKinds(spec.fragmentKinds)
+		spec.topLevelKinds = cloneKinds(spec.topLevelKinds)
 		result[index] = spec
 	}
 	sort.Slice(result, func(i, j int) bool {

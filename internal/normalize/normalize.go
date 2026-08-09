@@ -12,9 +12,9 @@ import (
 )
 
 // Version identifies the normalization contract used to build feature bags.
-// Bump it whenever the feature vocabulary, weights, canonical mappings, or
-// semantic-hint list changes.
-const Version = 6
+// Bump it whenever the selected comparison-unit contract, feature vocabulary,
+// weights, canonical mappings, or semantic-hint list changes.
+const Version = 7
 
 // Profile is a normalized, language-neutral view of one syntax fragment.
 // It is not the stable content identity exposed in reports.
