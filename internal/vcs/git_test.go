@@ -91,7 +91,8 @@ func TestResolveChangedRejectsNestedRepository(t *testing.T) {
 	_, err := ResolveChanged(context.Background(), []string{
 		filepath.Join(root, "main.go"), filepath.Join(nested, "nested.go"),
 	}, "HEAD")
-	if err == nil || !strings.Contains(err.Error(), "multiple Git worktrees") {
+	if err == nil || !strings.Contains(err.Error(), "multiple Git worktrees at nested") ||
+		!strings.Contains(err.Error(), "scan that worktree separately") {
 		t.Fatalf("nested repository error = %v", err)
 	}
 }

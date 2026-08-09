@@ -100,12 +100,19 @@ func resolveChanged(
 		if !pathutil.Within(root, canonicalPath) {
 			return Changes{}, fmt.Errorf("scan spans multiple Git worktrees: %s", filepath.Base(filePath))
 		}
-		nested, boundaryErr := hasNestedGitBoundary(root, filepath.Dir(canonicalPath))
+		boundary, boundaryErr := nestedGitBoundary(root, filepath.Dir(canonicalPath))
 		if boundaryErr != nil {
 			return Changes{}, boundaryErr
 		}
-		if nested {
-			return Changes{}, fmt.Errorf("scan spans multiple Git worktrees: %s", filepath.Base(filePath))
+		if boundary != "" {
+			relative, relErr := filepath.Rel(root, boundary)
+			if relErr != nil || relative == "." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+				return Changes{}, errors.New("scan spans multiple Git worktrees")
+			}
+			return Changes{}, fmt.Errorf(
+				"scan spans multiple Git worktrees at %s; exclude and scan that worktree separately or use --focus-path",
+				filepath.ToSlash(relative),
+			)
 		}
 	}
 
@@ -323,22 +330,22 @@ func isFullSHA(value string) bool {
 	return true
 }
 
-func hasNestedGitBoundary(root string, directory string) (bool, error) {
+func nestedGitBoundary(root string, directory string) (string, error) {
 	for current := filepath.Clean(directory); current != root; current = filepath.Dir(current) {
 		if !pathutil.Within(root, current) {
-			return false, errors.New("discovered path is outside the Git worktree")
+			return "", errors.New("discovered path is outside the Git worktree")
 		}
 		_, err := os.Lstat(filepath.Join(current, ".git"))
 		if err == nil {
-			return true, nil
+			return current, nil
 		}
 		if !errors.Is(err, os.ErrNotExist) {
-			return false, fmt.Errorf("inspect nested Git worktree: %w", err)
+			return "", fmt.Errorf("inspect nested Git worktree: %w", err)
 		}
 		parent := filepath.Dir(current)
 		if parent == current {
 			break
 		}
 	}
-	return false, nil
+	return "", nil
 }
