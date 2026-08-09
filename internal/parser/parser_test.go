@@ -282,6 +282,26 @@ func TestSwiftRepairsKnownValidSyntax(t *testing.T) {
   return value
 }
 `,
+		"labeled optional subscript cast chain": `func threadID(object: [String: Any]?, thread: [String: Any]?) -> String {
+  let value = object?["threadId"] as? String ?? thread?["id"] as? String ?? "fallback"
+  return value
+}
+`,
+		"parenthesized dictionary cast chain": `func providers(root: [String: Any]) -> [[String: Any]] {
+  let values = (root["all"] as? [[String: Any]] ?? root["providers"] as? [[String: Any]] ?? [])
+  return values
+}
+`,
+		"identifier collection cast chain": `func agents(payload: Any, root: [String: Any]) -> [[String: Any]] {
+  let values = payload as? [[String: Any]] ?? root["agents"] as? [[String: Any]] ?? []
+  return values
+}
+`,
+		"dictionary cast chain": `func unwrap(payload: Any, root: [String: Any]) -> [String: Any] {
+	let value = payload as? [String: Any] ?? root
+	return root["data"] as? [String: Any] ?? value
+}
+`,
 	}
 	for name, content := range tests {
 		name, content := name, content
