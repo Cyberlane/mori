@@ -50,6 +50,8 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 	switch args[0] {
 	case "scan":
 		return runScan(ctx, args[1:], stdout, stderr)
+	case "init":
+		return runInit(args[1:], stdout, stderr)
 	case "baseline":
 		return runBaseline(ctx, args[1:], stdout, stderr)
 	case "languages":
@@ -75,6 +77,7 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 }
 
 type scanOptions struct {
+	profile            string
 	excludes           stringList
 	languagePairs      stringList
 	comparisonDomain   string
@@ -125,6 +128,7 @@ func defaultScanOptions() scanOptions {
 }
 
 func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
+	flags.StringVar(&options.profile, "profile", options.profile, "scan profile: review, explore, or sql")
 	flags.Float64Var(&options.threshold, "threshold", options.threshold, "minimum weighted Jaccard score, from 0 to 1")
 	flags.IntVar(&options.minTokens, "min-tokens", options.minTokens, "minimum normalized AST tokens per fragment")
 	flags.IntVar(&options.maxGroups, "max-groups", options.maxGroups, "maximum reported content-pair groups; 0 is unlimited")
@@ -258,6 +262,11 @@ func parseScanOptions(
 		}
 		return scanOptions{}, nil, exitUsage, false
 	}
+	visited := make(map[string]bool)
+	flags.Visit(func(value *flag.Flag) {
+		visited[value.Name] = true
+	})
+	reconcileCLISelection(&options, visited)
 	options.respectIgnore = !options.noIgnore
 	if err := validateScanOptions(options); err != nil {
 		return scanOptions{}, nil, usageError(stderr, err.Error()), false
@@ -273,7 +282,16 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 	options := defaultScanOptions()
 	options.noConfig = request.disabled
 	options.requestedConfig = request.path
+	requestedProfile, err := findProfileRequest(args)
+	if err != nil {
+		return scanOptions{}, err
+	}
 	if request.disabled {
+		if requestedProfile != "" {
+			if err := applyScanProfile(&options, requestedProfile); err != nil {
+				return scanOptions{}, err
+			}
+		}
 		return options, nil
 	}
 
@@ -288,6 +306,11 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 			return scanOptions{}, err
 		}
 		if !found {
+			if requestedProfile != "" {
+				if err := applyScanProfile(&options, requestedProfile); err != nil {
+					return scanOptions{}, err
+				}
+			}
 			return options, nil
 		}
 		path = foundPath
@@ -296,9 +319,43 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 	if err != nil {
 		return scanOptions{}, err
 	}
+	selectedProfile := settings.Profile
+	if requestedProfile != "" {
+		selectedProfile = requestedProfile
+	}
+	if selectedProfile != "" {
+		if err := applyScanProfile(&options, selectedProfile); err != nil {
+			return scanOptions{}, err
+		}
+	}
 	applyConfig(&options, settings, filepath.Dir(path))
 	options.configPath = displayCLIPath(path)
 	return options, nil
+}
+
+func findProfileRequest(args []string) (string, error) {
+	var profile string
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		switch {
+		case argument == "--profile":
+			if index+1 >= len(args) {
+				return "", errors.New("--profile requires a value")
+			}
+			index++
+			profile = args[index]
+		case strings.HasPrefix(argument, "--profile="):
+			profile = strings.TrimPrefix(argument, "--profile=")
+		}
+	}
+	if profile == "" {
+		return "", nil
+	}
+	resolved, err := resolveScanProfile(profile)
+	if err != nil {
+		return "", err
+	}
+	return resolved.name, nil
 }
 
 type configRequest struct {
@@ -362,6 +419,7 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	if settings.SameLanguageOnly != nil {
 		options.sameLanguageOnly = *settings.SameLanguageOnly
 	}
+	reconcileConfiguredSelection(options, settings)
 	if settings.FailOnMatch != nil {
 		options.failOnMatch = *settings.FailOnMatch
 	}
@@ -394,6 +452,58 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	}
 }
 
+func reconcileConfiguredSelection(options *scanOptions, settings config.Settings) {
+	sameSelected := settings.SameLanguageOnly != nil && *settings.SameLanguageOnly
+	crossSelected := settings.CrossLanguageOnly != nil && *settings.CrossLanguageOnly
+	pairsSelected := len(settings.LanguagePairs) > 0
+	if sameSelected && !crossSelected {
+		options.crossLanguageOnly = false
+		if !pairsSelected {
+			options.languagePairs = nil
+		}
+	}
+	if crossSelected && !sameSelected {
+		options.sameLanguageOnly = false
+		if !pairsSelected {
+			options.languagePairs = nil
+		}
+	}
+	if pairsSelected {
+		if settings.SameLanguageOnly == nil {
+			options.sameLanguageOnly = false
+		}
+		if settings.CrossLanguageOnly == nil {
+			options.crossLanguageOnly = false
+		}
+	}
+}
+
+func reconcileCLISelection(options *scanOptions, visited map[string]bool) {
+	sameSelected := visited["same-language-only"] && options.sameLanguageOnly
+	crossSelected := visited["cross-language-only"] && options.crossLanguageOnly
+	pairsSelected := visited["language-pair"]
+	if sameSelected && !crossSelected {
+		options.crossLanguageOnly = false
+		if !pairsSelected {
+			options.languagePairs = nil
+		}
+	}
+	if crossSelected && !sameSelected {
+		options.sameLanguageOnly = false
+		if !pairsSelected {
+			options.languagePairs = nil
+		}
+	}
+	if pairsSelected {
+		if !visited["same-language-only"] {
+			options.sameLanguageOnly = false
+		}
+		if !visited["cross-language-only"] {
+			options.crossLanguageOnly = false
+		}
+	}
+}
+
 func resolveConfigPath(base string, path string) string {
 	if filepath.IsAbs(path) {
 		return filepath.Clean(path)
@@ -402,6 +512,11 @@ func resolveConfigPath(base string, path string) string {
 }
 
 func validateScanOptions(options scanOptions) error {
+	if options.profile != "" {
+		if _, err := resolveScanProfile(options.profile); err != nil {
+			return err
+		}
+	}
 	if math.IsNaN(options.threshold) || math.IsInf(options.threshold, 0) ||
 		options.threshold <= 0 || options.threshold > 1 {
 		return errors.New("--threshold must be greater than 0 and at most 1")
@@ -731,6 +846,7 @@ func executeScan(
 		return result, err
 	}
 	result.Configuration = model.EffectiveConfig{
+		Profile:           options.profile,
 		ConfigPath:        options.configPath,
 		IgnoreFiles:       discovered.IgnoreFiles,
 		RespectIgnore:     options.respectIgnore,
@@ -1207,6 +1323,7 @@ func writeRootUsage(writer io.Writer) error {
 		"森 (mori) — cross-language structural similarity for source code\n",
 		"\nUsage:\n",
 		"  mori scan [options] [path ...]\n",
+		"  mori init [--profile review|explore|sql] [--stdout | [--force] [directory]]\n",
 		"  mori baseline update --baseline <path> [options] [path ...]\n",
 		"  mori baseline prune --baseline <path> [options] [path ...]\n",
 		"  mori languages\n",

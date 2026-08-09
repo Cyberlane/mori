@@ -6,15 +6,49 @@ different file or `--no-config` to disable configuration loading.
 
 Unknown fields, malformed JSON, non-regular files, and files larger than one
 MiB are errors. Relative `baseline` paths resolve from the configuration
-file's directory. Command-line values override configured values; repeated
-`--exclude` and `--language-pair` values are additive. A command-line
-`--comparison-domain` overrides the configured domain. `--sql-dialect`
+file's directory. A selected profile supplies defaults, explicit configuration
+fields override profile values, and explicit command-line values override
+both. Repeated `--exclude` and `--language-pair` values are additive. A
+command-line `--comparison-domain` overrides the configured domain. `--sql-dialect`
 overrides the configured SQL parser dialect.
+
+Create a review-oriented config with `mori init [directory]`. The command
+writes deterministic, explicit values so the file remains reviewable if a
+future Mori version changes a profile. It never replaces an existing
+`.mori.json` unless `--force` is supplied. `mori init --stdout` writes the
+template without changing the filesystem, and `--profile review|explore|sql`
+selects the template.
+
+## Profiles
+
+`profile` accepts:
+
+- `review`: same-language code, threshold `0.85`, 40-token floor, at most 250
+  groups and 10 retained occurrences per fingerprint, review ranking,
+  generated-source exclusion, and required aggregate coverage;
+- `explore`: the broad compatibility defaults—threshold `0.70`, 12-token
+  floor, at most 100 groups, structural ranking, every comparison domain, and
+  no required coverage or generated-source exclusion; or
+- `sql`: SQL-query comparison, threshold `0.70`, 12-token floor, at most 250
+  groups and 10 retained occurrences per fingerprint, review ranking,
+  generated-source exclusion, and required aggregate coverage.
+
+Profiles deliberately do not guess project-specific test, migration, generated
+router, or framework exclusions. Add those only after auditing the repository's
+source categories and the first report.
+
+The selected profile is recorded in schema-11 reports. Omitting `profile`
+retains the legacy defaults. A CLI `--profile` replaces a configured profile;
+explicit fields from the config are then applied, followed by explicit CLI
+flags. An explicit language-selection mode replaces the profile's mode, so
+`--profile review --cross-language-only` does not require a separate
+`--same-language-only=false` flag.
 
 ## Fields
 
 ```json
 {
+  "profile": "review",
   "threshold": 0.85,
   "min_tokens": 40,
   "max_groups": 250,
@@ -104,8 +138,8 @@ Ignore files affect directory traversal only. A file passed explicitly remains
 visible. Repeated `--exclude` globs remain additive and continue to exclude an
 explicitly requested file. Use `--no-ignore` to disable both ignore-file types.
 
-Schema-10 JSON reports record the effective options and every loaded ignore
-file under `configuration` so a scan can be reproduced. Review focus remains
+Schema-11 JSON reports record the effective profile, options, and every loaded
+ignore file under `configuration` so a scan can be reproduced. Review focus remains
 CLI-only: `--focus-path` is repeatable, `--changed-since` always requires an
 explicit locally available Git revision, and repeatable
 `--changed-worktree PATH=REVISION` values give every additional Git worktree

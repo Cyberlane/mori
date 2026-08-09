@@ -7,6 +7,22 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added `review`, `explore`, and `sql` scan profiles with deterministic
+  defaults and explicit config/CLI precedence.
+- Added `mori init` for deterministic `.mori.json` scaffolding, including
+  stdout-only inspection, no-clobber creation, and explicit forced replacement
+  of regular files.
+
+### Changed
+
+- Machine-readable reports now use schema version 11 and record the selected
+  scan profile. Normalization remains version 7 and baseline schema remains
+  version 2.
+- Mori's bundled review skill and self-review config now use the conservative
+  `review` profile while keeping project exclusions explicit.
+
 ## [0.16.0] - 2026-08-09
 
 ### Added

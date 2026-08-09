@@ -224,8 +224,9 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-10 reports expose deterministic binary provenance, comparison selection,
-comparison domains, fragment kinds, optional exact focus metadata, grouped
+Schema-11 reports expose deterministic binary provenance, the selected scan
+profile, comparison selection, comparison domains, fragment kinds, optional
+exact focus metadata, grouped
 content-pair identities, fragment fingerprints, occurrence samples and exact
 counts, nesting metadata, structured parser
 diagnostics, effective configuration, ignore sources, and separate baseline

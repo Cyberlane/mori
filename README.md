@@ -51,18 +51,29 @@ binary when a report needs complete, independently verifiable provenance.
 Run this from the root of a project:
 
 ```sh
-mori scan \
-  --comparison-domain code \
-  --same-language-only \
-  --threshold 0.85 \
-  --min-tokens 40 \
-  .
+mori scan --profile review .
 ```
 
-This looks for reasonably sized functions that are very similar without
-letting SQL or cross-language scaffolding compete in the result ranking. Start
-at `0.85` to reduce noise. If you want more possible matches, lower the
-threshold gradually.
+The `review` profile selects same-language code, a `0.85` threshold,
+a 40-token floor, review-oriented ordering, generated-source exclusion, and a
+required aggregate coverage check. It is a conservative shortlist for manual
+source review, not a duplicate-code verdict. It cannot infer which tests,
+migrations, or repetitive framework files are intentional for your project;
+add those exclusions after reviewing the first report.
+
+To record the profile as explicit project settings, create `.mori.json` and
+then review its exclusions:
+
+```sh
+mori init
+mori scan .
+```
+
+`mori init` preserves an existing config unless `--force` is supplied. Use
+`mori init --stdout` to inspect or redirect the deterministic template without
+writing a file. Bare `mori scan` retains the broad pre-profile defaults for
+compatibility; use `--profile explore` when that broader intent should be
+visible in the report.
 
 To look only for matches between different languages:
 
@@ -176,6 +187,7 @@ Store repeatable project settings in `.mori.json`:
 
 ```json
 {
+  "profile": "review",
   "threshold": 0.85,
   "min_tokens": 40,
   "max_groups": 250,
@@ -186,6 +198,11 @@ Store repeatable project settings in `.mori.json`:
   "exclude": ["**/*_test.go"]
 }
 ```
+
+Profiles supply named defaults. Explicit fields in `.mori.json` override the
+selected profile, and explicit command-line flags override both. A command-line
+`--profile` replaces the configured profile before those explicit fields are
+applied.
 
 Bash/POSIX shell and Zsh use dedicated parsers in one `shell` review family.
 They are included together by `--same-language-only`; use an explicit pair for
@@ -229,7 +246,8 @@ the report and exit with status `4` when either condition occurs:
 mori scan --format json --require-coverage .
 ```
 
-Schema-10 reports embed deterministic `tool` build provenance, comparison
+Schema-11 reports embed deterministic `tool` build provenance, the selected
+profile, comparison
 selection, domain and fragment-kind metadata, exact focus metadata, and a
 per-file coverage inventory including generated-source classification. They do
 not include a scan timestamp, hostname, username, source body, diff, or Git
@@ -273,7 +291,7 @@ mori scan \
 `--changed-worktree PATH=REVISION` values describe the other worktrees. Mori
 requires every discovered file to belong to a resolved root, never inherits a
 parent revision for a nested repository, and records each root's requested
-base, full resolved commits, changed paths, and deleted paths in schema-10 JSON.
+base, full resolved commits, changed paths, and deleted paths in schema-11 JSON.
 Use only repeated `--changed-worktree` values when every scanned root should be
 explicit. Excluding and scanning a nested worktree separately remains valid;
 never interpret an excluded repository as unchanged. Mori bounds one scan to
@@ -381,10 +399,10 @@ Run Mori's explicit production-code self-review profile with:
 make dogfood
 ```
 
-The profile in `configs/self-review.mori.json` is not auto-discovered. It scans
-same-language code at the 0.85 threshold and 40-token floor while excluding
-tests and examples, so normal development and cross-language example commands
-keep their own selection settings.
+The config in `configs/self-review.mori.json` is not auto-discovered. It records
+the `review` profile plus explicit release-stable values and repository-specific
+exclusions, so normal development and cross-language example commands keep
+their own selection settings.
 
 ## License
 

@@ -20,6 +20,13 @@ similarity score evidence of semantic or behavioral equivalence.
 
 ## Command-line contract
 
+`--profile review|explore|sql` applies a named set of defaults before explicit
+configuration fields and command-line flags. `review` is the conservative
+same-language code shortlist, `explore` names the broad compatibility defaults,
+and `sql` selects query review. Bare scans retain the compatibility defaults
+without reporting a selected profile. See [Project configuration](configuration.md)
+for the exact values and precedence contract.
+
 `--comparison-domain <domain>` accepts one case-insensitive domain identifier
 shown by `mori languages`, currently `code` or `sql-query`. Omitting it selects
 every registered domain.
@@ -109,11 +116,12 @@ source constructs that are not comparison units, such as SQL DDL.
 
 ## Report and compatibility contract
 
-Schema version 8 retains the effective SQL parser added in schema 7 and the
-selection fields under `configuration`:
+Schema version 11 retains the effective SQL parser and selection fields under
+`configuration` and adds the selected named profile when one was used:
 
 ```json
 {
+  "profile": "review",
   "comparison_domain": "code",
   "sql_dialect": "generic",
   "same_language_only": true
@@ -126,8 +134,8 @@ to reject or explicitly handle unknown report schema versions.
 
 Domain and family selection do not change fragment features. SQL dialect
 selection chooses a different parser and is therefore recorded explicitly.
-Schema 8 additionally records explicit multi-worktree Git focus; it does not
-change selection or normalization. The current normalization version is 7
+Earlier schemas introduced explicit multi-worktree Git focus; schema 11 does
+not change normalization or baseline identities. The current normalization version is 7
 because shell top-level `script` comparison units extend the selected fragment
 set while excluding named function bodies. Baselines created with an older
 normalization version must be reviewed and regenerated. Changing a selection
