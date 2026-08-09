@@ -7,6 +7,26 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-09
+
+### Added
+
+- Added explicit `--embedded-sql` extraction for direct string arguments to a
+  bounded set of Go database method names. Extracted queries use the selected
+  SQL dialect, retain host literal locations and parent functions, group
+  multi-statement strings as one unit, and expose parser or resource-limit
+  warnings.
+- Added opt-in fixed-size `block` comparison fragments inside code functions,
+  with configurable statement-window and per-function bounds, duplicate-span
+  removal, direct function-parent linkage, and same-file overlap suppression.
+
+### Changed
+
+- Machine-readable reports now use schema version 13 and record every embedded
+  SQL and statement-block option. Normalization version 8 covers the expanded
+  opt-in comparison-unit contract; existing baselines must be reviewed and
+  regenerated. Baseline schema remains version 2.
+
 ## [0.18.0] - 2026-08-09
 
 ### Added
