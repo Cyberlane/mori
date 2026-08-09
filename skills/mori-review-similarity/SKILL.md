@@ -63,6 +63,11 @@ nested repositories, then compare that inventory with `mori languages`. State
 which meaningful source is supported, excluded, nested, or unexamined. Do not
 infer repository-wide coverage from Mori's discovered-file count alone.
 
+`mori languages` lists the direct and `/usr/bin/env` interpreter names Mori
+recognizes for extensionless files. Mori does not require the executable bit
+and does not execute the interpreter. An extension takes precedence over a
+conflicting shebang.
+
 Use `--require-coverage` for review and CI commands. Exit status `4` means Mori
 found no supported files or extracted no comparison fragments. The report is
 still written and contains a deterministic `coverage` warning; classify the
@@ -149,6 +154,8 @@ mori scan \
 Never combine
 `--cross-language-only` with `--same-language-only` or `--language-pair`.
 TypeScript and TSX belong to one family and do not count as cross-language.
+Bash/POSIX shell and Zsh likewise belong to the `shell` family. Use
+`--language-pair bash,zsh` when only cross-dialect shell results are wanted.
 Lower `--min-tokens` toward 12 only when a deliberately broad exploratory pass
 is worth the additional callbacks, wrappers, and boilerplate.
 

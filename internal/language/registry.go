@@ -7,11 +7,13 @@ import (
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
+	tree_sitter_bash "github.com/tree-sitter/tree-sitter-bash/bindings/go"
 	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
 	tree_sitter_javascript "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
 	tree_sitter_python "github.com/tree-sitter/tree-sitter-python/bindings/go"
 	tree_sitter_rust "github.com/tree-sitter/tree-sitter-rust/bindings/go"
 	tree_sitter_typescript "github.com/tree-sitter/tree-sitter-typescript/bindings/go"
+	tree_sitter_zsh "github.com/tree-sitter/tree-sitter-zsh/bindings/go"
 	tree_sitter_sql "github.com/wippyai/tree-sitter-sql/bindings/go"
 )
 
@@ -23,6 +25,7 @@ type Spec struct {
 	FragmentKind            string
 	DisplayName             string
 	Extensions              []string
+	Shebangs                []string
 	newLanguage             func() *tree_sitter.Language
 	fragmentKinds           map[string]struct{}
 	acceptBoundary          func(*tree_sitter.Node) bool
@@ -66,6 +69,20 @@ var javascriptFunctions = kinds(
 
 var specs = []Spec{
 	{
+		ID:               "bash",
+		Family:           "shell",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Bash / POSIX shell",
+		Extensions:       []string{".bash", ".sh"},
+		Shebangs:         []string{"bash", "dash", "sh"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_bash.Language())
+		},
+		fragmentKinds:           kinds("function_definition"),
+		excludeNestedBoundaries: true,
+	},
+	{
 		ID:               "go",
 		Family:           "go",
 		ComparisonDomain: "code",
@@ -85,6 +102,7 @@ var specs = []Spec{
 		FragmentKind:     "function",
 		DisplayName:      "JavaScript / JSX",
 		Extensions:       []string{".cjs", ".js", ".jsx", ".mjs"},
+		Shebangs:         []string{"node", "nodejs"},
 		newLanguage: func() *tree_sitter.Language {
 			return tree_sitter.NewLanguage(tree_sitter_javascript.Language())
 		},
@@ -124,6 +142,7 @@ var specs = []Spec{
 		FragmentKind:     "function",
 		DisplayName:      "Python",
 		Extensions:       []string{".py", ".pyi"},
+		Shebangs:         []string{"python", "python3"},
 		newLanguage: func() *tree_sitter.Language {
 			return tree_sitter.NewLanguage(tree_sitter_python.Language())
 		},
@@ -141,6 +160,20 @@ var specs = []Spec{
 			return tree_sitter.NewLanguage(tree_sitter_rust.Language())
 		},
 		fragmentKinds:           kinds("closure_expression", "function_item"),
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "zsh",
+		Family:           "shell",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Zsh",
+		Extensions:       []string{".zsh"},
+		Shebangs:         []string{"zsh"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_zsh.Language())
+		},
+		fragmentKinds:           kinds("function_definition"),
 		excludeNestedBoundaries: true,
 	},
 	{
@@ -232,11 +265,48 @@ func Detect(path string) (Spec, bool) {
 	return Spec{}, false
 }
 
+// DetectShebang returns the grammar named by one bounded shebang line. It does
+// not execute the interpreter or inspect any other source content.
+func DetectShebang(line string) (Spec, bool) {
+	line = strings.TrimSpace(line)
+	if !strings.HasPrefix(line, "#!") || strings.ContainsRune(line, '\x00') {
+		return Spec{}, false
+	}
+	fields := strings.Fields(strings.TrimSpace(strings.TrimPrefix(line, "#!")))
+	if len(fields) == 0 {
+		return Spec{}, false
+	}
+	interpreter := filepath.Base(fields[0])
+	if interpreter == "env" {
+		fields = fields[1:]
+		for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
+			if fields[0] == "-S" || fields[0] == "--split-string" {
+				fields = fields[1:]
+				break
+			}
+			fields = fields[1:]
+		}
+		if len(fields) == 0 || strings.Contains(fields[0], "=") {
+			return Spec{}, false
+		}
+		interpreter = filepath.Base(fields[0])
+	}
+	for _, spec := range specs {
+		for _, candidate := range spec.Shebangs {
+			if interpreter == candidate {
+				return spec, true
+			}
+		}
+	}
+	return Spec{}, false
+}
+
 // All returns all supported language specifications in display order.
 func All() []Spec {
 	result := make([]Spec, len(specs))
 	for index, spec := range specs {
 		spec.Extensions = append([]string(nil), spec.Extensions...)
+		spec.Shebangs = append([]string(nil), spec.Shebangs...)
 		spec.fragmentKinds = cloneKinds(spec.fragmentKinds)
 		result[index] = spec
 	}

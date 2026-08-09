@@ -118,6 +118,69 @@ func normalize(value string) string {
 	}
 }
 
+func TestShellGrammarAliasesPreservePositiveAndNegativeSeparation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	fixtures := map[string]string{
+		"positive.sh": `validate_email() {
+  value=$1
+  if [ -z "$value" ]; then return 1; fi
+  case "$value" in *@*.*) return 0 ;; *) return 1 ;; esac
+}
+`,
+		"renamed.zsh": `check_address() {
+  candidate=$1
+  if [ -z "$candidate" ]; then return 1; fi
+  case "$candidate" in *@*.*) return 0 ;; *) return 1 ;; esac
+}
+`,
+		"nearby.zsh": `report_items() {
+  for item in "$@"; do print -r -- "item: $item"; done
+}
+`,
+	}
+	fragments := make(map[string]model.Fragment, len(fixtures))
+	for name, content := range fixtures {
+		path := filepath.Join(root, name)
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+		spec, ok := language.Detect(path)
+		if !ok {
+			t.Fatalf("Detect(%s) returned unsupported", name)
+		}
+		parsed, warnings := parser.File(context.Background(), source.File{
+			Path: path, DisplayPath: name, Language: spec,
+		}, 1)
+		if len(warnings) != 0 || len(parsed) != 1 {
+			t.Fatalf("%s warnings/fragments = %#v/%d", name, warnings, len(parsed))
+		}
+		fragments[name] = parsed[0]
+	}
+
+	positive, _, _ := similarity.WeightedJaccard(
+		fragments["positive.sh"].Features,
+		fragments["renamed.zsh"].Features,
+	)
+	nearby, _, _ := similarity.WeightedJaccard(
+		fragments["positive.sh"].Features,
+		fragments["nearby.zsh"].Features,
+	)
+	if positive < 0.90 {
+		t.Fatalf("shell positive score = %.3f, want at least 0.90", positive)
+	}
+	if nearby >= 0.60 {
+		t.Fatalf("shell nearby-negative score = %.3f, want below 0.60", nearby)
+	}
+	for feature := range fragments["renamed.zsh"].Features {
+		if strings.Contains(feature, "variable_ref") || strings.Contains(feature, "variable_name") ||
+			strings.Contains(feature, "glob_pattern") || strings.Contains(feature, "extglob_pattern") {
+			t.Fatalf("Zsh grammar vocabulary leaked into feature %q", feature)
+		}
+	}
+}
+
 func TestSemanticOperationFamiliesAndNearbyNames(t *testing.T) {
 	t.Parallel()
 

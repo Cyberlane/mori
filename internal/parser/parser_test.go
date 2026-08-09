@@ -53,6 +53,42 @@ export const other = (input) => {
 	}
 }
 
+func TestShellDialectsExtractNamedFunctions(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"functions.sh": `first() { printf '%s\n' "$1"; }
+function second { printf '%s\n' "$1"; }
+`,
+		"functions.zsh": `first() { print -r -- "$1"; }
+function second { print -r -- "$1"; }
+`,
+	}
+	for name, content := range tests {
+		name, content := name, content
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), name)
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatalf("WriteFile: %v", err)
+			}
+			spec, ok := language.Detect(path)
+			if !ok {
+				t.Fatalf("%s grammar not detected", name)
+			}
+			fragments, warnings := File(context.Background(), source.File{
+				Path: path, DisplayPath: name, Language: spec,
+			}, 1)
+			if len(warnings) != 0 || len(fragments) != 2 {
+				t.Fatalf("fragments/warnings = %#v/%#v, want two/none", fragments, warnings)
+			}
+			if fragments[0].Location.Name != "first" || fragments[1].Location.Name != "second" {
+				t.Fatalf("names = %q/%q, want first/second", fragments[0].Location.Name, fragments[1].Location.Name)
+			}
+		})
+	}
+}
+
 func TestFileWarnsAndSkipsInvalidFragment(t *testing.T) {
 	t.Parallel()
 

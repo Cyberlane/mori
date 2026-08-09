@@ -32,9 +32,23 @@ func TestRunLanguages(t *testing.T) {
 	if code != exitSuccess {
 		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
 	}
-	for _, expected := range []string{"Go", "JavaScript / JSX", "Python", "Rust", "SQL queries", "TypeScript / TSX", "sql-query"} {
+	for _, expected := range []string{"Bash / POSIX shell", "Go", "JavaScript / JSX", "Python", "Rust", "SQL queries", "TypeScript / TSX", "Zsh", "shell", "sql-query", "bash, dash, sh"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Errorf("languages output missing %q", expected)
+		}
+	}
+}
+
+func TestRunLanguagesHelp(t *testing.T) {
+	t.Parallel()
+
+	for _, argument := range []string{"--help", "-h"} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := Run(context.Background(), []string{"languages", argument}, &stdout, &stderr)
+		if code != exitSuccess || stderr.Len() != 0 ||
+			!strings.Contains(stdout.String(), "extensionless-script shebang interpreters") {
+			t.Fatalf("languages %s = %d/%q/%q", argument, code, stdout.String(), stderr.String())
 		}
 	}
 }
@@ -69,6 +83,48 @@ func TestRunScanSQLQueries(t *testing.T) {
 			location.ComparisonDomain != "sql-query" || location.FragmentKind != "query" {
 			t.Fatalf("SQL location = %+v", location)
 		}
+	}
+}
+
+func TestRunScanShellDialects(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--format", "json", "--threshold", "0.85", "--min-tokens", "12",
+		"--language-pair", "bash,zsh", "../../examples/shell-validation",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode JSON: %v\n%s", err, stdout.String())
+	}
+	if result.Files != 3 || result.Fragments != 3 || result.TotalMatchGroups != 1 ||
+		len(result.Groups) != 1 || len(result.Warnings) != 0 {
+		t.Fatalf("shell report summary = %+v", result)
+	}
+	languages := make(map[string]bool)
+	locations := make([]model.Location, 0, 2)
+	for _, profile := range result.Groups[0].Profiles {
+		for _, occurrence := range profile.Occurrences {
+			locations = append(locations, occurrence.Location)
+		}
+	}
+	if len(locations) != 2 {
+		t.Fatalf("shell locations = %+v", locations)
+	}
+	for _, location := range locations {
+		languages[location.Language] = true
+		if location.LanguageFamily != "shell" || location.ComparisonDomain != "code" ||
+			location.FragmentKind != "function" {
+			t.Fatalf("shell location = %+v", location)
+		}
+	}
+	if !languages["bash"] || !languages["zsh"] {
+		t.Fatalf("shell languages = %+v", languages)
 	}
 }
 
@@ -584,7 +640,7 @@ func TestRunRequireCoverageDistinguishesEmptyFilesAndFragments(t *testing.T) {
 		{
 			name: "unsupported",
 			content: map[string]string{
-				"script.zsh": "print hello\n",
+				"script.fish": "echo hello\n",
 			},
 			want: "no supported source files",
 		},

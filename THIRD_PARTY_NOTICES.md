@@ -9,11 +9,13 @@
 | `github.com/mattn/go-pointer` | 0.0.1 | Copyright (c) 2019 Yasuhiro Matsumoto | MIT |
 | `github.com/tree-sitter/go-tree-sitter` | 0.25.0 | Copyright (c) 2024 Amaan Qureshi | MIT |
 | Tree-sitter core | bundled by the Go binding | Copyright (c) 2018 Max Brunsfeld | MIT |
+| Tree-sitter Bash grammar | 0.25.1 | Copyright (c) 2017 Max Brunsfeld | MIT |
 | Tree-sitter Go grammar | 0.25.0 | Copyright (c) 2014 Max Brunsfeld | MIT |
 | Tree-sitter JavaScript grammar | 0.25.0 | Copyright (c) 2014 Max Brunsfeld | MIT |
 | Tree-sitter TypeScript/TSX grammars | 0.23.2 | Copyright (c) 2017 Max Brunsfeld | MIT |
 | Tree-sitter Python grammar | 0.25.0 | Copyright (c) 2016 Max Brunsfeld | MIT |
 | Tree-sitter Rust grammar | 0.24.2 | Copyright (c) 2017 Maxim Sokolov | MIT |
+| Tree-sitter Zsh grammar (`github.com/georgeharker/tree-sitter-zsh`) | 0.63.5 | Copyright (c) 2017 Max Brunsfeld | MIT |
 | Tree-sitter SQL grammar (`github.com/wippyai/tree-sitter-sql`) | 0.0.4 | Copyright (c) 2021 Derek Stride | MIT |
 
 ## MIT license text
