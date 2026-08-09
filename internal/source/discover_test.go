@@ -130,6 +130,18 @@ func TestDiscoverFiltersComparisonDomainsBeforeFileChecks(t *testing.T) {
 	}
 }
 
+func TestDiscoverSelectsPostgreSQLDialect(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "migration.sql")
+	writeFixture(t, path, "SELECT 1;\n")
+	result := Discover([]string{path}, Options{SQLDialect: "postgresql"})
+	if len(result.Files) != 1 || result.Files[0].Language.ID != "postgresql" ||
+		len(result.Warnings) != 0 {
+		t.Fatalf("PostgreSQL discovery = %#v", result)
+	}
+}
+
 func TestDiscoverContextStopsBeforeWalking(t *testing.T) {
 	t.Parallel()
 

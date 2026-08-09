@@ -75,6 +75,7 @@ type scanOptions struct {
 	excludes           stringList
 	languagePairs      stringList
 	comparisonDomain   string
+	sqlDialect         string
 	focusPaths         stringList
 	changedSince       string
 	threshold          float64
@@ -110,6 +111,7 @@ func defaultScanOptions() scanOptions {
 		maxFileBytes:   2 * 1024 * 1024,
 		workers:        runtime.GOMAXPROCS(0),
 		format:         "text",
+		sqlDialect:     language.SQLDialectGeneric,
 		baselineScope:  string(baseline.ScopeContent),
 		respectIgnore:  true,
 	}
@@ -130,6 +132,12 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 		"comparison-domain",
 		options.comparisonDomain,
 		"scan one comparison domain, such as code or sql-query",
+	)
+	flags.StringVar(
+		&options.sqlDialect,
+		"sql-dialect",
+		options.sqlDialect,
+		"SQL parser dialect: generic or postgresql",
 	)
 	flags.BoolVar(
 		&options.sameLanguageOnly,
@@ -345,6 +353,9 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	if settings.ComparisonDomain != "" {
 		options.comparisonDomain = settings.ComparisonDomain
 	}
+	if settings.SQLDialect != "" {
+		options.sqlDialect = settings.SQLDialect
+	}
 	if settings.Baseline != "" {
 		options.baselinePath = resolveConfigPath(base, settings.Baseline)
 	}
@@ -377,6 +388,9 @@ func validateScanOptions(options scanOptions) error {
 	}
 	if options.format != "text" && options.format != "json" {
 		return errors.New("--format must be text or json")
+	}
+	if _, err := resolveSQLDialect(options.sqlDialect); err != nil {
+		return err
 	}
 	selectionModes := 0
 	if options.sameLanguageOnly {
@@ -616,11 +630,16 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, err
 	}
+	sqlDialect, err := resolveSQLDialect(options.sqlDialect)
+	if err != nil {
+		return model.Report{}, err
+	}
 	discovered, err := source.DiscoverContext(ctx, paths, source.Options{
 		Excludes:          options.excludes,
 		MaxFileBytes:      options.maxFileBytes,
 		IgnoreFiles:       options.respectIgnore,
 		ComparisonDomains: domainSet,
+		SQLDialect:        sqlDialect,
 	})
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
@@ -674,6 +693,7 @@ func executeScan(
 		MaxPairs:          options.maxPairs,
 		MaxFileBytes:      options.maxFileBytes,
 		ComparisonDomain:  domain,
+		SQLDialect:        sqlDialect,
 		SameLanguageOnly:  options.sameLanguageOnly,
 		CrossLanguageOnly: options.crossLanguageOnly,
 		LanguagePairs:     append([]string{}, options.languagePairs...),
@@ -685,6 +705,20 @@ func executeScan(
 	sort.Strings(result.Configuration.Excludes)
 	sort.Strings(result.Configuration.LanguagePairs)
 	return result, nil
+}
+
+func resolveSQLDialect(value string) (string, error) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	for _, candidate := range language.SQLDialects() {
+		if value == candidate {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf(
+		"unknown --sql-dialect %q; expected one of %s",
+		value,
+		strings.Join(language.SQLDialects(), ", "),
+	)
 }
 
 func resolveFocus(
@@ -897,6 +931,7 @@ func writeLanguagesUsage(writer io.Writer) error {
 		writer,
 		"Usage: mori languages\n",
 		"\nList supported parser languages, review families, comparison domains, file extensions, and extensionless-script shebang interpreters.\n",
+		"Select one parser for discovered .sql files with --sql-dialect generic or postgresql.\n",
 	)
 	return err
 }

@@ -7,6 +7,22 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added explicit `--sql-dialect postgresql` and `sql_dialect` configuration
+  with a dedicated PostgreSQL 18.3 parser for top-level query comparison.
+- Added checksum-pinned PostgreSQL generated-source provenance and
+  positive/nearby-negative query fixtures.
+
+### Changed
+
+- Machine-readable reports now use schema version 7 and record the effective
+  SQL dialect.
+- Normalization version 6 maps PostgreSQL query structure into Mori's shared
+  SQL vocabulary. Existing baselines must be reviewed and regenerated.
+- The bundled review skill now requires explicit PostgreSQL selection and
+  separate profiles for mixed-dialect repositories.
+
 ## [0.11.0] - 2026-08-09
 
 ### Added

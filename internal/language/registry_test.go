@@ -14,6 +14,7 @@ func TestEveryGrammarHasCompatibleABI(t *testing.T) {
 		"go":         15,
 		"javascript": 15,
 		"python":     15,
+		"postgresql": 15,
 		"rust":       15,
 		"sql":        14,
 		"swift":      14,
@@ -47,6 +48,24 @@ func TestEveryGrammarHasCompatibleABI(t *testing.T) {
 				t.Fatalf("SetLanguage(%s): %v", spec.ID, err)
 			}
 		})
+	}
+}
+
+func TestDetectWithSQLDialect(t *testing.T) {
+	t.Parallel()
+
+	for dialect, expected := range map[string]string{
+		SQLDialectGeneric:    "sql",
+		SQLDialectPostgreSQL: "postgresql",
+	} {
+		spec, ok := DetectWithSQLDialect("migration.SQL", dialect)
+		if !ok || spec.ID != expected {
+			t.Errorf("DetectWithSQLDialect(%q) = %q/%t, want %q/true", dialect, spec.ID, ok, expected)
+		}
+	}
+	spec, ok := DetectWithSQLDialect("main.go", SQLDialectPostgreSQL)
+	if !ok || spec.ID != "go" {
+		t.Fatalf("non-SQL dialect detection = %q/%t, want go/true", spec.ID, ok)
 	}
 }
 
@@ -126,7 +145,7 @@ func TestComparisonDomainsAndFragmentKinds(t *testing.T) {
 	t.Parallel()
 
 	for _, spec := range All() {
-		if spec.ID == "sql" {
+		if spec.Family == "sql" {
 			if spec.ComparisonDomain != "sql-query" || spec.FragmentKind != "query" {
 				t.Fatalf("SQL spec = %#v", spec)
 			}

@@ -32,9 +32,41 @@ func TestRunLanguages(t *testing.T) {
 	if code != exitSuccess {
 		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
 	}
-	for _, expected := range []string{"Bash / POSIX shell", "Go", "JavaScript / JSX", "Python", "Rust", "SQL queries", "Swift", "TypeScript / TSX", "Zsh", "shell", "sql-query", "bash, dash, sh"} {
+	for _, expected := range []string{"Bash / POSIX shell", "Go", "JavaScript / JSX", "PostgreSQL queries", "Python", "Rust", "SQL queries", "Swift", "TypeScript / TSX", "Zsh", "shell", "sql-query", "bash, dash, sh"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Errorf("languages output missing %q", expected)
+		}
+	}
+}
+
+func TestRunScanPostgreSQLQueries(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--format", "json", "--sql-dialect", "postgresql",
+		"--comparison-domain", "sql-query", "--threshold", "0.90", "--min-tokens", "12",
+		"../../examples/postgresql-queries",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode JSON: %v\n%s", err, stdout.String())
+	}
+	if result.Files != 3 || result.Fragments != 3 || result.TotalMatchGroups != 1 ||
+		len(result.Groups) != 1 || len(result.Warnings) != 0 ||
+		result.Configuration.SQLDialect != "postgresql" {
+		t.Fatalf("PostgreSQL report summary = %+v", result)
+	}
+	for _, profile := range result.Groups[0].Profiles {
+		for _, occurrence := range profile.Occurrences {
+			if occurrence.Location.Language != "postgresql" ||
+				occurrence.Location.LanguageFamily != "sql" {
+				t.Fatalf("PostgreSQL location = %+v", occurrence.Location)
+			}
 		}
 	}
 }
@@ -50,6 +82,19 @@ func TestRunLanguagesHelp(t *testing.T) {
 			!strings.Contains(stdout.String(), "extensionless-script shebang interpreters") {
 			t.Fatalf("languages %s = %d/%q/%q", argument, code, stdout.String(), stderr.String())
 		}
+	}
+}
+
+func TestRunScanHelpListsSQLDialect(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{"scan", "--help"}, &stdout, &stderr)
+	if code != exitSuccess || stdout.Len() != 0 ||
+		!strings.Contains(stderr.String(), "-sql-dialect") ||
+		!strings.Contains(stderr.String(), "generic or postgresql") {
+		t.Fatalf("scan help = %d/%q/%q", code, stdout.String(), stderr.String())
 	}
 }
 
@@ -539,6 +584,11 @@ func TestRunRejectsInvalidSelectionCombinations(t *testing.T) {
 			want: "unknown --comparison-domain",
 		},
 		{
+			name: "unknown SQL dialect",
+			args: []string{"scan", "--sql-dialect", "mysql", "."},
+			want: "unknown --sql-dialect",
+		},
+		{
 			name: "pair outside domain",
 			args: []string{
 				"scan", "--comparison-domain", "sql-query", "--language-pair", "go,go", ".",
@@ -569,6 +619,7 @@ func TestConfigLoadsBeforeCLIOverridesAndLanguagePairsExpand(t *testing.T) {
   "threshold": 0.5,
   "max_groups": 250,
   "comparison_domain": "sql-query",
+  "sql_dialect": "postgresql",
   "language_pairs": ["go,typescript"],
   "exclude": ["generated/**"],
   "respect_ignore": true,
@@ -581,13 +632,15 @@ func TestConfigLoadsBeforeCLIOverridesAndLanguagePairsExpand(t *testing.T) {
 		"--config", configPath,
 		"--threshold", "0.9",
 		"--comparison-domain", "CODE",
+		"--sql-dialect", "generic",
 		"--no-ignore",
 	}, &stderr, false)
 	if !ok || code != exitSuccess {
 		t.Fatalf("parse = %t/%d, stderr = %q", ok, code, stderr.String())
 	}
 	if options.threshold != 0.9 || options.maxGroups != 250 || options.respectIgnore ||
-		len(options.languagePairs) != 1 || options.comparisonDomain != "CODE" || len(options.excludes) != 1 ||
+		len(options.languagePairs) != 1 || options.comparisonDomain != "CODE" ||
+		options.sqlDialect != "generic" || len(options.excludes) != 1 ||
 		options.baselinePath != filepath.Join(root, "accepted.json") {
 		t.Fatalf("options = %#v", options)
 	}

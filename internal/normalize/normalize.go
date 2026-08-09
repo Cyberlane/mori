@@ -14,7 +14,7 @@ import (
 // Version identifies the normalization contract used to build feature bags.
 // Bump it whenever the feature vocabulary, weights, canonical mappings, or
 // semantic-hint list changes.
-const Version = 5
+const Version = 6
 
 // Profile is a normalized, language-neutral view of one syntax fragment.
 // It is not the stable content identity exposed in reports.
@@ -162,7 +162,12 @@ func canonicalNamed(node *tree_sitter.Node, source []byte) string {
 	// Grammar-only containers are transparent. In particular, Go grammar
 	// ABI 15 wraps block children in statement_list without changing the
 	// source structure that Mori intends to compare.
-	if kind == "statement_list" || kind == "expression_list" || kind == "value_argument" {
+	if kind == "statement_list" || kind == "expression_list" || kind == "value_argument" ||
+		kind == "stmt" || kind == "select_no_parens" || kind == "simple_select" ||
+		kind == "a_expr" || kind == "a_expr_prec" || kind == "c_expr" ||
+		kind == "ColId" || kind == "ColLabel" || kind == "attr_name" ||
+		kind == "indirection" || kind == "indirection_el" || kind == "unreserved_keyword" ||
+		strings.HasPrefix(kind, "opt_") {
 		return ""
 	}
 	if kind == "statements" {
@@ -182,7 +187,7 @@ func canonicalNamed(node *tree_sitter.Node, source []byte) string {
 	if kind == "literal" {
 		return sqlLiteralKind(node.Utf8Text(source))
 	}
-	if strings.HasPrefix(kind, "keyword_") {
+	if strings.HasPrefix(kind, "keyword_") || strings.HasPrefix(kind, "kw_") {
 		return ""
 	}
 
@@ -218,36 +223,60 @@ var canonicalKinds = map[string]string{
 	"lambda_literal":                 "function",
 
 	// SQL query boundaries and structure.
-	"statement":            "query",
-	"select":               "query:select",
-	"insert":               "query:insert",
-	"update":               "query:update",
-	"delete":               "query:delete",
-	"cte":                  "query:cte",
-	"select_expression":    "query:projection",
-	"term":                 "query:projection-item",
-	"from":                 "query:source",
-	"relation":             "query:relation",
-	"join":                 "query:join",
-	"cross_join":           "query:join:cross",
-	"lateral_join":         "query:join:lateral",
-	"lateral_cross_join":   "query:join:lateral-cross",
-	"where":                "query:where",
-	"group_by":             "query:group",
-	"order_by":             "query:order",
-	"order_target":         "query:order-target",
-	"limit":                "query:limit",
-	"offset":               "query:offset",
-	"returning":            "query:returning",
-	"set_operation":        "query:set-operation",
-	"subquery":             "query:subquery",
-	"values":               "query:values",
-	"assignment_list":      "query:assignments",
-	"all_fields":           "query:wildcard",
-	"window_clause":        "query:window",
-	"window_specification": "query:window-specification",
-	"window_frame":         "query:window-frame",
-	"partition_by":         "query:partition",
+	"statement":               "query",
+	"toplevel_stmt":           "query",
+	"select":                  "query:select",
+	"SelectStmt":              "query:select",
+	"insert":                  "query:insert",
+	"InsertStmt":              "query:insert",
+	"update":                  "query:update",
+	"UpdateStmt":              "query:update",
+	"delete":                  "query:delete",
+	"DeleteStmt":              "query:delete",
+	"cte":                     "query:cte",
+	"common_table_expr":       "query:cte",
+	"select_expression":       "query:projection",
+	"select_clause":           "query:projection",
+	"target_list":             "query:projection",
+	"term":                    "query:projection-item",
+	"target_el":               "query:projection-item",
+	"from":                    "query:source",
+	"from_clause":             "query:source",
+	"relation":                "query:relation",
+	"relation_expr":           "query:relation",
+	"qualified_name":          "query:relation",
+	"join":                    "query:join",
+	"join_expr":               "query:join",
+	"cross_join":              "query:join:cross",
+	"lateral_join":            "query:join:lateral",
+	"lateral_cross_join":      "query:join:lateral-cross",
+	"where":                   "query:where",
+	"where_clause":            "query:where",
+	"where_or_current_clause": "query:where",
+	"group_by":                "query:group",
+	"group_clause":            "query:group",
+	"order_by":                "query:order",
+	"sort_clause":             "query:order",
+	"order_target":            "query:order-target",
+	"sortby":                  "query:order-target",
+	"limit":                   "query:limit",
+	"limit_clause":            "query:limit",
+	"offset":                  "query:offset",
+	"offset_clause":           "query:offset",
+	"returning":               "query:returning",
+	"returning_clause":        "query:returning",
+	"set_operation":           "query:set-operation",
+	"subquery":                "query:subquery",
+	"values":                  "query:values",
+	"values_clause":           "query:values",
+	"assignment_list":         "query:assignments",
+	"set_clause_list":         "query:assignments",
+	"all_fields":              "query:wildcard",
+	"window_clause":           "query:window",
+	"window_specification":    "query:window-specification",
+	"window_frame":            "query:window-frame",
+	"partition_by":            "query:partition",
+	"with_clause":             "query:with",
 
 	// SQL expressions and operands.
 	"between_expression": "expression:between",
@@ -261,6 +290,9 @@ var canonicalKinds = map[string]string{
 	"field":              "symbol",
 	"object_reference":   "symbol",
 	"column":             "symbol",
+	"columnref":          "symbol",
+	"param":              "parameter",
+	"AexprConst":         "literal",
 
 	// SQL keyword nodes that carry structure not already represented by a
 	// named clause node. Other keyword_* nodes are transparent.
@@ -284,6 +316,9 @@ var canonicalKinds = map[string]string{
 	"keyword_in":        "operator:membership",
 	"keyword_is":        "operator:is",
 	"keyword_like":      "operator:pattern-match",
+	"kw_true":           "literal:boolean",
+	"kw_false":          "literal:boolean",
+	"kw_null":           "literal:null",
 
 	// Parameters, blocks, and bindings.
 	"block":                 "block",

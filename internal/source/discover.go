@@ -34,6 +34,7 @@ type Options struct {
 	MaxFileBytes      int64
 	IgnoreFiles       bool
 	ComparisonDomains map[string]struct{}
+	SQLDialect        string
 }
 
 // Result contains deterministic discovery output and recoverable warnings.
@@ -233,7 +234,7 @@ func addFile(
 	explicit bool,
 	options Options,
 ) {
-	spec, supported := language.Detect(path)
+	spec, supported := language.DetectWithSQLDialect(path, options.SQLDialect)
 	needsShebang := !supported && filepath.Ext(path) == ""
 	if !supported && !needsShebang {
 		if explicit {

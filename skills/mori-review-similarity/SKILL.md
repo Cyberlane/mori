@@ -177,6 +177,12 @@ mori scan \
   path/to/queries
 ```
 
+For PostgreSQL source, add `--sql-dialect postgresql`. The default is
+`generic`; one invocation applies one dialect to every discovered `.sql` file,
+so split mixed-dialect roots into separate scans. The PostgreSQL parser covers
+PostgreSQL 18.3 SQL syntax but does not make PL/pgSQL bodies independent
+comparison units.
+
 SQL queries occupy the `sql-query` comparison domain and are never compared
 with code functions. Do not request `sql` in a language pair with a code
 language. Mori extracts top-level `SELECT`/set-operation, `INSERT`, `UPDATE`,
@@ -197,7 +203,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `6`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `7`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while

@@ -247,6 +247,68 @@ func clampNumber(value int, lower int, upper int) int {
 	}
 }
 
+func TestPostgreSQLMappingsPreservePositiveAndNegativeSeparation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	fixtures := map[string]string{
+		"users.sql": `SELECT id, email
+FROM users
+WHERE status = $1
+ORDER BY created_at DESC;
+`,
+		"accounts.sql": `SELECT account_id, contact_email
+FROM accounts
+WHERE state = $1
+ORDER BY opened_at DESC;
+`,
+		"archive.sql": `UPDATE sessions
+SET archived = TRUE
+WHERE expires_at < NOW()
+RETURNING id;
+`,
+	}
+	fragments := make(map[string]model.Fragment, len(fixtures))
+	for name, content := range fixtures {
+		path := filepath.Join(root, name)
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+		spec, ok := language.DetectWithSQLDialect(path, language.SQLDialectPostgreSQL)
+		if !ok {
+			t.Fatalf("DetectWithSQLDialect(%s) returned unsupported", name)
+		}
+		parsed, warnings := parser.File(context.Background(), source.File{
+			Path: path, DisplayPath: name, Language: spec,
+		}, 1)
+		if len(warnings) != 0 || len(parsed) != 1 {
+			t.Fatalf("%s warnings/fragments = %#v/%d", name, warnings, len(parsed))
+		}
+		fragments[name] = parsed[0]
+	}
+
+	positive, _, _ := similarity.WeightedJaccard(
+		fragments["users.sql"].Features,
+		fragments["accounts.sql"].Features,
+	)
+	nearby, _, _ := similarity.WeightedJaccard(
+		fragments["users.sql"].Features,
+		fragments["archive.sql"].Features,
+	)
+	if positive < 0.90 {
+		t.Fatalf("PostgreSQL positive score = %.3f, want at least 0.90", positive)
+	}
+	if nearby >= 0.65 {
+		t.Fatalf("PostgreSQL nearby-negative score = %.3f, want below 0.65", nearby)
+	}
+	for feature := range fragments["users.sql"].Features {
+		if strings.Contains(feature, "syntax:kw_") || strings.Contains(feature, "syntax:a_expr") ||
+			strings.Contains(feature, "syntax:opt_") || strings.Contains(feature, "syntax:ColId") {
+			t.Fatalf("PostgreSQL grammar vocabulary leaked into feature %q", feature)
+		}
+	}
+}
+
 func TestSemanticOperationFamiliesAndNearbyNames(t *testing.T) {
 	t.Parallel()
 

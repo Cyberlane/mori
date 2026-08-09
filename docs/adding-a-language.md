@@ -38,6 +38,9 @@ Add a `language.Spec` in `internal/language/registry.go` with:
 For code, signatures, declarations without bodies, interfaces, and type
 members are usually poor comparison units. Non-code languages must define
 their own coherent comparison domain; incompatible domains are never compared.
+Two parsers that intentionally share an extension must have an explicit,
+validated selector and one documented default. Do not guess a SQL dialect from
+syntax or silently replace the established parser.
 
 The registry ABI test automatically calls `Parser.SetLanguage` for every spec.
 

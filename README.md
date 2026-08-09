@@ -136,6 +136,23 @@ nested query structure remains part of its top-level query. Common SQLite and
 SQLC pagination parameters and SQLite `ON CONFLICT` column targets are parsed
 without weakening diagnostics for malformed nearby syntax.
 
+The default `generic` SQL parser is suitable for the documented SQLite and
+SQLC forms. Select the dedicated PostgreSQL 18 parser explicitly for a
+PostgreSQL source root or profile:
+
+```sh
+mori scan \
+  --sql-dialect postgresql \
+  --comparison-domain sql-query \
+  --threshold 0.70 \
+  --min-tokens 12 \
+  path/to/postgresql
+```
+
+One scan uses one SQL dialect for every `.sql` file it discovers. Split mixed
+dialect repositories into separate profiles. PostgreSQL procedural bodies are
+not PL/pgSQL comparison units.
+
 ## Common Uses
 
 Mori honors nested `.gitignore` and `.moriignore` files during directory scans.
@@ -191,7 +208,7 @@ the report and exit with status `4` when either condition occurs:
 mori scan --format json --require-coverage .
 ```
 
-Schema-6 reports embed deterministic `tool` build provenance, comparison
+Schema-7 reports embed deterministic `tool` build provenance, comparison
 selection, domain and fragment-kind metadata, and exact focus metadata. They do
 not include a scan timestamp, hostname, username, source body, diff, or Git
 remote.
@@ -251,6 +268,7 @@ copy in a new file must appear for review. The conventional file name is
 | TypeScript | TypeScript | code | `.ts`, `.mts`, `.cts` | — |
 | TSX | TypeScript | code | `.tsx` | — |
 | Python | Python | code | `.py`, `.pyi` | `python`, `python3` |
+| PostgreSQL queries | SQL | sql-query | `.sql` with `--sql-dialect postgresql` | — |
 | Rust | Rust | code | `.rs` | — |
 | Swift | Swift | code | `.swift` | — |
 | Zsh | Shell | code | `.zsh` | `zsh` |
@@ -269,10 +287,11 @@ comparison coverage, and any comparison fragment containing a parse error is
 skipped with an explicit count. Swift support extracts implemented functions,
 initializers, deinitializers, and closures. Protocol requirements, computed
 properties, accessors, and subscripts are not independent comparison units;
-unsupported Swift syntax can still produce visible diagnostics. SQL dialect
-extensions outside Mori's
-pinned grammar and Mori's bounded SQLite/SQLC adaptations may therefore produce
-diagnostics or incomplete coverage. Mori also applies a bounded,
+unsupported Swift syntax can still produce visible diagnostics. Generic SQL
+dialect extensions outside Mori's pinned grammar and bounded SQLite/SQLC
+adaptations may produce diagnostics or incomplete coverage. The PostgreSQL
+parser targets PostgreSQL 18.3 syntax but does not extract PL/pgSQL bodies as
+independent comparison units. Mori also applies a bounded,
 byte-preserving repair for recognized cases of the
 [upstream raw-ampersand JSX text grammar issue](https://github.com/tree-sitter/tree-sitter-javascript/issues/366).
 Other JavaScript and TSX parse errors remain visible and invalidate affected

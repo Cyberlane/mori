@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	tree_sitter_postgresql "github.com/Cyberlane/mori/internal/grammar/postgresql"
 	tree_sitter_swift "github.com/Cyberlane/mori/internal/grammar/swift"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tree_sitter_bash "github.com/tree-sitter/tree-sitter-bash/bindings/go"
@@ -66,6 +67,11 @@ var javascriptFunctions = kinds(
 	"generator_function",
 	"generator_function_declaration",
 	"method_definition",
+)
+
+const (
+	SQLDialectGeneric    = "generic"
+	SQLDialectPostgreSQL = "postgresql"
 )
 
 var specs = []Spec{
@@ -209,6 +215,19 @@ var specs = []Spec{
 		fragmentKinds:  kinds("statement"),
 		acceptBoundary: isSQLQueryStatement,
 	},
+	{
+		ID:               "postgresql",
+		Family:           "sql",
+		ComparisonDomain: "sql-query",
+		FragmentKind:     "query",
+		DisplayName:      "PostgreSQL queries",
+		Extensions:       []string{".sql"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_postgresql.Language())
+		},
+		fragmentKinds:  kinds("toplevel_stmt"),
+		acceptBoundary: isPostgreSQLQueryStatement,
+	},
 }
 
 func acceptsSwiftBoundary(node *tree_sitter.Node) bool {
@@ -235,6 +254,27 @@ func isSQLQueryStatement(node *tree_sitter.Node) bool {
 		}
 	}
 	return false
+}
+
+func isPostgreSQLQueryStatement(node *tree_sitter.Node) bool {
+	parent := node.Parent()
+	if parent == nil || parent.Kind() != "source_file" || node.NamedChildCount() != 1 {
+		return false
+	}
+	statement := node.NamedChild(0)
+	if statement == nil || statement.Kind() != "stmt" || statement.NamedChildCount() != 1 {
+		return false
+	}
+	child := statement.NamedChild(0)
+	if child == nil {
+		return false
+	}
+	switch child.Kind() {
+	case "SelectStmt", "InsertStmt", "UpdateStmt", "DeleteStmt":
+		return true
+	default:
+		return false
+	}
 }
 
 // Lookup returns one concrete grammar specification by ID.
@@ -291,6 +331,29 @@ func Detect(path string) (Spec, bool) {
 		}
 	}
 	return Spec{}, false
+}
+
+// DetectWithSQLDialect returns the grammar associated with a file extension,
+// selecting one explicit SQL parser for .sql files.
+func DetectWithSQLDialect(path string, dialect string) (Spec, bool) {
+	if strings.ToLower(filepath.Ext(path)) != ".sql" {
+		return Detect(path)
+	}
+	target := "sql"
+	if dialect == SQLDialectPostgreSQL {
+		target = "postgresql"
+	}
+	for _, spec := range specs {
+		if spec.ID == target {
+			return spec, true
+		}
+	}
+	return Spec{}, false
+}
+
+// SQLDialects returns the accepted SQL parser selections.
+func SQLDialects() []string {
+	return []string{SQLDialectGeneric, SQLDialectPostgreSQL}
 }
 
 // DetectShebang returns the grammar named by one bounded shebang line. It does

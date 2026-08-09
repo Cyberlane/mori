@@ -8,7 +8,8 @@ Unknown fields, malformed JSON, non-regular files, and files larger than one
 MiB are errors. Relative `baseline` paths resolve from the configuration
 file's directory. Command-line values override configured values; repeated
 `--exclude` and `--language-pair` values are additive. A command-line
-`--comparison-domain` overrides the configured domain.
+`--comparison-domain` overrides the configured domain. `--sql-dialect`
+overrides the configured SQL parser dialect.
 
 ## Fields
 
@@ -23,6 +24,7 @@ file's directory. Command-line values override configured values; repeated
   "workers": 8,
   "format": "json",
   "comparison_domain": "code",
+  "sql_dialect": "generic",
   "same_language_only": true,
   "cross_language_only": false,
   "language_pairs": [],
@@ -39,6 +41,11 @@ file's directory. Command-line values override configured values; repeated
 `mori languages`. The selected domain is applied before parsing, so other
 domains do not affect file counts, warnings, focus, or pair limits. An empty or
 omitted value selects every registered domain.
+
+`sql_dialect` accepts `generic` or `postgresql` and defaults to `generic`.
+It selects the parser for every discovered `.sql` file and does not affect
+non-SQL files. Use separate scans when one repository contains multiple SQL
+dialects.
 
 `same_language_only` compares within review families. TypeScript and TSX are
 one family and remain comparable. It is mutually exclusive with
@@ -77,7 +84,7 @@ Ignore files affect directory traversal only. A file passed explicitly remains
 visible. Repeated `--exclude` globs remain additive and continue to exclude an
 explicitly requested file. Use `--no-ignore` to disable both ignore-file types.
 
-Schema-6 JSON reports record the effective options and every loaded ignore
+Schema-7 JSON reports record the effective options and every loaded ignore
 file under `configuration` so a scan can be reproduced. Review focus remains
 CLI-only: `--focus-path` is repeatable, and `--changed-since` always requires
 an explicit locally available Git revision.
