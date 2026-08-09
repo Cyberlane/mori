@@ -184,6 +184,60 @@ func TestSwiftMalformedFunctionProducesParseWarning(t *testing.T) {
 	}
 }
 
+func TestPostgreSQLExtractsQueriesAndIgnoresDialectDDL(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "migration.sql")
+	content := `CREATE TABLE jobs (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_state_check;
+
+-- name: ArchiveJobs :exec
+UPDATE jobs SET archived = TRUE WHERE created_at < now() RETURNING id;
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_jobs_created
+ON jobs (created_at DESC) INCLUDE (archived)
+WHERE archived = FALSE;
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.DetectWithSQLDialect(path, language.SQLDialectPostgreSQL)
+	if !ok {
+		t.Fatal("PostgreSQL grammar not detected")
+	}
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "migration.sql", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 1 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want one/none", fragments, warnings)
+	}
+	location := fragments[0].Location
+	if location.Name != "ArchiveJobs" || location.Language != "postgresql" ||
+		location.LanguageFamily != "sql" || location.FragmentKind != "query" {
+		t.Fatalf("PostgreSQL fragment = %#v", location)
+	}
+}
+
+func TestPostgreSQLMalformedQueryProducesParseWarning(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "broken.sql")
+	if err := os.WriteFile(path, []byte("SELECT (1;\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.DetectWithSQLDialect(path, language.SQLDialectPostgreSQL)
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "broken.sql", Language: spec,
+	}, 1)
+	if len(fragments) != 0 || len(warnings) != 1 || warnings[0].Kind != "parse" {
+		t.Fatalf("fragments/warnings = %#v/%#v, want none/one parse", fragments, warnings)
+	}
+}
+
 func TestFileWarnsAndSkipsInvalidFragment(t *testing.T) {
 	t.Parallel()
 

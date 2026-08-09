@@ -28,6 +28,7 @@ type Settings struct {
 	Workers           *int     `json:"workers,omitempty"`
 	Format            *string  `json:"format,omitempty"`
 	ComparisonDomain  string   `json:"comparison_domain,omitempty"`
+	SQLDialect        string   `json:"sql_dialect,omitempty"`
 	SameLanguageOnly  *bool    `json:"same_language_only,omitempty"`
 	CrossLanguageOnly *bool    `json:"cross_language_only,omitempty"`
 	LanguagePairs     []string `json:"language_pairs,omitempty"`

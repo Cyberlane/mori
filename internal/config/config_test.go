@@ -34,6 +34,7 @@ func TestLoadStrictConfig(t *testing.T) {
   "threshold": 0.85,
   "max_groups": 250,
   "comparison_domain": "code",
+  "sql_dialect": "postgresql",
   "same_language_only": false,
   "language_pairs": ["go,typescript"],
   "require_coverage": true,
@@ -47,6 +48,7 @@ func TestLoadStrictConfig(t *testing.T) {
 	if settings.Threshold == nil || *settings.Threshold != 0.85 ||
 		settings.MaxGroups == nil || *settings.MaxGroups != 250 ||
 		settings.ComparisonDomain != "code" ||
+		settings.SQLDialect != "postgresql" ||
 		settings.SameLanguageOnly == nil || *settings.SameLanguageOnly ||
 		len(settings.LanguagePairs) != 1 || settings.RequireCoverage == nil || !*settings.RequireCoverage ||
 		settings.RespectIgnore == nil || !*settings.RespectIgnore {

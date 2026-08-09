@@ -31,6 +31,10 @@ mori scan --comparison-domain code .
 mori scan --comparison-domain sql-query --min-tokens 12 .
 ```
 
+`--sql-dialect <dialect>` selects `generic` (the default) or `postgresql` for
+every discovered `.sql` file. It does not infer a dialect from source content.
+Run separate profiles when a repository contains multiple SQL dialects.
+
 `--same-language-only` compares fragments only when their review families are
 the same. A family can contain multiple parser grammars, so TypeScript and TSX
 remain comparable in `typescript`, while Bash/POSIX shell and Zsh remain
@@ -63,6 +67,7 @@ mori scan --comparison-domain sql-query --language-pair go,go .
 ```json
 {
   "comparison_domain": "code",
+  "sql_dialect": "generic",
   "same_language_only": true
 }
 ```
@@ -75,9 +80,9 @@ configured booleans, for example `--same-language-only=false`.
 ## Execution model
 
 Mori validates domain names and option compatibility before discovery begins.
-Source discovery detects the registered grammar for each candidate and drops a
-file whose comparison domain was not selected before file-size checks or
-parsing. As a result:
+Source discovery selects the configured SQL grammar, detects each other
+registered grammar, and drops a file whose comparison domain was not selected
+before file-size checks or parsing. As a result:
 
 - `files` and `fragments` count only selected domains;
 - parser warnings come only from selected domains;
@@ -104,11 +109,13 @@ source constructs that are not comparison units, such as SQL DDL.
 
 ## Report and compatibility contract
 
-Schema version 6 adds these fields to `configuration`:
+Schema version 7 adds the effective SQL parser to the schema-6 selection fields
+under `configuration`:
 
 ```json
 {
   "comparison_domain": "code",
+  "sql_dialect": "generic",
   "same_language_only": true
 }
 ```
@@ -117,11 +124,13 @@ The domain is normalized to its registered lowercase identifier. An empty
 string means that no domain restriction was requested. Consumers must continue
 to reject or explicitly handle unknown report schema versions.
 
-Selection itself does not change fragment features or the report schema. The
-current normalization version is 5 because Swift canonical mappings extend the
-code feature vocabulary; baselines created with an older normalization version
-must be reviewed and regenerated. Changing a selection profile still requires
-the ordinary human review expected for any baseline scope change.
+Domain and family selection do not change fragment features. SQL dialect
+selection chooses a different parser and is therefore recorded explicitly.
+The current normalization version is 6 because PostgreSQL canonical mappings
+extend the SQL feature vocabulary; baselines created with an older
+normalization version must be reviewed and regenerated. Changing a selection
+profile still requires the ordinary human review expected for any baseline
+scope change.
 
 ## Verification requirements
 
@@ -134,6 +143,8 @@ Tests must prove:
 - cross-language and same-language modes are mutually exclusive;
 - explicit language pairs incompatible with selected domains are rejected;
 - configuration loads, merges, normalizes, and reports the new fields;
+- generic SQL remains the default and PostgreSQL is selected only explicitly;
+- the PostgreSQL fixtures include a positive and nearby negative;
 - repeated identical scans produce byte-identical JSON; and
 - the neutral parser warning reports zero skipped fragments for unsupported
   DDL while retaining bounded diagnostics.

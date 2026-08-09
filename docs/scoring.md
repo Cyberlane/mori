@@ -28,6 +28,12 @@ It also maps parameters and broad literal kinds without preserving names or
 values. These features describe syntax, not query equivalence or database
 behavior.
 
+The `generic` and `postgresql` parsers share the `sql` review family and
+`sql-query` domain, but one scan selects one parser dialect for all `.sql`
+files. PostgreSQL grammar wrappers and keyword nodes are reduced into the same
+query vocabulary; a matching score still does not account for schemas,
+constraints, plans, permissions, transactions, or PL/pgSQL behavior.
+
 Bash/POSIX shell and Zsh use separate grammars in one review family. Mori maps
 their grammar-specific word, variable-reference, and glob nodes to shared
 canonical features. A 100% result across those parsers is normalized structural
@@ -168,17 +174,17 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 6,
+  "schema_version": 7,
   "tool": {
     "name": "mori",
-    "version": "0.10.0",
+    "version": "0.12.0",
     "revision": "<full source revision>",
     "source_date": "<RFC3339 commit time>",
     "modified": false,
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 5
+    "normalization_version": 6
   },
   "threshold": 0.7,
   "files": 4,
@@ -202,6 +208,7 @@ The top-level shape is:
     "max_pairs": 5000000,
     "max_file_bytes": 2097152,
     "comparison_domain": "code",
+    "sql_dialect": "generic",
     "same_language_only": true,
     "cross_language_only": false,
     "language_pairs": []

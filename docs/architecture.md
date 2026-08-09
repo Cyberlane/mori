@@ -56,10 +56,12 @@ The registry binds:
 - grammar node predicates that identify comparison units.
 
 Grammar versions are pinned as a compatible ABI set. Swift's upstream project
-publishes generated C sources as a workflow artifact, so Mori vendors the
-minimum generated sources and required headers under `internal/grammar/swift`.
-That package records the exact source commit, workflow artifact, license, ABI,
-and SHA-256 digests; ordinary builds never download or regenerate it. A
+publishes generated C sources as a workflow artifact, while the PostgreSQL
+module publishes its generated parser through Git LFS and a release archive.
+Mori vendors the minimum generated sources and required headers under
+`internal/grammar/swift` and `internal/grammar/postgresql`. Those packages
+record exact source commits, artifacts, licenses, ABIs, and SHA-256 digests;
+ordinary builds never download or regenerate them. A
 table-driven test calls `Parser.SetLanguage` for every entry; compilation alone
 does not detect grammar ABI mismatches.
 
@@ -87,7 +89,8 @@ refer to the original source. Nearby malformed forms remain parser errors.
 Code languages extract function-like boundaries. Swift extracts implemented
 functions, initializers, deinitializers, and closures; bodyless protocol
 requirements, computed properties, accessors, and subscripts are not separate
-comparison units. SQL extracts only top-level
+comparison units. Generic SQL and explicitly selected PostgreSQL each extract
+only top-level
 `SELECT`/set-operation, `INSERT`, `UPDATE`, and `DELETE` statements. Exact,
 immediately adjacent SQLC name comments label query locations. DDL is ignored,
 and nested query structure remains inside its top-level query rather than
@@ -120,7 +123,7 @@ Operation families are intentionally small and curated. Bash/POSIX shell and
 Zsh additionally share canonical word, variable-reference, and glob aliases
 while retaining separate parsers. Swift maps its declarations, expressions,
 arguments, identifiers, and control transfers into existing language-neutral
-families. SQL additionally maps
+families. Generic SQL and PostgreSQL additionally map
 query clauses, relational structure, and data-manipulation operations. All are
 score hints, not semantic facts.
 
@@ -199,7 +202,7 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-6 reports expose deterministic binary provenance, comparison selection,
+Schema-7 reports expose deterministic binary provenance, comparison selection,
 comparison domains, fragment kinds, optional exact focus metadata, grouped
 content-pair identities, fragment fingerprints, occurrence samples and exact
 counts, nesting metadata, structured parser
