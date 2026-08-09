@@ -199,43 +199,43 @@ func Analyze(
 }
 
 func compareWithinFamilies(fragments []model.Fragment, collector *matchCollector) error {
-	byDomainAndFamily := make(map[string][]model.Fragment)
+	return comparePartitions(fragments, collector, domainAndFamilyKey, compareAll)
+}
+
+func compareCompatibleDomains(fragments []model.Fragment, collector *matchCollector) error {
+	return comparePartitions(fragments, collector, domainKey, compareAll)
+}
+
+func comparePartitions(
+	fragments []model.Fragment,
+	collector *matchCollector,
+	key func(model.Fragment) string,
+	compare func([]model.Fragment, *matchCollector) error,
+) error {
+	byPartition := make(map[string][]model.Fragment)
 	for _, fragment := range fragments {
-		key := fragment.Location.ComparisonDomain + "\x00" + fragment.Location.LanguageFamily
-		byDomainAndFamily[key] = append(byDomainAndFamily[key], fragment)
+		partition := key(fragment)
+		byPartition[partition] = append(byPartition[partition], fragment)
 	}
-	partitions := make([]string, 0, len(byDomainAndFamily))
-	for partition := range byDomainAndFamily {
+	partitions := make([]string, 0, len(byPartition))
+	for partition := range byPartition {
 		partitions = append(partitions, partition)
 	}
 	sort.Strings(partitions)
 	for _, partition := range partitions {
-		if err := compareAll(byDomainAndFamily[partition], collector); err != nil {
+		if err := compare(byPartition[partition], collector); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func compareCompatibleDomains(fragments []model.Fragment, collector *matchCollector) error {
-	byDomain := make(map[string][]model.Fragment)
-	for _, fragment := range fragments {
-		byDomain[fragment.Location.ComparisonDomain] = append(
-			byDomain[fragment.Location.ComparisonDomain],
-			fragment,
-		)
-	}
-	domains := make([]string, 0, len(byDomain))
-	for domain := range byDomain {
-		domains = append(domains, domain)
-	}
-	sort.Strings(domains)
-	for _, domain := range domains {
-		if err := compareAll(byDomain[domain], collector); err != nil {
-			return err
-		}
-	}
-	return nil
+func domainKey(fragment model.Fragment) string {
+	return fragment.Location.ComparisonDomain
+}
+
+func domainAndFamilyKey(fragment model.Fragment) string {
+	return fragment.Location.ComparisonDomain + "\x00" + fragment.Location.LanguageFamily
 }
 
 func validateOptions(options Options) error {
@@ -291,24 +291,7 @@ func compareAll(fragments []model.Fragment, collector *matchCollector) error {
 }
 
 func compareAcrossFamilies(fragments []model.Fragment, collector *matchCollector) error {
-	byDomain := make(map[string][]model.Fragment)
-	for _, fragment := range fragments {
-		byDomain[fragment.Location.ComparisonDomain] = append(
-			byDomain[fragment.Location.ComparisonDomain],
-			fragment,
-		)
-	}
-	domains := make([]string, 0, len(byDomain))
-	for domain := range byDomain {
-		domains = append(domains, domain)
-	}
-	sort.Strings(domains)
-	for _, domain := range domains {
-		if err := compareAcrossDomainFamilies(byDomain[domain], collector); err != nil {
-			return err
-		}
-	}
-	return nil
+	return comparePartitions(fragments, collector, domainKey, compareAcrossDomainFamilies)
 }
 
 func compareAcrossDomainFamilies(fragments []model.Fragment, collector *matchCollector) error {

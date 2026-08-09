@@ -82,16 +82,27 @@ TypeScript and TSX are one language family. To compare only Go with that
 family, use:
 
 ```sh
-mori scan --language-pair go,typescript --threshold 0.65 .
+mori scan \
+  --comparison-domain code \
+  --language-pair go,typescript \
+  --threshold 0.65 \
+  --min-tokens 40 \
+  .
 ```
 
 To try Mori against this repository's example files:
 
 ```sh
-mori scan --threshold 0.70 --cross-language-only examples/email-validation
+mori scan \
+  --comparison-domain code \
+  --cross-language-only \
+  --threshold 0.70 \
+  --min-tokens 12 \
+  examples/email-validation
 ```
 
-Example output:
+This deliberately small fixture uses the broad 12-token exploration floor.
+Abridged example output (first group):
 
 ```text
 1. 71.0% structural similarity · 1 location pair(s)
@@ -247,6 +258,7 @@ mori skill install --global
 ## More Detail
 
 - [How Mori scores fragments](docs/scoring.md)
+- [Scan selection controls](docs/scan-selection.md)
 - [Project configuration](docs/configuration.md)
 - [Architecture](docs/architecture.md)
 - [Add a language](docs/adding-a-language.md)
@@ -257,6 +269,17 @@ mori skill install --global
 ```sh
 make check
 ```
+
+Run Mori's explicit production-code self-review profile with:
+
+```sh
+make dogfood
+```
+
+The profile in `configs/self-review.mori.json` is not auto-discovered. It scans
+same-language code at the 0.85 threshold and 40-token floor while excluding
+tests and examples, so normal development and cross-language example commands
+keep their own selection settings.
 
 ## License
 

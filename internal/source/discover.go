@@ -14,6 +14,7 @@ import (
 	"github.com/Cyberlane/mori/internal/diagnostic"
 	"github.com/Cyberlane/mori/internal/language"
 	"github.com/Cyberlane/mori/internal/model"
+	"github.com/Cyberlane/mori/internal/pathutil"
 	"github.com/bmatcuk/doublestar/v4"
 )
 
@@ -134,7 +135,7 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 		root := absolutePath
 		if options.IgnoreFiles {
 			boundary := root
-			if pathWithin(cwd, root) {
+			if pathutil.Within(cwd, root) {
 				boundary = cwd
 			}
 			if err := ignores.loadAncestors(boundary, root); err != nil {
@@ -309,18 +310,11 @@ func hasSymlinkComponent(path string, boundary string) (bool, error) {
 			return true, nil
 		}
 		parent := filepath.Dir(current)
-		if parent == current || !pathWithin(boundary, parent) {
+		if parent == current || !pathutil.Within(boundary, parent) {
 			return false, nil
 		}
 		current = parent
 	}
-}
-
-func pathWithin(base string, path string) bool {
-	relative, err := filepath.Rel(base, path)
-	return err == nil &&
-		relative != ".." &&
-		!strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
 func trustedBoundary(cwd string, path string) string {
@@ -328,7 +322,7 @@ func trustedBoundary(cwd string, path string) string {
 	best := filepath.Clean(volumeRoot)
 	for _, candidate := range []string{cwd, os.TempDir()} {
 		absoluteCandidate, err := filepath.Abs(candidate)
-		if err != nil || !pathWithin(absoluteCandidate, path) {
+		if err != nil || !pathutil.Within(absoluteCandidate, path) {
 			continue
 		}
 		if len(absoluteCandidate) > len(best) {
@@ -364,7 +358,7 @@ func relativeSlash(root string, path string) string {
 
 func displayPath(cwd string, path string) string {
 	relative, err := filepath.Rel(cwd, path)
-	if err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+	if err == nil && pathutil.Within(cwd, path) {
 		return filepath.ToSlash(relative)
 	}
 	return filepath.ToSlash(path)

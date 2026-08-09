@@ -1,0 +1,11 @@
+{
+  "threshold": 0.85,
+  "min_tokens": 40,
+  "max_groups": 1000,
+  "max_occurrences": 10,
+  "format": "text",
+  "comparison_domain": "code",
+  "same_language_only": true,
+  "exclude": ["**/*_test.go", "examples/**"],
+  "respect_ignore": true
+}
