@@ -28,6 +28,12 @@ It also maps parameters and broad literal kinds without preserving names or
 values. These features describe syntax, not query equivalence or database
 behavior.
 
+Bash/POSIX shell and Zsh use separate grammars in one review family. Mori maps
+their grammar-specific word, variable-reference, and glob nodes to shared
+canonical features. A 100% result across those parsers is normalized structural
+identity, not byte identity or proof that shell options and runtime semantics
+are equivalent.
+
 The normalizer has a version constant for persisted review artifacts. Any
 change to the feature vocabulary, weights, canonical mappings, or
 semantic-hint list increments that version.
@@ -158,14 +164,14 @@ The top-level shape is:
   "schema_version": 6,
   "tool": {
     "name": "mori",
-    "version": "0.8.0",
+    "version": "0.10.0",
     "revision": "<full source revision>",
     "source_date": "<RFC3339 commit time>",
     "modified": false,
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 3
+    "normalization_version": 4
   },
   "threshold": 0.7,
   "files": 4,

@@ -7,6 +7,23 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added dedicated Bash/POSIX-shell and Zsh function parsers with `.sh`,
+  `.bash`, and `.zsh` discovery.
+- Added bounded, non-executing shebang detection for extensionless Bash/POSIX,
+  Zsh, Python, and Node.js scripts.
+- Added shebang interpreter names to `mori languages` and help for
+  `mori languages --help`.
+
+### Changed
+
+- Normalization version 4 aligns shell word, variable-reference, and glob node
+  vocabulary across the Bash and Zsh grammars. Existing baselines must be
+  reviewed and regenerated.
+- The bundled review skill now explains shell-family selection and shebang
+  coverage.
+
 ## [0.9.0] - 2026-08-09
 
 ### Added

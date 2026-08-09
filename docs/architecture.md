@@ -25,6 +25,8 @@ overlap without claiming behavioral equivalence.
 
 - Expands explicit files and directories.
 - Detects supported extensions through the language registry.
+- Reads only a bounded first line to recognize supported interpreters in
+  extensionless scripts; it never executes an interpreter.
 - Skips dependency, VCS, and build-output directories.
 - Loads nested `.gitignore` and `.moriignore` rules for directory scans.
 - Applies repeatable doublestar exclude globs.
@@ -49,7 +51,7 @@ repeatable exclusions and language pairs are additive.
 The registry binds:
 
 - a stable language ID, review family, comparison domain, and fragment kind;
-- display name and extensions;
+- display name, extensions, and optional shebang interpreter names;
 - one generated Tree-sitter grammar; and
 - grammar node predicates that identify comparison units.
 
@@ -106,7 +108,9 @@ syntax is excluded. Unknown nodes remain as namespaced syntax features instead
 of disappearing, preserving evidence while naturally reducing cross-language
 overlap.
 
-Operation families are intentionally small and curated. SQL additionally maps
+Operation families are intentionally small and curated. Bash/POSIX shell and
+Zsh additionally share canonical word, variable-reference, and glob aliases
+while retaining separate parsers. SQL additionally maps
 query clauses, relational structure, and data-manipulation operations. All are
 score hints, not semantic facts.
 
@@ -125,8 +129,8 @@ bag \(B\), weighted Jaccard cannot exceed:
 Pairs whose upper bound is below the threshold are never scored. Fragments are
 first partitioned by comparison domain, so SQL queries are never compared with
 code functions. Same-language scans score within each review family, while
-cross-language scans score across review families. TypeScript and TSX therefore
-remain same-family comparisons. Explicit language-pair selectors expand
+cross-language scans score across review families. TypeScript and TSX, and
+Bash/POSIX shell and Zsh, therefore remain same-family comparisons. Explicit language-pair selectors expand
 families into concrete grammar-ID pairs within one compatible domain without
 enumerating unrelated combinations. The `--max-pairs` cap bounds the remaining
 scored pairs and fails with an actionable error rather than returning an

@@ -159,6 +159,19 @@ Store repeatable project settings in `.mori.json`:
 }
 ```
 
+Bash/POSIX shell and Zsh use dedicated parsers in one `shell` review family.
+They are included together by `--same-language-only`; use an explicit pair for
+a shell-dialect-only review:
+
+```sh
+mori scan \
+  --comparison-domain code \
+  --language-pair bash,zsh \
+  --threshold 0.85 \
+  --min-tokens 40 \
+  .
+```
+
 Mori searches the current directory and its parents for `.mori.json`. Use
 `--config <path>`, `--no-config`, or `--no-ignore` to control discovery. See
 [Project configuration](docs/configuration.md) for the complete contract.
@@ -230,17 +243,23 @@ copy in a new file must appear for review. The conventional file name is
 
 ## Supported Languages
 
-| Parser language | Review family | Comparison domain | File types |
-| --- | --- | --- | --- |
-| Go | Go | code | `.go` |
-| JavaScript and JSX | JavaScript | code | `.js`, `.jsx`, `.mjs`, `.cjs` |
-| TypeScript | TypeScript | code | `.ts`, `.mts`, `.cts` |
-| TSX | TypeScript | code | `.tsx` |
-| Python | Python | code | `.py`, `.pyi` |
-| Rust | Rust | code | `.rs` |
-| SQL queries | SQL | sql-query | `.sql` |
+| Parser language | Review family | Comparison domain | File types | Extensionless shebangs |
+| --- | --- | --- | --- | --- |
+| Bash / POSIX shell | Shell | code | `.sh`, `.bash` | `sh`, `dash`, `bash` |
+| Go | Go | code | `.go` | — |
+| JavaScript and JSX | JavaScript | code | `.js`, `.jsx`, `.mjs`, `.cjs` | `node`, `nodejs` |
+| TypeScript | TypeScript | code | `.ts`, `.mts`, `.cts` | — |
+| TSX | TypeScript | code | `.tsx` | — |
+| Python | Python | code | `.py`, `.pyi` | `python`, `python3` |
+| Rust | Rust | code | `.rs` | — |
+| Zsh | Shell | code | `.zsh` | `zsh` |
+| SQL queries | SQL | sql-query | `.sql` | — |
 
-Run `mori languages` to see the languages in your installed version.
+For files with no extension, Mori reads at most the first 256 bytes and uses a
+supported direct or `/usr/bin/env` shebang without executing the interpreter.
+An extension always takes precedence over a conflicting shebang. Run
+`mori languages` to see the exact languages and shebang names in your installed
+version; `mori languages --help` describes the columns.
 
 ## Known Parser Limits
 
@@ -252,7 +271,9 @@ diagnostics or incomplete coverage. Mori also applies a bounded,
 byte-preserving repair for recognized cases of the
 [upstream raw-ampersand JSX text grammar issue](https://github.com/tree-sitter/tree-sitter-javascript/issues/366).
 Other JavaScript and TSX parse errors remain visible and invalidate affected
-function fragments.
+function fragments. The pinned Zsh grammar requires `:` rather than arbitrary
+paired delimiters for the `s::`, `n::`, and `b::` glob-qualifier forms; affected
+functions produce visible parser diagnostics.
 
 ## For AI Coding Tools
 

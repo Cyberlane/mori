@@ -25,6 +25,7 @@ Add a `language.Spec` in `internal/language/registry.go` with:
 - stable lowercase ID, review family, comparison domain, and fragment kind;
 - human-readable name;
 - non-overlapping extensions;
+- optional interpreter basenames for extensionless shebang discovery;
 - language constructor; and
 - a precise fragment-boundary predicate.
 
@@ -52,6 +53,10 @@ Assign dialect grammars such as TypeScript and TSX to the same family when
 maintainers would not reasonably describe them as cross-language results. For
 other fragment kinds, test top-level versus nested boundaries and explicitly
 document constructs that remain unsupported.
+
+Shebang support is only for extensionless regular files. Detection must remain
+bounded, must not require an executable bit, and must never execute or resolve
+the named interpreter. A recognized extension remains authoritative.
 
 ## 4. Extend normalization deliberately
 

@@ -33,7 +33,8 @@ mori scan --comparison-domain sql-query --min-tokens 12 .
 
 `--same-language-only` compares fragments only when their review families are
 the same. A family can contain multiple parser grammars, so TypeScript and TSX
-remain comparable because both belong to the `typescript` family. The filter
+remain comparable in `typescript`, while Bash/POSIX shell and Zsh remain
+comparable in `shell`. The filter
 partitions by comparison domain first; cross-domain pairs remain impossible.
 
 ```sh
@@ -116,10 +117,10 @@ The domain is normalized to its registered lowercase identifier. An empty
 string means that no domain restriction was requested. Consumers must continue
 to reject or explicitly handle unknown report schema versions.
 
-Normalization remains version 3. This feature does not change fragment
-features, fingerprints, similarity scores, content-pair identities, or
-baseline schemas. Existing baselines remain valid when reused with the same
-effective fragment selection; changing a selection profile requires the
+Selection itself does not change fragment features or the report schema. The
+current normalization version is 4 because shell grammar aliases change shell
+fingerprints; baselines created with an older normalization version must be
+reviewed and regenerated. Changing a selection profile still requires the
 ordinary human review expected for any baseline scope change.
 
 ## Verification requirements
