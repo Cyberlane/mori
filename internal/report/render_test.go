@@ -315,3 +315,48 @@ func TestTextExplainsReviewRanking(t *testing.T) {
 		}
 	}
 }
+
+func TestColorTextAddsOnlyPresentationEscapes(t *testing.T) {
+	t.Parallel()
+	value := model.Report{Files: 1, Fragments: 1, Threshold: 0.7, Groups: []model.MatchGroup{{
+		ID: "aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb", Similarity: 0.8, LocationPairs: 1,
+	}}}
+	var plain, colored bytes.Buffer
+	if err := Text(&plain, value); err != nil {
+		t.Fatal(err)
+	}
+	if err := ColorText(&colored, value); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(colored.String(), "\x1b[1;32m") || !strings.Contains(colored.String(), "\x1b[1;36m") {
+		t.Fatalf("colored output = %q", colored.String())
+	}
+	clean := strings.NewReplacer("\x1b[1;32m", "", "\x1b[1;36m", "", "\x1b[33m", "", "\x1b[0m", "").Replace(colored.String())
+	if clean != plain.String() {
+		t.Fatalf("color changed content\nplain: %q\ncolor: %q", plain.String(), colored.String())
+	}
+}
+
+func TestHTMLReportIsStandaloneAndEscapesPaths(t *testing.T) {
+	t.Parallel()
+	value := model.Report{Files: 2, Fragments: 2, TotalMatchGroups: 1, TotalLocationPairs: 1, Groups: []model.MatchGroup{{
+		ID: "aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb", Similarity: 0.9, LocationPairs: 1,
+		Profiles: []model.FragmentProfile{{
+			Occurrences: []model.FragmentSummary{{
+				Location: model.Location{Path: "src/<unsafe>.go", Language: "go", Name: "check", StartLine: 2, EndLine: 4},
+			}},
+		}},
+	}}}
+	var output bytes.Buffer
+	if err := HTML(&output, value); err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"<!doctype html>", "<style>", "90.0%", "src/&lt;unsafe&gt;.go", "not prove semantic or behavioral equivalence"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Errorf("HTML missing %q", expected)
+		}
+	}
+	if strings.Contains(output.String(), "src/<unsafe>.go") {
+		t.Fatal("HTML path was not escaped")
+	}
+}

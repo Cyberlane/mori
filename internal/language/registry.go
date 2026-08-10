@@ -7,20 +7,29 @@ import (
 	"sort"
 	"strings"
 
+	tree_sitter_gdscript "github.com/Cyberlane/mori/internal/grammar/gdscript"
 	tree_sitter_hack "github.com/Cyberlane/mori/internal/grammar/hack"
 	tree_sitter_postgresql "github.com/Cyberlane/mori/internal/grammar/postgresql"
 	tree_sitter_swift "github.com/Cyberlane/mori/internal/grammar/swift"
+	tree_sitter_dart "github.com/UserNobody14/tree-sitter-dart/bindings/go"
+	tree_sitter_kotlin "github.com/tree-sitter-grammars/tree-sitter-kotlin/bindings/go"
+	tree_sitter_lua "github.com/tree-sitter-grammars/tree-sitter-lua/bindings/go"
+	tree_sitter_luau "github.com/tree-sitter-grammars/tree-sitter-luau/bindings/go"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tree_sitter_bash "github.com/tree-sitter/tree-sitter-bash/bindings/go"
 	tree_sitter_c_sharp "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
+	tree_sitter_c "github.com/tree-sitter/tree-sitter-c/bindings/go"
+	tree_sitter_cpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
 	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
 	tree_sitter_java "github.com/tree-sitter/tree-sitter-java/bindings/go"
 	tree_sitter_javascript "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
 	tree_sitter_php "github.com/tree-sitter/tree-sitter-php/bindings/go"
 	tree_sitter_python "github.com/tree-sitter/tree-sitter-python/bindings/go"
+	tree_sitter_ruby "github.com/tree-sitter/tree-sitter-ruby/bindings/go"
 	tree_sitter_rust "github.com/tree-sitter/tree-sitter-rust/bindings/go"
 	tree_sitter_typescript "github.com/tree-sitter/tree-sitter-typescript/bindings/go"
 	tree_sitter_zsh "github.com/tree-sitter/tree-sitter-zsh/bindings/go"
+	tree_sitter_powershell "github.com/wharflab/tree-sitter-powershell/bindings/go"
 	tree_sitter_sql "github.com/wippyai/tree-sitter-sql/bindings/go"
 )
 
@@ -125,6 +134,32 @@ var specs = []Spec{
 		excludeNestedBoundaries: true,
 	},
 	{
+		ID:               "c",
+		Family:           "c-cpp",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "C",
+		Extensions:       []string{".c", ".h"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_c.Language())
+		},
+		fragmentKinds:           kinds("function_definition"),
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "cpp",
+		Family:           "c-cpp",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "C++",
+		Extensions:       []string{".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_cpp.Language())
+		},
+		fragmentKinds:           kinds("function_definition", "lambda_expression"),
+		excludeNestedBoundaries: true,
+	},
+	{
 		ID:               "csharp",
 		Family:           "csharp",
 		ComparisonDomain: "code",
@@ -146,6 +181,36 @@ var specs = []Spec{
 			"operator_declaration",
 		),
 		acceptBoundary:          acceptsCSharpBoundary,
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "dart",
+		Family:           "dart",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Dart",
+		Extensions:       []string{".dart"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_dart.Language())
+		},
+		fragmentKinds: kinds(
+			"function_expression",
+			"function_body",
+			"local_function_declaration",
+		),
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "gdscript",
+		Family:           "gdscript",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "GDScript",
+		Extensions:       []string{".gd"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_gdscript.Language())
+		},
+		fragmentKinds:           kinds("function_definition", "lambda"),
 		excludeNestedBoundaries: true,
 	},
 	{
@@ -192,6 +257,47 @@ var specs = []Spec{
 			return tree_sitter.NewLanguage(tree_sitter_javascript.Language())
 		},
 		fragmentKinds:           javascriptFunctions,
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "lua",
+		Family:           "lua-luau",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Lua",
+		Extensions:       []string{".lua"},
+		Shebangs:         []string{"lua", "lua5.1", "lua5.2", "lua5.3", "lua5.4", "luajit"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_lua.Language())
+		},
+		fragmentKinds:           kinds("function_declaration", "function_definition"),
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "kotlin",
+		Family:           "kotlin",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Kotlin",
+		Extensions:       []string{".kt", ".kts"},
+		Shebangs:         []string{"kotlin"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_kotlin.Language())
+		},
+		fragmentKinds:           kinds("anonymous_function", "function_declaration", "lambda_literal"),
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "luau",
+		Family:           "lua-luau",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Luau",
+		Extensions:       []string{".luau"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_luau.Language())
+		},
+		fragmentKinds:           kinds("function_declaration", "function_definition"),
 		excludeNestedBoundaries: true,
 	},
 	{
@@ -270,6 +376,34 @@ var specs = []Spec{
 			return tree_sitter.NewLanguage(tree_sitter_python.Language())
 		},
 		fragmentKinds:           kinds("function_definition", "lambda"),
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "powershell",
+		Family:           "powershell",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "PowerShell",
+		Extensions:       []string{".ps1", ".psd1", ".psm1"},
+		Shebangs:         []string{"powershell", "pwsh"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_powershell.Language())
+		},
+		fragmentKinds:           kinds("class_method_definition", "function_statement"),
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "ruby",
+		Family:           "ruby",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Ruby",
+		Extensions:       []string{".gemspec", ".rake", ".rb"},
+		Shebangs:         []string{"ruby"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_ruby.Language())
+		},
+		fragmentKinds:           kinds("lambda", "method", "singleton_method"),
 		excludeNestedBoundaries: true,
 	},
 	{

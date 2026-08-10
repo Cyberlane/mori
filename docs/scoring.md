@@ -222,7 +222,7 @@ The top-level shape is:
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 11
+    "normalization_version": 12
   },
   "threshold": 0.85,
   "files": 4,

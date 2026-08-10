@@ -96,6 +96,7 @@ function validate_email(string $value): bool {
   if ($clean === '') return false;
   return str_contains($clean, '@') && str_contains($clean, '.');
 }
+
 `)
 	writeAnalyzerFixture(t, positive, "check.hack", `function check_address(string $candidate): bool {
   $normalized = Str\trim($candidate);
@@ -126,6 +127,228 @@ function validate_email(string $value): bool {
 	if negativeResult.CandidatePairs != 0 || negativeResult.TotalMatchGroups != 0 ||
 		len(negativeResult.Groups) != 0 {
 		t.Fatalf("PHP/Hack nearby-negative result = %#v", negativeResult)
+	}
+}
+
+func TestAnalyzeCCPPPositiveAndNearbyNegative(t *testing.T) {
+	t.Parallel()
+	positive := t.TempDir()
+	writeAnalyzerFixture(t, positive, "clamp.c", `int clamp_number(int value, int minimum, int maximum) {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+}
+`)
+	writeAnalyzerFixture(t, positive, "clamp.cpp", `int clampValue(int input, int lower, int upper) {
+  if (input < lower) return lower;
+  if (input > upper) return upper;
+  return input;
+}
+`)
+	positiveResult := analyzeTwoFileFixture(t, positive, Options{Threshold: 0.70, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{{Left: "c", Right: "cpp"}}})
+	if positiveResult.CandidatePairs != 1 || positiveResult.TotalMatchGroups != 1 || len(positiveResult.Groups) != 1 || positiveResult.Groups[0].Similarity < 0.87 || positiveResult.Groups[0].Similarity > 0.89 {
+		t.Fatalf("C/C++ positive result = %#v", positiveResult)
+	}
+
+	negative := t.TempDir()
+	writeAnalyzerFixture(t, negative, "clamp.c", `int clamp_number(int value, int minimum, int maximum) {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+}
+`)
+	writeAnalyzerFixture(t, negative, "sum.cpp", `int sumValues(const int *values, int count) {
+  int total = 0;
+  for (int index = 0; index < count; index++) total += values[index];
+  return total;
+}
+`)
+	negativeResult := analyzeTwoFileFixture(t, negative, Options{Threshold: 0.70, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{{Left: "c", Right: "cpp"}}})
+	if negativeResult.CandidatePairs != 1 || negativeResult.TotalMatchGroups != 0 {
+		t.Fatalf("C/C++ nearby-negative result = %#v", negativeResult)
+	}
+}
+
+func TestAnalyzeLuaLuauAndGDScriptPositiveAndNearbyNegative(t *testing.T) {
+	t.Parallel()
+	luaRoot := t.TempDir()
+	writeAnalyzerFixture(t, luaRoot, "validate.lua", `local function validate(value)
+  if value == nil then return false end
+  return string.find(value, "@") ~= nil
+end
+`)
+	writeAnalyzerFixture(t, luaRoot, "validate.luau", `local function check(candidate: string): boolean
+  if candidate == nil then return false end
+  return string.find(candidate, "@") ~= nil
+end
+`)
+	luaResult := analyzeTwoFileFixture(t, luaRoot, Options{Threshold: 0.70, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{{Left: "lua", Right: "luau"}}})
+	if luaResult.TotalMatchGroups != 1 || len(luaResult.Groups) != 1 || luaResult.Groups[0].Similarity < 0.89 || luaResult.Groups[0].Similarity > 0.91 {
+		t.Fatalf("Lua/Luau positive result = %#v", luaResult)
+	}
+
+	gdRoot := t.TempDir()
+	writeAnalyzerFixture(t, gdRoot, "clamp.gd", `func clamp_value(value, minimum, maximum):
+    if value < minimum:
+        return minimum
+    if value > maximum:
+        return maximum
+    return value
+`)
+	writeAnalyzerFixture(t, gdRoot, "clamp.py", `def clamp_number(item, lower, upper):
+    if item < lower:
+        return lower
+    if item > upper:
+        return upper
+    return item
+`)
+	gdResult := analyzeTwoFileFixture(t, gdRoot, Options{Threshold: 0.65, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{{Left: "gdscript", Right: "python"}}})
+	if gdResult.TotalMatchGroups != 1 || len(gdResult.Groups) != 1 || gdResult.Groups[0].Similarity < 0.68 || gdResult.Groups[0].Similarity > 0.70 {
+		t.Fatalf("GDScript/Python positive result = %#v", gdResult)
+	}
+
+	negative := t.TempDir()
+	writeAnalyzerFixture(t, negative, "clamp.gd", `func clamp_value(value, minimum, maximum):
+    if value < minimum:
+        return minimum
+    if value > maximum:
+        return maximum
+    return value
+`)
+	writeAnalyzerFixture(t, negative, "sum.py", `def sum_values(values):
+    total = 0
+    for value in values:
+        total += value
+    return total
+`)
+	negativeResult := analyzeTwoFileFixture(t, negative, Options{Threshold: 0.65, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{{Left: "gdscript", Right: "python"}}})
+	if negativeResult.TotalMatchGroups != 0 {
+		t.Fatalf("GDScript/Python nearby-negative result = %#v", negativeResult)
+	}
+}
+
+func TestAnalyzeKotlinRubyDartAndPowerShellPositiveAndNearbyNegative(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		leftName  string
+		left      string
+		rightName string
+		right     string
+		negative  string
+		pair      LanguagePair
+		threshold float64
+		minimum   float64
+		maximum   float64
+	}{
+		{
+			name: "Kotlin and Java", leftName: "Clamp.kt", rightName: "Clamp.java",
+			left: `fun clamp(value: Int, minimum: Int, maximum: Int): Int {
+    if (value < minimum) return minimum
+    if (value > maximum) return maximum
+    return value
+}
+`,
+			right: `class Clamp { static int apply(int value, int minimum, int maximum) {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+} }
+`, negative: `class Sum { static int apply(int[] values) {
+  int total = 0;
+  for (int value : values) total += value;
+  return total;
+} }
+`, pair: LanguagePair{Left: "kotlin", Right: "java"}, threshold: 0.70, minimum: 0.71, maximum: 0.72,
+		},
+		{
+			name: "Ruby and Python", leftName: "clamp.rb", rightName: "clamp.py",
+			left: `def clamp(value, minimum, maximum)
+  if value < minimum
+    return minimum
+  end
+  if value > maximum
+    return maximum
+  end
+  return value
+end
+`,
+			right: `def clamp(value, minimum, maximum):
+    if value < minimum:
+        return minimum
+    if value > maximum:
+        return maximum
+    return value
+`, negative: `def total(values):
+    result = 0
+    for value in values:
+        result += value
+    return result
+`, pair: LanguagePair{Left: "ruby", Right: "python"}, threshold: 0.45, minimum: 0.47, maximum: 0.49,
+		},
+		{
+			name: "Dart and TypeScript", leftName: "clamp.dart", rightName: "clamp.ts",
+			left: `int clamp(int value, int minimum, int maximum) {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+}
+`,
+			right: `function clamp(value: number, minimum: number, maximum: number): number {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+}
+`, negative: `function total(values: number[]): number {
+  let result = 0;
+  for (const value of values) result += value;
+  return result;
+}
+`, pair: LanguagePair{Left: "dart", Right: "typescript"}, threshold: 0.55, minimum: 0.59, maximum: 0.61,
+		},
+		{
+			name: "PowerShell and C sharp", leftName: "clamp.ps1", rightName: "Clamp.cs",
+			left: `function Get-ClampedValue {
+  param([int]$Value, [int]$Minimum, [int]$Maximum)
+  if ($Value -lt $Minimum) { return $Minimum }
+  if ($Value -gt $Maximum) { return $Maximum }
+  return $Value
+}
+`,
+			right: `class Clamp { static int Apply(int value, int minimum, int maximum) {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+} }
+`, negative: `class Sum { static int Apply(int[] values) {
+  int result = 0;
+  foreach (int value in values) result += value;
+  return result;
+} }
+`, pair: LanguagePair{Left: "powershell", Right: "csharp"}, threshold: 0.50, minimum: 0.53, maximum: 0.55,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			writeAnalyzerFixture(t, root, test.leftName, test.left)
+			writeAnalyzerFixture(t, root, test.rightName, test.right)
+			options := Options{Threshold: test.threshold, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{test.pair}}
+			result := analyzeTwoFileFixture(t, root, options)
+			if len(result.Groups) != 1 || result.Groups[0].Similarity < test.minimum || result.Groups[0].Similarity > test.maximum {
+				t.Fatalf("positive result = %#v", result)
+			}
+
+			negativeRoot := t.TempDir()
+			writeAnalyzerFixture(t, negativeRoot, test.leftName, test.left)
+			writeAnalyzerFixture(t, negativeRoot, test.rightName, test.negative)
+			negative := analyzeTwoFileFixture(t, negativeRoot, options)
+			if negative.TotalMatchGroups != 0 || len(negative.Groups) != 0 {
+				t.Fatalf("nearby-negative result = %#v", negative)
+			}
+		})
 	}
 }
 

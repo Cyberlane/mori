@@ -9,6 +9,18 @@ The extension does not download Mori, upload source, create temporary source
 files, or send telemetry. Install an official Mori release separately and make
 `mori` available on `PATH`, or set `mori.executable` to an explicit local path.
 
+## Install a release package
+
+Download `mori-vscode_<version>.vsix` from the matching Mori release, then run:
+
+```sh
+code --install-extension mori-vscode_<version>.vsix
+```
+
+Marketplace and Open VSX publication are separate maintainer actions. The VSIX
+is checksummed alongside every other release asset and does not bundle or
+download the Mori executable.
+
 ## Run from source
 
 1. Open this directory in VS Code.
@@ -27,8 +39,9 @@ Settings:
 - `mori.profile`: `review`, `explore`, or `sql`; and
 - `mori.debounceMilliseconds`: 100 through 10,000 milliseconds.
 
-The reference client supports VS Code language IDs for C#, Go, Hack, Java,
-JavaScript, PHP, TypeScript, JSX, TSX, Python, Rust, shell, Swift, and SQL. Mori
+The reference client supports VS Code language IDs for C#, GDScript, Go, Hack,
+Java, JavaScript, Lua, Luau, PHP, TypeScript, JSX, TSX, Python, Rust, shell,
+Swift, and SQL. Mori
 still decides support from the discovered file path and selected dialect. A
 scan covers the containing workspace root so the unsaved buffer can be
 compared with existing repository source, then filters diagnostics back to the

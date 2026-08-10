@@ -26,12 +26,15 @@ The release workflow:
 2. reruns the full verification gate;
 3. tests and builds on five native OS/architecture runners;
 4. creates five native archives and one portable Agent Skill ZIP;
-5. generates `checksums.txt` for all six archives;
-6. creates or reuses a draft GitHub release;
-7. attaches every asset;
-8. publishes the draft;
-9. verifies the downloaded Agent Skill against the tagged source; and
-10. verifies checksums and runs every downloaded native binary.
+5. packages the VS Code client and versioned JSON Schema;
+6. generates checksum-pinned Homebrew, Scoop, and WinGet manifests;
+7. generates an SPDX source-dependency SBOM and `checksums.txt` for every asset;
+8. signs provenance, checksum-manifest, and native-archive SBOM attestations
+   through GitHub and Sigstore;
+9. creates or reuses a draft GitHub release and attaches every asset;
+10. publishes the draft; and
+11. verifies checksums, attestations, the portable Agent Skill, and every
+    downloaded native binary.
 
 A tag with a prerelease component, such as `v0.2.1-rc.1`, is published as a
 GitHub prerelease and is never marked Latest.
@@ -45,12 +48,15 @@ apply.
 After the workflow completes:
 
 - confirm the release is no longer a draft;
-- confirm six archives plus `checksums.txt` are present;
+- confirm the native and portable archives, VSIX, schema, package-manager
+  manifests, SPDX SBOM, and `checksums.txt` are present;
 - verify all archive checksums;
 - run `mori version`, `mori languages`, and `mori skill install` from release
   archives;
 - compare the portable Agent Skill with the tagged source; and
 - inspect workflow logs for native test failures or skipped jobs.
+- verify representative downloaded assets with
+  `gh attestation verify ASSET --repo Cyberlane/mori`.
 
 If a published immutable release is wrong, create a new patch release. Do not
 move or reuse its tag.

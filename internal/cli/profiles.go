@@ -105,9 +105,21 @@ func applyScanProfile(options *scanOptions, value string) error {
 }
 
 func renderProfileConfig(value string) ([]byte, error) {
-	profile, err := resolveScanProfile(value)
+	settings, err := profileSettings(value)
 	if err != nil {
 		return nil, err
+	}
+	content, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("encode config: %w", err)
+	}
+	return append(content, '\n'), nil
+}
+
+func profileSettings(value string) (config.Settings, error) {
+	profile, err := resolveScanProfile(value)
+	if err != nil {
+		return config.Settings{}, err
 	}
 	settings := config.Settings{
 		Profile:           profile.name,
@@ -126,11 +138,7 @@ func renderProfileConfig(value string) ([]byte, error) {
 		FailOnDiagnostic:  pointer(profile.failOnDiagnostic),
 		ExcludeGenerated:  pointer(profile.excludeGenerated),
 	}
-	content, err := json.MarshalIndent(settings, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("encode config: %w", err)
-	}
-	return append(content, '\n'), nil
+	return settings, nil
 }
 
 func pointer[T any](value T) *T {

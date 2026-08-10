@@ -7,6 +7,40 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-08-10
+
+### Added
+
+- Added guided `mori setup` and `mori configure` flows with safe previews,
+  explicit writes, strict answer files, and a read-only JSON protocol for
+  project coding agents.
+- Added `mori doctor`, `mori inspect`, `mori config validate`, and provenance-
+  aware effective-configuration output for first-run diagnosis and ongoing
+  maintenance.
+- Added `mori explain`, self-contained HTML reports, restrained terminal color,
+  and opt-in deterministic `--redact-paths` placeholders for reports that cross
+  a project boundary.
+- Added a bounded local Language Server Protocol implementation and a packaged,
+  dependency-free VS Code reference client for diagnostics on unsaved buffers.
+- Added C, C++, Dart, GDScript, Kotlin, Lua, Luau, PowerShell, and Ruby parsing,
+  function-boundary extraction, ABI checks, editor activation, documentation,
+  and calibrated cross-language positive and nearby-negative fixtures.
+- Added checksum-pinned Homebrew, Scoop, and WinGet release manifests, an SPDX
+  source-dependency SBOM, and signed GitHub/Sigstore attestations for release
+  assets and the checksum manifest.
+- Added a compact new-user README, task-oriented documentation, a Mori favicon,
+  and responsive forest-themed project artwork.
+
+### Changed
+
+- Normalization now uses version 12, with canonical mappings required by the
+  newly supported grammars. Existing baselines require deliberate review and
+  regeneration because scores and fingerprints can change. Report schema
+  remains version 17 and baseline schema remains version 3.
+- Release verification now checks native archives, the portable Agent Skill,
+  the JSON Schema, the VS Code package, package-manager metadata, checksums,
+  and representative provenance attestations before completion.
+
 ## [0.26.0] - 2026-08-10
 
 ### Added
@@ -535,7 +569,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/Cyberlane/mori/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/Cyberlane/mori/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/Cyberlane/mori/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/Cyberlane/mori/compare/v0.23.0...v0.24.0

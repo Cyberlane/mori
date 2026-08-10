@@ -1,537 +1,152 @@
+<p align="center">
+  <img src="docs/assets/mori-hero.webp" alt="Mori forest-green banner with the kanji for forest" width="100%">
+</p>
+
 # Mori
 
+[![Release](https://img.shields.io/github/v/release/Cyberlane/mori?color=0f766e)](https://github.com/Cyberlane/mori/releases/latest)
 [![CI](https://github.com/Cyberlane/mori/actions/workflows/ci.yml/badge.svg)](https://github.com/Cyberlane/mori/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-d97706.svg)](LICENSE)
 
-Mori finds source fragments that look alike, including functions written in
-different programming languages and top-level SQL queries.
+Mori finds source fragments with similar structure—even when they use different
+names or programming languages—and gives you an explainable shortlist to review.
 
-Use it to find possible duplicate logic before you copy, refactor, or review
-code. Mori gives you a shortlist to inspect. It cannot prove that two functions
-or queries do the same thing.
+> Mori reports structural evidence. A match is never proof that two fragments
+> behave the same way or should be merged.
 
-## What It Does
-
-Mori reads your source code locally and compares individual functions or SQL
-queries within compatible comparison domains. It ignores details such as
-formatting, comments, most variable names, and literal values so it can focus
-on structural shape.
-
-For example, it can flag a JavaScript function and a Go function that both:
-
-- check an input;
-- split it into parts;
-- loop over those parts; and
-- return early when something is wrong.
-
-Each result groups every retained source occurrence with the same normalized
-content-pair identity. It includes a percentage, exact weighted
-intersection/union totals, bounded directional feature differences, a
-shared-shape summary, and the code locations to review. A higher percentage
-means the functions have more structural overlap, not that they have identical
-behavior. A 100% result means normalized feature identity only.
+| | |
+| --- | --- |
+| 🔒 **Local** | Source stays on your machine. No upload or telemetry is required. |
+| 🌐 **Cross-language** | Compare compatible functions across supported languages. |
+| 🔎 **Explainable** | See scores, locations, shared shape, and directional differences. |
+| ⚙️ **Predictable** | Deterministic output, visible coverage, and bounded resource use. |
 
 ## Install
 
-Download a prebuilt binary for Linux, macOS, or Windows from the
-[latest release](https://github.com/Cyberlane/mori/releases/latest).
-
-Or install from source. You need Go 1.23 or newer and a C compiler.
+Download a native archive from the [latest release](https://github.com/Cyberlane/mori/releases/latest),
+or build from source with Go 1.23+ and a C compiler:
 
 ```sh
 go install github.com/Cyberlane/mori/cmd/mori@latest
 mori version
 ```
 
-Source-built installations can report the module version while leaving the
-source revision and date as `unknown` when Go does not embed VCS settings. They
-remain suitable for exploratory local review, but use an official release
-binary when a report needs complete, independently verifiable provenance.
+Official release binaries include complete build provenance and are recommended
+for CI and auditable reports.
 
-## Start Here
+Each release also includes checksum-pinned Homebrew, Scoop, and WinGet manifest
+assets, an SPDX SBOM, and GitHub/Sigstore attestations. Package-index submission
+is intentionally separate, so verify the release asset before local use.
 
-Run this from the root of a project:
+## Quick start
+
+From a project root:
+
+```sh
+mori setup
+mori scan .
+```
+
+`mori setup` inventories the project, asks a few focused questions, previews a
+conservative `.mori.json`, and writes it only after confirmation. Review its
+exclusions after the first scan; Mori cannot decide which tests, generated
+files, migrations, or framework repetition are intentional in your project.
+
+For a no-write trial:
 
 ```sh
 mori scan --profile review .
 ```
 
-The `review` profile selects same-language code, a `0.85` threshold,
-a 40-token floor, review-oriented ordering, generated-source exclusion, and a
-required aggregate coverage check. It is a conservative shortlist for manual
-source review, not a duplicate-code verdict. It cannot infer which tests,
-migrations, or repetitive framework files are intentional for your project;
-add those exclusions after reviewing the first report.
+The review profile starts with same-language code, an 85% threshold, a
+40-token floor, generated-source exclusion, and required aggregate coverage.
 
-To record the profile as explicit project settings, create `.mori.json` and
-then review its exclusions:
-
-```sh
-mori init
-mori scan .
-```
-
-`mori init` preserves an existing config unless `--force` is supplied. Use
-`mori init --stdout` to inspect or redirect the deterministic template without
-writing a file. Bare `mori scan` retains the broad pre-profile defaults for
-compatibility; use `--profile explore` when that broader intent should be
-visible in the report.
-
-To look only for matches between different languages:
-
-```sh
-mori scan \
-  --comparison-domain code \
-  --cross-language-only \
-  --threshold 0.65 \
-  --min-tokens 40 \
-  .
-```
-
-Lower `--min-tokens` toward 12 only for a deliberately broad exploratory pass;
-small callbacks and wrappers commonly dominate at that floor.
-
-TypeScript and TSX are one language family. To compare only Go with that
-family, use:
-
-```sh
-mori scan \
-  --comparison-domain code \
-  --language-pair go,typescript \
-  --threshold 0.65 \
-  --min-tokens 40 \
-  .
-```
-
-To try Mori against this repository's example files:
-
-```sh
-mori scan \
-  --comparison-domain code \
-  --cross-language-only \
-  --threshold 0.70 \
-  --min-tokens 12 \
-  examples/email-validation
-```
-
-This deliberately small fixture uses the broad 12-token exploration floor.
-Abridged example output (first group):
+Example result:
 
 ```text
 1. 92.7% structural similarity · 1 location pair(s)
    weighted feature evidence: 114 intersection / 123 union
-   A-only weighted units: 8 (135969eb81fc3f97); top features: ...
-   B-only weighted units: 1 (4c1419f1009db578); top features: ...
-   A  fingerprint 135969eb81fc3f97 · 1 occurrence(s)
-      - Validator.java:6-9  [java] looksLikeEmail
-   B  fingerprint 4c1419f1009db578 · 1 occurrence(s)
-      - validator.js:1-4  [javascript] looksLikeEmail
-      shared shape: 3 calls, 1 return, 2 bindings
+   A  Validator.java:6-9   [java]       looksLikeEmail
+   B  validator.js:1-4     [javascript] looksLikeEmail
+   shared shape: 3 calls, 1 return, 2 bindings
 ```
 
-Read both fragments before acting on a match. Mori does not understand runtime
-values, external calls, side effects, query plans, schemas, or all
-language-specific behavior.
-
-To review structurally similar SQL queries:
-
-```sh
-mori scan \
-  --comparison-domain sql-query \
-  --threshold 0.70 \
-  --min-tokens 12 \
-  examples/sql-queries
-```
-
-SQL queries are compared only with SQL queries, never with code functions.
-Mori extracts top-level `SELECT` and set-operation queries plus `INSERT`,
-`UPDATE`, and `DELETE` statements. It uses exact, immediately adjacent SQLC
-`-- name: Name :mode` comments for display names and otherwise reports
-`query@<line>`. DDL and nested queries are not independent comparison units;
-nested query structure remains part of its top-level query. Common SQLite and
-SQLC pagination parameters and SQLite `ON CONFLICT` column targets are parsed
-without weakening diagnostics for malformed nearby syntax.
-
-The default `generic` SQL parser is suitable for the documented SQLite and
-SQLC forms. Select the dedicated PostgreSQL 18 parser explicitly for a
-PostgreSQL source root or profile:
-
-```sh
-mori scan \
-  --sql-dialect postgresql \
-  --comparison-domain sql-query \
-  --threshold 0.70 \
-  --min-tokens 12 \
-  path/to/postgresql
-```
-
-One scan uses one SQL dialect for every `.sql` file it discovers. Split mixed
-dialect repositories into separate profiles. PostgreSQL procedural bodies are
-not PL/pgSQL comparison units.
-
-Go repositories can explicitly include SQL passed as a direct string argument
-to recognized `database/sql`-style `Exec`, `Query`, `QueryRow`, and `Prepare`
-methods, including their `Context` variants:
-
-```sh
-mori scan \
-  --comparison-domain sql-query \
-  --embedded-sql \
-  --sql-dialect postgresql \
-  path/to/go/project
-```
-
-This mode is off by default and requires the `sql-query` domain. It does not
-guess from arbitrary strings, follow variables, concatenate expressions, or
-perform receiver type analysis. Locations point to the enclosing Go string and
-retain parent-function metadata; inspect the host call and runtime values.
-Mori skips a file with more than 1,000 recognized calls and skips an individual
-decoded query over 256 KiB, with visible coverage warnings in both cases. A
-single string containing multiple top-level statements is one query-batch unit.
-
-## Common Uses
-
-Mori honors nested `.gitignore` and `.moriignore` files during directory scans.
-An explicitly requested file is still scanned. Add command-line exclusions for
-additional policy:
-
-```sh
-mori scan --exclude '**/*_test.go' --exclude '**/*.test.ts' .
-```
-
-Mori also classifies conservative generated-source header markers without
-changing the default scan. Use `--exclude-generated` to omit recognized
-generated files while retaining them as `excluded_generated` entries in the
-JSON `file_coverage` inventory:
-
-```sh
-mori scan --exclude-generated .
-```
-
-Store repeatable project settings in `.mori.json`:
-
-```json
-{
-  "profile": "review",
-  "threshold": 0.85,
-  "min_tokens": 40,
-  "max_groups": 250,
-  "comparison_domain": "code",
-  "ranking": "review",
-  "same_language_only": true,
-	"min_file_coverage": 0.95,
-	"max_zero_fragment_files": 2,
-	"fail_on_parse_diagnostic": true,
-  "exclude_generated": true,
-  "exclude": ["**/*_test.go"]
-}
-```
-
-Profiles supply named defaults. Explicit fields in `.mori.json` override the
-selected profile, and explicit command-line flags override both. A command-line
-`--profile` replaces the configured profile before those explicit fields are
-applied.
-
-Bash/POSIX shell and Zsh use dedicated parsers in one `shell` review family.
-They are included together by `--same-language-only`; use an explicit pair for
-a shell-dialect-only review:
-
-```sh
-mori scan \
-  --comparison-domain code \
-  --language-pair bash,zsh \
-  --threshold 0.85 \
-  --min-tokens 40 \
-  .
-```
-
-PHP and Hack use dedicated parsers in one `php-hack` review family. Modern Hack
-uses `.hack`; legacy `.php` is selected as Hack only when its first line, or
-the line after one optional shebang, begins with an exact `<?hh` header:
-
-```sh
-mori scan --language-pair php,hack --threshold 0.70 --min-tokens 12 .
-```
-
-Mori searches the current directory and its parents for `.mori.json`. Use
-`--config <path>`, `--no-config`, or `--no-ignore` to control discovery. See
-[Project configuration](docs/configuration.md) for the complete contract.
-
-Write results as JSON for a script or CI system:
-
-```sh
-mori scan --format json .
-```
-
-Write SARIF 2.1.0 for IDEs and code-scanning consumers:
-
-```sh
-mori scan --profile review --format sarif .
-```
-
-Editors can analyze an unsaved buffer without writing it to disk. The path must
-already be one discovered supported source file; Mori reads at most 16 MiB from
-standard input, applies the configured file-size limit when it is smaller, and
-automatically focuses results that touch the overlaid file:
-
-```sh
-mori scan --profile review --format sarif --stdin-path src/example.go . \
-  < src/example.go
-```
-
-The repository includes a dependency-free reference [VS Code extension](editors/vscode/README.md)
-that uses this editor-neutral contract. See [Machine and editor integration](docs/machine-integration.md)
-for stable rule IDs, suppression behavior, limits, and the versioned JSON Schema.
-
-For a human review shortlist, opt into explainable source-location ranking:
-
-```sh
-mori scan --ranking review .
-```
-
-Projects can add deterministic presentation-only path priority without changing
-scores or match eligibility:
-
-```sh
-mori scan --profile review --priority-path '**/auth/**=25' .
-```
-
-Repeat the flag or use `priority_paths` in `.mori.json`. A matching path changes
-review order only and is not evidence that a finding is risky or actionable.
-
-This prioritizes disclosed same-name, cross-directory, cross-file, and repeated
-location-pair signals before the ordinary structural ordering. It does not
-change similarity scores, fingerprints, or which groups qualify.
-
-To investigate localized repetition inside functions, opt into fixed-size
-statement windows:
-
-```sh
-mori scan --statement-blocks --block-statements 3 .
-```
-
-Block windows are a separate `block` fragment kind and never compare with full
-functions. Overlapping windows from the same file are not candidates. Mori
-skips all block windows for a function, with a coverage warning, when their
-count exceeds `--max-blocks-per-function` (default 64, maximum 256). This mode
-is intentionally off by default because it expands candidate counts and can
-surface ordinary local syntax symmetry.
-
-Mori emits a `coverage` warning when a scan discovers no supported files or
-extracts no comparison fragments. Such a result is not evidence that the
-repository has no duplication. Use strict coverage policies in automation to
-write the report and exit with status `4` when its evidence is insufficient:
-
-```sh
-mori scan --format json \
-  --require-coverage \
-  --min-file-coverage 0.95 \
-  --max-zero-fragment-files 2 \
-  --fail-on-parse-diagnostic \
-  .
-```
-
-`--min-file-coverage` divides fragment-producing files by analyzed supported
-files. Generated exclusions do not enter that denominator.
-`--max-zero-fragment-files` accepts `-1` to disable the policy, and
-`--fail-on-warning` or `--fail-on-parse-diagnostic` make incomplete inputs
-fatal independently. Every scan-backed baseline mutation evaluates the same
-policies before modifying a baseline.
-
-Schema-17 reports embed deterministic `tool` build provenance, the selected
-profile, comparison selection, domain and fragment-kind metadata, exact focus
-metadata, loaded ignore-file paths and SHA-256 content evidence, a coverage
-summary, per-file zero-fragment reasons, and aggregate unsupported-extension
-counts. They do not include a scan timestamp, hostname,
-username, source body, diff, or Git remote.
-
-Normalization version 11 adds PHP and Hack function boundaries, canonical
-syntax mappings, and curated standard-library operation aliases. It retains
-version 10's Java/C# mappings, transparent redundant parentheses, and anonymous
-member/call shape for qualified Java method calls.
-Names and name digests are never reported or fingerprinted directly, and these
-syntax mappings cannot prove call identity or behavior.
-Because this changes scores and fingerprints, baselines created by an older
-normalization version must be reviewed and regenerated.
-
-Fail a CI job when Mori finds a match at your threshold:
-
-```sh
-mori scan --threshold 0.85 --require-coverage --fail-on-match .
-```
-
-With `--fail-on-match`, Mori exits with status `3` when it finds a match. Any
-strict coverage-policy failure takes precedence and exits with status `4`.
-
-For change review, keep the full repository comparison universe while putting
-groups that touch changed files first:
-
-```sh
-mori scan --changed-since origin/main --threshold 0.85 .
-```
-
-The revision must already exist locally. Mori uses the merge base through the
-current working tree, including staged, unstaged, and untracked non-ignored
-files; it never fetches a remote. Add repeatable `--focus-path <path>` values
-for explicit paths. `--fail-on-focused-match` exits with status `3` only when
-an unsuppressed focused group exists and is mutually exclusive with
-`--fail-on-match`.
-
-One revision cannot safely describe multiple Git histories. Add each nested or
-sibling worktree explicitly with its own locally available revision:
-
-```sh
-mori scan \
-  --changed-since origin/main \
-  --changed-worktree byparr=origin/main \
-  --threshold 0.85 \
-  .
-```
-
-`--changed-since` describes the primary worktree; repeatable
-`--changed-worktree PATH=REVISION` values describe the other worktrees. Mori
-requires every discovered file to belong to a resolved root, never inherits a
-parent revision for a nested repository, and records each root's requested
-base, full resolved commits, changed paths, and deleted paths in schema-17 JSON.
-Use only repeated `--changed-worktree` values when every scanned root should be
-explicit. Excluding and scanning a nested worktree separately remains valid;
-never interpret an excluded repository as unchanged. Mori bounds one scan to
-64 explicit worktrees and 100,000 combined changed and deleted paths.
-
-To review and accept intentional candidates incrementally:
-
-```sh
-mori scan --format json --threshold 0.85 .
-mori baseline add \
-  --baseline mori-baseline.json \
-  --identity <content-pair-id> \
-  --classification intentional \
-  --note 'Reviewed with the owning team' \
-  --threshold 0.85 \
-  .
-mori scan --baseline mori-baseline.json --threshold 0.85 --fail-on-match .
-mori baseline prune --baseline mori-baseline.json --check .
-```
-
-`baseline update` is preview-only unless `--accept-all` is explicit.
-`baseline remove` revokes one identity and `baseline edit` changes its durable
-note or classification without changing acceptance. Schema-3 baselines bind
-acceptance to a deterministic digest of the effective selection, threshold,
-dialect, fragment, exclusion, loaded ignore-file content, resource, and
-coverage policies. A mismatched profile fails closed. Schema 1 and 2 remain
-readable for compatibility, but must be explicitly upgraded with
-`baseline migrate --accept-profile` before mutation. Mutating operations refuse
-truncated scans and warnings unless each reviewed warning kind is explicitly
-allowed with `--allow-warning`.
-
-Baselines are opt-in, and a suppressed candidate is reported as both a
-content-identity count and a location-pair count. The default `content` scope
-follows identical normalized content into new locations. Use
-`--baseline-scope path` when a copy in a new file must appear for review; one
-`baseline add --identity` then accepts all currently scored path pairs for that
-content identity. The conventional file name is `mori-baseline.json`; pass it
-explicitly with `--baseline`.
-
-## Supported Languages
-
-| Parser language | Review family | Comparison domain | File types | Extensionless shebangs |
-| --- | --- | --- | --- | --- |
-| Bash / POSIX shell | Shell | code | `.sh`, `.bash` | `sh`, `dash`, `bash` |
-| C# | C# | code | `.cs` | — |
-| Go | Go | code | `.go` | — |
-| Hack | PHP/Hack | code | `.hack`, or legacy `.php` with an exact `<?hh` header | — |
-| Java | Java | code | `.java` | — |
-| JavaScript and JSX | JavaScript | code | `.js`, `.jsx`, `.mjs`, `.cjs` | `node`, `nodejs` |
-| TypeScript | TypeScript | code | `.ts`, `.mts`, `.cts` | — |
-| TSX | TypeScript | code | `.tsx` | — |
-| Python | Python | code | `.py`, `.pyi` | `python`, `python3` |
-| PostgreSQL queries | SQL | sql-query | `.sql` with `--sql-dialect postgresql` | — |
-| PHP | PHP/Hack | code | `.php`, `.phtml` | — |
-| Rust | Rust | code | `.rs` | — |
-| Swift | Swift | code | `.swift` | — |
-| Zsh | Shell | code | `.zsh` | `zsh` |
-| SQL queries | SQL | sql-query | `.sql` | — |
-
-For files with no extension, Mori reads at most the first 256 bytes and uses a
-supported direct or `/usr/bin/env` shebang without executing the interpreter.
-An extension always takes precedence over a conflicting shebang. The one
-content-aware dialect exception is legacy `.php` with the bounded exact Hack
-header described above. Run
-`mori languages` to see the exact languages and shebang names in your installed
-version; `mori languages --help` describes the columns.
-
-Code parsers expose opt-in `block` fragments in addition to their normal
-function units. Shell files produce one `script` comparison fragment for their top-level
-executable statements plus independent `function` fragments for every named
-function. Function bodies are excluded from the script fingerprint and scored
-separately. A file containing only function definitions can therefore have no
-script fragment at a higher token floor while still contributing functions.
-Scripts, functions, and blocks are never compared with each other.
-
-## Known Parser Limits
-
-Tree-sitter recovery is visible in report warnings as potentially incomplete
-comparison coverage, and any comparison fragment containing a parse error is
-skipped with an explicit count. Java extracts implemented methods,
-constructors, compact constructors, and lambdas; bodyless methods are excluded.
-C# extracts implemented methods, constructors, destructors, operators,
-accessors, local functions, anonymous methods, and lambdas; bodyless members
-are excluded. Swift support extracts implemented functions,
-initializers, deinitializers, and closures. Protocol requirements, computed
-properties, accessors, and subscripts are not independent comparison units;
-Mori applies bounded byte-preserving compatibility adaptations for recognized
-valid optional-await bindings, awaited switches, empty-tuple call arguments,
-and conditional casts followed by nil coalescing. The optional-await binding
-adaptation omits the unsupported `try? await` wrapper from that repaired syntax
-tree while retaining the enclosed expression. Other unsupported Swift syntax
-can still produce visible diagnostics. Generic SQL
-dialect extensions outside Mori's pinned grammar and bounded SQLite/SQLC
-adaptations may produce diagnostics or incomplete coverage. The PostgreSQL
-parser targets PostgreSQL 18.3 syntax but does not extract PL/pgSQL bodies as
-independent units. Embedded SQL currently recognizes only direct Go string
-arguments to a bounded method-name set; it does not establish receiver types or
-runtime query contents. Statement blocks use bounded fixed-size windows rather
-than arbitrary subtree matching, and low token floors can be noisy. Mori also applies a bounded,
-byte-preserving repair for recognized cases of the
-[upstream raw-ampersand JSX text grammar issue](https://github.com/tree-sitter/tree-sitter-javascript/issues/366).
-Other JavaScript and TSX parse errors remain visible and invalidate affected
-function fragments. The pinned Zsh grammar requires `:` rather than arbitrary
-paired delimiters for the `s::`, `n::`, and `b::` glob-qualifier forms; affected
-functions produce visible parser diagnostics.
-
-PHP extracts implemented functions, methods, anonymous functions, and arrow
-functions; Hack extracts implemented functions, methods, anonymous functions,
-and lambdas. Bodyless declarations are excluded in both. Hack uses a pinned
-MIT-licensed generated-source snapshot from the now-archived
-`slackhq/tree-sitter-hack` repository, so newer Hack syntax can produce visible
-diagnostics until Mori maintains or replaces that grammar.
-
-## For AI Coding Tools
-
-Mori includes an optional skill for compatible coding agents. It helps an agent
-use Mori results as review leads rather than treating a score as proof.
-
-Install it in the current project:
+Always read both locations. Mori does not establish equivalent runtime values,
+effects, types, external calls, permissions, transactions, or error behavior.
+
+## Choose a workflow
+
+| Goal | Start with |
+| --- | --- |
+| Review likely same-language duplication | `mori scan --profile review .` |
+| Explore across languages | `mori scan --profile explore --cross-language-only .` |
+| Review one language pair | `mori scan --language-pair go,typescript .` |
+| Review SQL queries | `mori scan --profile sql path/to/sql` |
+| Produce CI or agent evidence | `mori scan --profile review --format json .` |
+| Produce editor diagnostics | `mori scan --profile review --format sarif .` |
+| Save a local visual report | `mori scan --profile review --format html . > mori.html` |
+| Inspect language coverage | `mori inspect .` |
+| Check project setup | `mori doctor .` |
+
+Lower the token floor toward 12 only for deliberate broad exploration; small
+callbacks and wrappers commonly dominate at that size.
+
+Use `mori explain <content-pair-id> [scan options] .` to reproduce and isolate
+one reported identity. Text output uses restrained color on terminals; set
+`--color never` or `NO_COLOR` to disable it.
+
+## Supported source
+
+Mori currently supports:
+
+- Bash/POSIX shell and Zsh;
+- C, C++, C#, Dart, GDScript, Go, Hack, Java, JavaScript/JSX, Kotlin, Lua,
+  Luau, PHP, PowerShell, Python, Ruby, Rust, Swift, TypeScript/TSX;
+- generic SQL queries and explicitly selected PostgreSQL queries.
+
+Run `mori languages` for the exact extensions, families, fragment kinds, and
+extensionless shebangs supported by your installed version. See
+[Languages and parser limits](docs/reference/languages-and-parser-limits.md)
+for comparison boundaries and known gaps.
+
+## Editors and AI coding tools
+
+The repository includes a dependency-free
+[VS Code reference client](editors/vscode/README.md). It analyzes unsaved
+buffers through a local Mori process and reports SARIF diagnostics without
+uploading source.
+
+Install Mori's review skill into a project for compatible coding agents:
 
 ```sh
 mori skill install --project .
 ```
 
-Install it for your user account instead:
+The skill teaches agents to treat matches as review leads, verify coverage,
+inspect both source locations, and avoid score-only refactors.
+
+To let a project agent configure Mori without granting hidden write access:
 
 ```sh
-mori skill install --global
+mori setup --agent --format json .
 ```
 
-## More Detail
+The agent can answer the emitted questions and preview the exact configuration
+before an explicit `--apply`. See [Editors and coding agents](docs/guides/editors-and-agents.md).
 
-- [How Mori scores fragments](docs/scoring.md)
-- [Scan selection controls](docs/scan-selection.md)
+## Documentation
+
+- [Documentation home](docs/README.md)
+- [Getting started](docs/getting-started.md)
+- [Reviewing results](docs/guides/reviewing-results.md)
+- [SQL and embedded SQL](docs/guides/sql.md)
+- [Automation and baselines](docs/guides/automation-and-baselines.md)
+- [Editors and coding agents](docs/guides/editors-and-agents.md)
 - [Project configuration](docs/configuration.md)
-- [Machine and editor integration](docs/machine-integration.md)
+- [Scoring](docs/scoring.md)
+- [Machine integration](docs/machine-integration.md)
 - [Architecture](docs/architecture.md)
-- [Add a language](docs/adding-a-language.md)
-- [Contributing](CONTRIBUTING.md)
+- [Adding a language](docs/adding-a-language.md)
 
 ## Development
 
@@ -539,29 +154,10 @@ mori skill install --global
 make check
 ```
 
-Run Mori's explicit production-code self-review profile with:
-
-```sh
-make dogfood
-```
-
-Run the redistributable labeled calibration corpus with:
-
-```sh
-make corpus
-go run ./internal/cmd/corpuseval
-```
-
-The corpus records reviewed positives, intentional structural similarity, and
-false positives across code, shell, generic SQL, and PostgreSQL. Its metrics
-are regression evidence for the included cases, not a universal precision or
-threshold claim. See [corpus/README.md](corpus/README.md).
-
-The config in `configs/self-review.mori.json` is not auto-discovered. It records
-the `review` profile plus explicit release-stable values and repository-specific
-exclusions, so normal development and cross-language example commands keep
-their own selection settings.
+See [Contributing](CONTRIBUTING.md) for development policy. The calibration
+corpus is regression evidence for its reviewed cases, not a universal accuracy
+claim.
 
 ## License
 
-Mori is available under the [MIT License](LICENSE).
+[MIT](LICENSE)

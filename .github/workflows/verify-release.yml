@@ -75,7 +75,7 @@ jobs:
             --dir dist
 
           cd dist
-          expected="$(awk -v name="./$archive" '$2 == name { print $1 }' checksums.txt)"
+          expected="$(awk -v name="$archive" '$2 == name || $2 == "./" name { print $1 }' checksums.txt)"
           if [[ -z "$expected" ]]; then
             echo "No checksum found for $archive." >&2
             exit 1
