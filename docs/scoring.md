@@ -16,6 +16,7 @@ For each comparison fragment, the normalizer may emit:
 | `edge:` | canonical parent-child relation | `edge:flow:return>expression:call` |
 | `role:` | selected grammar field role | `role:condition>expression:comparison` |
 | `semantic:` | curated operation-family hint | `semantic:membership` |
+| `ordered:` | bounded canonical position evidence | `ordered:statement:first:binding` |
 
 Semantic hints currently cover membership, pattern matching, length, trimming,
 case conversion, filtering, mapping, and reduction. They have weight two.
@@ -166,9 +167,18 @@ top features ordered by descending count then feature name. The bounded lists
 can omit lower-count feature names without losing the exact totals.
 
 Text output labels a 100% score as **normalized feature identity** and states
-that it is not proof of semantic or behavioral equivalence. These fields make
-existing scores easier to inspect; they do not change normalization,
-fingerprints, eligibility, ranking, or scores.
+that it is not proof of semantic or behavioral equivalence. Schema 16 added
+these explanation fields without changing the then-current scores.
+
+Normalization version 9 separately adds weight-one ordered evidence. Direct
+statements within canonical blocks are associated with `first`, `middle`,
+`last`, or `only` positions. Calls can also be associated with a canonical
+control position and a fragment-local anonymous callee slot. Call evidence is
+emitted only for two through eight distinct callees and is capped at eight call
+occurrences per fragment. Callee names and name digests are never serialized;
+the lexical assignment is local to each fragment, low-weight, and not a claim
+that similarly numbered slots identify the same operation. These features can
+make exchanged operations visible while limiting identifier influence.
 
 Every fragment report includes a stable content fingerprint derived from its
 normalized feature bag. Feature names are sorted before SHA-256 hashing and
@@ -196,7 +206,7 @@ The top-level shape is:
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 8
+    "normalization_version": 9
   },
   "threshold": 0.85,
   "files": 4,
@@ -325,6 +335,12 @@ Schema 16 adds exact and bounded difference-oriented structural evidence to
 each retained group. It changes reporting only. Normalization remains version
 8 and baseline schema remains version 3.
 
+Normalization version 9 adds bounded ordered statement and anonymous
+callee/control-position evidence without changing the schema-16 JSON shape or
+baseline schema 3. Scores, fingerprints, and accepted identities can change,
+so older-normalization baselines fail closed and require deliberate review and
+regeneration.
+
 Schema 9 added a deterministic `file_coverage` array with one entry per analyzed
 or generated-excluded supported file. Each entry records its language, review
 family, comparison domain, analysis status, generated-source classification,
@@ -396,8 +412,10 @@ match or that explicit migration is performed.
 
 The file also records the Mori version, normalization version, threshold,
 stable identities, and human-readable locations. The normalization version
-must match the running binary; after a normalization change, run `baseline
-update` deliberately and review the resulting diff.
+must match the running binary. Preserve the old file for review, generate a new
+baseline using the same effective scan profile, and selectively add reviewed
+identities; use `baseline update --accept-all` only when accepting every
+currently reported identity is deliberate.
 
 `baseline prune` removes entries whose IDs no longer occur, while
 `baseline prune --check` reports stale entries and exits with status `3`

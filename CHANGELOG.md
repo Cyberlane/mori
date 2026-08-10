@@ -7,6 +7,18 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added low-weight canonical statement-position features and bounded anonymous
+  callee-role features that distinguish calls exchanged between control and
+  linear positions without serializing callee names or name digests.
+
+### Changed
+
+- Normalization now uses version 9. Existing baselines require deliberate
+  review and regeneration because fingerprints and scores can change. Report
+  schema remains version 16 and baseline schema remains version 3.
+
 ## [0.22.0] - 2026-08-10
 
 ### Added

@@ -78,6 +78,76 @@ function total(values) {
 	}
 }
 
+func TestOrderedCallRolesDistinguishSwapsWithoutExposingNames(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "ordered.go")
+	content := `package sample
+
+func original(ok bool) {
+	audit()
+	if ok { persist() }
+}
+
+func renamed(flag bool) {
+	logEvent()
+	if flag { storeRecord() }
+}
+
+func swapped(ok bool) {
+	persist()
+	if ok { audit() }
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.Detect(path)
+	if !ok {
+		t.Fatal("Go grammar not detected")
+	}
+	fragments, warnings := parser.File(context.Background(), source.File{
+		Path: path, DisplayPath: "ordered.go", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 3 {
+		t.Fatalf("warnings/fragments = %#v/%d, want none/3", warnings, len(fragments))
+	}
+	byName := make(map[string]model.Fragment, len(fragments))
+	for _, fragment := range fragments {
+		byName[fragment.Location.Name] = fragment
+	}
+
+	renameScore, _, _ := similarity.WeightedJaccard(
+		byName["original"].Features,
+		byName["renamed"].Features,
+	)
+	if renameScore != 1 {
+		t.Fatalf("anonymous callee rename score = %.3f, want 1.0", renameScore)
+	}
+	swapScore, _, _ := similarity.WeightedJaccard(
+		byName["original"].Features,
+		byName["swapped"].Features,
+	)
+	if swapScore >= 1 {
+		t.Fatalf("swapped call score = %.3f, want below identity", swapScore)
+	}
+
+	features := byName["original"].Features
+	if features["ordered:call:linear:callee-slot-0"] != 1 ||
+		features["ordered:call:branch:callee-slot-1"] != 1 {
+		t.Fatalf("ordered call features = %#v", features)
+	}
+	if features["ordered:statement:first:statement:expression"] != 1 ||
+		features["ordered:statement:last:flow:if"] != 1 {
+		t.Fatalf("ordered statement features = %#v", features)
+	}
+	for feature := range features {
+		if strings.Contains(feature, "audit") || strings.Contains(feature, "persist") {
+			t.Fatalf("callee name leaked into feature %q", feature)
+		}
+	}
+}
+
 func TestLiteralDigestsExposeDriftWithoutChangingFingerprint(t *testing.T) {
 	t.Parallel()
 

@@ -317,6 +317,13 @@ summary, per-file zero-fragment reasons, and aggregate unsupported-extension
 counts. They do not include a scan timestamp, hostname,
 username, source body, diff, or Git remote.
 
+Normalization version 9 adds low-weight canonical statement-position evidence
+and at most eight anonymous callee/control-position features per fragment.
+Callee names and name digests are never reported or fingerprinted directly;
+the bounded fragment-local slots cannot prove call identity or behavior.
+Because this changes scores and fingerprints, baselines created by an older
+normalization version must be reviewed and regenerated.
+
 Fail a CI job when Mori finds a match at your threshold:
 
 ```sh
