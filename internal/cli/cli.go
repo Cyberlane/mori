@@ -65,6 +65,16 @@ func RunWithInput(
 	switch args[0] {
 	case "scan":
 		return runScan(ctx, args[1:], stdin, stdout, stderr)
+	case "setup":
+		return runProjectSetup(ctx, "setup", args[1:], stdin, stdout, stderr)
+	case "configure":
+		return runProjectSetup(ctx, "configure", args[1:], stdin, stdout, stderr)
+	case "config":
+		return runConfigCommand(args[1:], stdout, stderr)
+	case "inspect":
+		return runInspect(ctx, args[1:], stdout, stderr)
+	case "doctor":
+		return runDoctor(ctx, args[1:], stdout, stderr)
 	case "init":
 		return runInit(args[1:], stdout, stderr)
 	case "baseline":
@@ -2178,6 +2188,11 @@ func writeRootUsage(writer io.Writer) error {
 		"森 (mori) — cross-language structural similarity for source code\n",
 		"\nUsage:\n",
 		"  mori scan [options] [path ...]\n",
+		"  mori setup [--agent [--format json]] [--answers <path|-> [--apply]] [directory]\n",
+		"  mori configure [--agent [--format json]] [--answers <path|-> [--apply]] [directory]\n",
+		"  mori config <show|validate> [options] [directory]\n",
+		"  mori inspect [--format text|json] [directory]\n",
+		"  mori doctor [--format text|json] [directory]\n",
 		"  mori init [--profile review|explore|sql] [--stdout | [--force] [directory]]\n",
 		"  mori baseline add --baseline <path> --identity <id> [options] [path ...]\n",
 		"  mori baseline remove --baseline <path> --identity <id>\n",

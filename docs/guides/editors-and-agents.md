@@ -54,3 +54,44 @@ It explicitly prohibits treating a score as proof of equivalent behavior.
 Agent installation, project configuration, refactoring, baselining, CI,
 committing, pushing, and releasing are separate permissions. Installing the
 skill alone does not authorize any of the others.
+
+## Agent-guided project setup
+
+Ask Mori for a deterministic, read-only project inventory and question plan:
+
+```sh
+mori setup --agent --format json . > mori-setup-plan.json
+```
+
+The plan uses project-relative paths and describes the supported-language
+inventory, unsupported extensions, current configuration state, questions, and
+next commands. A project agent can write a small answers document such as:
+
+```json
+{
+  "profile": "review",
+  "comparison_mode": "cross-language",
+  "strictness": "standard",
+  "exclude_generated": true,
+  "exclude": ["fixtures/**"]
+}
+```
+
+Preview the exact `.mori.json` without writing:
+
+```sh
+mori setup --answers mori-answers.json --dry-run .
+```
+
+Apply only after review:
+
+```sh
+mori setup --answers mori-answers.json --apply .
+mori doctor .
+```
+
+Use `mori configure --agent` and the corresponding `configure --answers`
+commands for an existing file. Answer files are strict JSON, symlinks are
+refused, and configuration replacement is atomic. These commands do not create
+a baseline, install a hook or skill, edit CI, refactor source, commit, push, or
+release anything.

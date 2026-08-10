@@ -39,13 +39,14 @@ for CI and auditable reports.
 From a project root:
 
 ```sh
-mori init
+mori setup
 mori scan .
 ```
 
-`mori init` creates a conservative `.mori.json`. Review its exclusions after
-the first scan; Mori cannot decide which tests, generated files, migrations, or
-framework repetition are intentional in your project.
+`mori setup` inventories the project, asks a few focused questions, previews a
+conservative `.mori.json`, and writes it only after confirmation. Review its
+exclusions after the first scan; Mori cannot decide which tests, generated
+files, migrations, or framework repetition are intentional in your project.
 
 For a no-write trial:
 
@@ -79,6 +80,8 @@ effects, types, external calls, permissions, transactions, or error behavior.
 | Review SQL queries | `mori scan --profile sql path/to/sql` |
 | Produce CI or agent evidence | `mori scan --profile review --format json .` |
 | Produce editor diagnostics | `mori scan --profile review --format sarif .` |
+| Inspect language coverage | `mori inspect .` |
+| Check project setup | `mori doctor .` |
 
 Lower the token floor toward 12 only for deliberate broad exploration; small
 callbacks and wrappers commonly dominate at that size.
@@ -112,6 +115,15 @@ mori skill install --project .
 
 The skill teaches agents to treat matches as review leads, verify coverage,
 inspect both source locations, and avoid score-only refactors.
+
+To let a project agent configure Mori without granting hidden write access:
+
+```sh
+mori setup --agent --format json .
+```
+
+The agent can answer the emitted questions and preview the exact configuration
+before an explicit `--apply`. See [Editors and coding agents](docs/guides/editors-and-agents.md).
 
 ## Documentation
 

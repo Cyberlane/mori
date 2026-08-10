@@ -28,16 +28,22 @@ The `review` profile selects same-language code, an `0.85` threshold, a
 required aggregate coverage check. It is a conservative shortlist, not a
 duplicate-code verdict.
 
-To make those values explicit and reviewable in the repository:
+To make those values explicit and reviewable in the repository, use the guided
+setup:
 
 ```sh
-mori init
+mori setup
 mori scan .
 ```
 
-`mori init` refuses to replace an existing `.mori.json` unless `--force` is
-explicit. `mori init --stdout` prints the deterministic template without
-writing a file.
+Setup inventories supported and unsupported source, asks about the primary
+workflow, comparison mode, coverage policy, generated source, and exclusions,
+then previews the exact file before asking to write it. Use `mori configure` to
+change an existing configuration and `mori doctor` to check it.
+
+The lower-level `mori init` command remains available for scripts. It refuses
+to replace an existing `.mori.json` unless `--force` is explicit, while
+`mori init --stdout` prints the deterministic template without writing a file.
 
 ## Pick a profile
 
@@ -100,3 +106,12 @@ Inspect unsupported extensions, generated exclusions, every zero-fragment
 file, parser diagnostics, warnings, and report truncation. Continue with
 [Reviewing results](guides/reviewing-results.md) or read the complete
 [configuration reference](configuration.md).
+
+Useful setup checks:
+
+```sh
+mori inspect --format json .
+mori config validate .
+mori config show --effective --provenance .
+mori doctor .
+```
