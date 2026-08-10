@@ -2022,6 +2022,12 @@ func executeScan(
 	}
 	if focus != nil {
 		annotateFocusCoverage(focus, options, changes, discovered)
+		focusWarnings = nil
+		if missing := focus.RequiredFocusFiles - focus.CoveredFocusFiles; missing > 0 {
+			focusWarnings = append(focusWarnings, model.Warning{
+				Kind: "focus", Message: fmt.Sprintf("%d supported focused path(s) were excluded or not discovered", missing),
+			})
+		}
 	}
 	discovered.Warnings = append(discovered.Warnings, initialWarnings...)
 	discovered.Warnings = append(discovered.Warnings, focusWarnings...)

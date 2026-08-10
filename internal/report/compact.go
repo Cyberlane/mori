@@ -25,7 +25,7 @@ func Compact(writer io.Writer, report model.Report) error {
 	}
 	if focus := report.Configuration.Focus; focus != nil {
 		if _, err := fmt.Fprintf(
-			writer, "focus: %d/%d non-deleted file(s) analyzed; %d focused group(s)\n",
+			writer, "focus: %d/%d supported non-deleted file(s) analyzed; %d focused group(s)\n",
 			focus.CoveredFocusFiles, focus.RequiredFocusFiles, report.TotalFocusedMatchGroups,
 		); err != nil {
 			return err
