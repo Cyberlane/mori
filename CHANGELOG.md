@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-08-11
+
 ### Added
 
 - Baseline schema 4 adds `false-positive` as a durable review classification.
