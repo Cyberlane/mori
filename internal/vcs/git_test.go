@@ -150,6 +150,45 @@ func TestParseNameStatusRejectsUnsafeAndUnboundedPaths(t *testing.T) {
 	}
 }
 
+func TestResolveIndexReadsOnlyStageZeroSnapshot(t *testing.T) {
+	root := initRepository(t)
+	writeFile(t, root, "sample.go", "package sample\nfunc First() int { return 1 }\n")
+	runGit(t, root, "add", ".")
+	runGit(t, root, "commit", "-m", "base")
+	writeFile(t, root, "sample.go", "package sample\nfunc Staged() int { return 2 }\n")
+	runGit(t, root, "add", "sample.go")
+	writeFile(t, root, "sample.go", "package sample\nfunc Working() int { return 3 }\n")
+
+	snapshot, err := ResolveIndex(context.Background(), root)
+	if err != nil {
+		t.Fatalf("ResolveIndex: %v", err)
+	}
+	if !reflect.DeepEqual(snapshot.ChangedPaths, []string{"sample.go"}) || snapshot.IndexDigest == "" {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+	entry, ok := IndexEntryForPath(snapshot, "sample.go")
+	if !ok {
+		t.Fatal("sample.go missing from index")
+	}
+	content, size, err := ReadIndexBlob(context.Background(), snapshot, entry, 1024)
+	if err != nil {
+		t.Fatalf("ReadIndexBlob: %v", err)
+	}
+	if !strings.Contains(string(content), "Staged") || strings.Contains(string(content), "Working") || int64(len(content)) != size {
+		t.Fatalf("content = %q, size = %d", content, size)
+	}
+}
+
+func TestParseIndexEntriesRejectsUnsafeAndUnmergedEntries(t *testing.T) {
+	oid := strings.Repeat("a", 40)
+	if _, err := parseIndexEntries([]byte("100644 "+oid+" 0\t../outside.go\x00"), 10); err == nil {
+		t.Fatal("unsafe index path returned nil")
+	}
+	if _, err := parseIndexEntries([]byte("100644 "+oid+" 2\tconflict.go\x00"), 10); err == nil || !strings.Contains(err.Error(), "unmerged") {
+		t.Fatalf("unmerged index error = %v", err)
+	}
+}
+
 func initRepository(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

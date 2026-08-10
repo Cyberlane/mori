@@ -113,6 +113,14 @@ func Load(path string) (Settings, error) {
 	if len(content) > maxBytes {
 		return Settings{}, fmt.Errorf("config exceeds %d bytes while reading", maxBytes)
 	}
+	return Decode(content)
+}
+
+// Decode decodes one bounded strict configuration snapshot.
+func Decode(content []byte) (Settings, error) {
+	if len(content) > maxBytes {
+		return Settings{}, fmt.Errorf("config exceeds %d bytes", maxBytes)
+	}
 	decoder := json.NewDecoder(bytes.NewReader(content))
 	decoder.DisallowUnknownFields()
 	var settings Settings

@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 17
+const SchemaVersion = 18
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -168,6 +168,7 @@ type FocusConfig struct {
 	BaseCommit           string                `json:"base_commit,omitempty"`
 	MergeBase            string                `json:"merge_base,omitempty"`
 	HeadCommit           string                `json:"head_commit,omitempty"`
+	IndexDigest          string                `json:"index_digest,omitempty"`
 	WorkingTreeIncluded  bool                  `json:"working_tree_included"`
 	UntrackedIncluded    bool                  `json:"untracked_included"`
 	ChangedPaths         []string              `json:"changed_paths"`
@@ -273,6 +274,17 @@ type EffectiveConfig struct {
 	BaselineStatus    string               `json:"baseline_profile_status,omitempty"`
 	StdinPath         string               `json:"stdin_path,omitempty"`
 	Focus             *FocusConfig         `json:"focus,omitempty"`
+	Input             *InputSnapshot       `json:"input,omitempty"`
+}
+
+// InputSnapshot identifies the immutable input view used for a scan.
+type InputSnapshot struct {
+	Mode                string `json:"mode"`
+	GitRoot             string `json:"git_root,omitempty"`
+	HeadCommit          string `json:"head_commit,omitempty"`
+	IndexDigest         string `json:"index_digest,omitempty"`
+	WorkingTreeIncluded bool   `json:"working_tree_included"`
+	UntrackedIncluded   bool   `json:"untracked_included"`
 }
 
 // IgnoreFileEvidence identifies the exact ignore content used during source

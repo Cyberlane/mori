@@ -158,6 +158,8 @@ type scanOptions struct {
 	allowedWarnings    stringList
 	stdinPath          string
 	stdinContent       []byte
+	staged             bool
+	stagedSnapshot     *vcs.IndexSnapshot
 }
 
 func defaultScanOptions() scanOptions {
@@ -201,6 +203,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 			options.stdinPath,
 			"analyze bounded stdin as the unsaved content of one discovered source path",
 		)
+		flags.BoolVar(&options.staged, "staged", options.staged, "analyze the immutable Git index instead of working-tree files")
 	}
 	flags.StringVar(
 		&options.comparisonDomain,
@@ -399,6 +402,9 @@ func parseScanOptions(
 	})
 	options.noteSet = visited["note"]
 	options.classificationSet = visited["classification"]
+	if !options.staged {
+		options.stagedSnapshot = nil
+	}
 	reconcileCLISelection(&options, visited)
 	options.respectIgnore = !options.noIgnore
 	if err := validateScanOptions(options); err != nil {
@@ -413,6 +419,18 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 		return scanOptions{}, err
 	}
 	options := defaultScanOptions()
+	staged, err := findStagedRequest(args)
+	if err != nil {
+		return scanOptions{}, err
+	}
+	if staged {
+		snapshot, err := vcs.ResolveIndex(context.Background(), ".")
+		if err != nil {
+			return scanOptions{}, fmt.Errorf("resolve --staged input: %w", err)
+		}
+		options.staged = true
+		options.stagedSnapshot = &snapshot
+	}
 	options.noConfig = request.disabled
 	options.requestedConfig = request.path
 	requestedProfile, err := findProfileRequest(args)
@@ -429,6 +447,32 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 	}
 
 	path := request.path
+	if options.stagedSnapshot != nil {
+		settings, stagedPath, found, err := loadStagedConfig(context.Background(), *options.stagedSnapshot, path)
+		if err != nil {
+			return scanOptions{}, err
+		}
+		if !found {
+			if requestedProfile != "" {
+				if err := applyScanProfile(&options, requestedProfile); err != nil {
+					return scanOptions{}, err
+				}
+			}
+			return options, nil
+		}
+		selectedProfile := settings.Profile
+		if requestedProfile != "" {
+			selectedProfile = requestedProfile
+		}
+		if selectedProfile != "" {
+			if err := applyScanProfile(&options, selectedProfile); err != nil {
+				return scanOptions{}, err
+			}
+		}
+		applyConfig(&options, settings, filepath.Dir(stagedPath))
+		options.configPath = displayCLIPath(stagedPath)
+		return options, nil
+	}
 	if path == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -464,6 +508,88 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 	applyConfig(&options, settings, filepath.Dir(path))
 	options.configPath = displayCLIPath(path)
 	return options, nil
+}
+
+func findStagedRequest(args []string) (bool, error) {
+	staged := false
+	for _, argument := range args {
+		if argument == "--" {
+			break
+		}
+		switch {
+		case argument == "--staged":
+			staged = true
+		case strings.HasPrefix(argument, "--staged="):
+			value, err := strconv.ParseBool(strings.TrimPrefix(argument, "--staged="))
+			if err != nil {
+				return false, fmt.Errorf("invalid value for --staged: %w", err)
+			}
+			staged = value
+		}
+	}
+	return staged, nil
+}
+
+func loadStagedConfig(
+	ctx context.Context,
+	snapshot vcs.IndexSnapshot,
+	requested string,
+) (config.Settings, string, bool, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return config.Settings{}, "", false, err
+	}
+	var candidates []string
+	if requested != "" {
+		relative, err := vcs.RelativeIndexPath(snapshot, requested)
+		if err != nil {
+			return config.Settings{}, "", false, err
+		}
+		candidates = []string{relative}
+	} else {
+		relative, err := vcs.RelativeIndexPath(snapshot, cwd)
+		if err != nil {
+			return config.Settings{}, "", false, err
+		}
+		current := filepath.FromSlash(relative)
+		for {
+			candidate := config.FileName
+			if current != "." {
+				candidate = filepath.ToSlash(filepath.Join(current, config.FileName))
+			}
+			candidates = append(candidates, candidate)
+			if current == "." {
+				break
+			}
+			parent := filepath.Dir(current)
+			if parent == current || parent == "" {
+				parent = "."
+			}
+			current = parent
+		}
+	}
+	for _, candidate := range candidates {
+		entry, found := vcs.IndexEntryForPath(snapshot, candidate)
+		if !found {
+			continue
+		}
+		if entry.Mode != "100644" && entry.Mode != "100755" {
+			return config.Settings{}, "", false, errors.New("staged config is not a regular file")
+		}
+		content, _, err := vcs.ReadIndexBlob(ctx, snapshot, entry, 1024*1024)
+		if err != nil {
+			return config.Settings{}, "", false, err
+		}
+		settings, err := config.Decode(content)
+		if err != nil {
+			return config.Settings{}, "", false, err
+		}
+		return settings, filepath.Join(snapshot.Root, filepath.FromSlash(candidate)), true, nil
+	}
+	if requested != "" {
+		return config.Settings{}, "", false, fmt.Errorf("staged config %q is not present in the Git index", requested)
+	}
+	return config.Settings{}, "", false, nil
 }
 
 func findProfileRequest(args []string) (string, error) {
@@ -721,6 +847,9 @@ func validateScanOptions(options scanOptions) error {
 	if options.stdinPath != "" && options.baselinePath != "" {
 		return errors.New("--stdin-path cannot be used with --baseline")
 	}
+	if options.staged && (options.stdinPath != "" || options.changedSince != "" || len(options.changedWorktrees) > 0) {
+		return errors.New("--staged cannot be combined with --stdin-path, --changed-since, or --changed-worktree")
+	}
 	if _, err := resolveSQLDialect(options.sqlDialect); err != nil {
 		return err
 	}
@@ -756,8 +885,8 @@ func validateScanOptions(options scanOptions) error {
 		return errors.New("--fail-on-match and --fail-on-focused-match cannot be used together")
 	}
 	if options.failOnFocusedMatch && len(options.focusPaths) == 0 && options.changedSince == "" &&
-		len(options.changedWorktrees) == 0 {
-		return errors.New("--fail-on-focused-match requires --focus-path, --changed-since, or --changed-worktree")
+		len(options.changedWorktrees) == 0 && !options.staged {
+		return errors.New("--fail-on-focused-match requires --focus-path, --changed-since, --changed-worktree, or --staged")
 	}
 	if _, err := parseChangedWorktreeSpecs(options.changedWorktrees); err != nil {
 		return err
@@ -1641,7 +1770,7 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, err
 	}
-	discovered, err := source.DiscoverContext(ctx, paths, source.Options{
+	discoveryOptions := source.Options{
 		Excludes:          options.excludes,
 		MaxFileBytes:      options.maxFileBytes,
 		IgnoreFiles:       options.respectIgnore,
@@ -1649,7 +1778,17 @@ func executeScan(
 		SQLDialect:        sqlDialect,
 		EmbeddedSQL:       options.embeddedSQL,
 		ExcludeGenerated:  options.excludeGenerated,
-	})
+	}
+	var discovered source.Result
+	if options.stagedSnapshot != nil {
+		entries, err := stagedSourceEntries(ctx, *options.stagedSnapshot, options.maxFileBytes, sqlDialect)
+		if err != nil {
+			return model.Report{}, fmt.Errorf("read staged source: %w", err)
+		}
+		discovered, err = source.DiscoverSnapshot(ctx, options.stagedSnapshot.Root, paths, entries, discoveryOptions)
+	} else {
+		discovered, err = source.DiscoverContext(ctx, paths, discoveryOptions)
+	}
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
 	}
@@ -1688,14 +1827,21 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, err
 	}
-	changes, worktreeMode, err := resolveChangedWorktrees(
-		ctx,
-		discovered.Files,
-		options.changedSince,
-		options.changedWorktrees,
-	)
-	if err != nil {
-		return model.Report{}, fmt.Errorf("resolve changed files: %w", err)
+	var changes []vcs.Changes
+	worktreeMode := false
+	if options.stagedSnapshot != nil {
+		changes = []vcs.Changes{{
+			Root: options.stagedSnapshot.Root, HeadCommit: options.stagedSnapshot.HeadCommit,
+			ChangedPaths: append([]string{}, options.stagedSnapshot.ChangedPaths...),
+			DeletedPaths: append([]string{}, options.stagedSnapshot.DeletedPaths...),
+		}}
+	} else {
+		changes, worktreeMode, err = resolveChangedWorktrees(
+			ctx, discovered.Files, options.changedSince, options.changedWorktrees,
+		)
+		if err != nil {
+			return model.Report{}, fmt.Errorf("resolve changed files: %w", err)
+		}
 	}
 	focus, focusSet, focusWarnings, err := resolveFocus(
 		options.focusPaths,
@@ -1705,6 +1851,15 @@ func executeScan(
 	)
 	if err != nil {
 		return model.Report{}, fmt.Errorf("resolve focus: %w", err)
+	}
+	if focus != nil && options.stagedSnapshot != nil {
+		focus.Mode = "git-index"
+		if len(options.focusPaths) > 0 {
+			focus.Mode = "git-index-and-explicit"
+		}
+		focus.IndexDigest = options.stagedSnapshot.IndexDigest
+		focus.WorkingTreeIncluded = false
+		focus.UntrackedIncluded = false
 	}
 	discovered.Warnings = append(discovered.Warnings, initialWarnings...)
 	discovered.Warnings = append(discovered.Warnings, focusWarnings...)
@@ -1772,11 +1927,47 @@ func executeScan(
 		StdinPath:         displayOptionalPath(options.stdinPath),
 		Focus:             focus,
 	}
+	if options.stagedSnapshot != nil {
+		result.Configuration.Input = &model.InputSnapshot{
+			Mode: "git-index", GitRoot: displayCLIPath(options.stagedSnapshot.Root),
+			HeadCommit: options.stagedSnapshot.HeadCommit, IndexDigest: options.stagedSnapshot.IndexDigest,
+			WorkingTreeIncluded: false, UntrackedIncluded: false,
+		}
+	}
 	result.Tool = buildinfo.Current()
 	result.Tool.NormalizationVersion = normalize.Version
 	sort.Strings(result.Configuration.Excludes)
 	sort.Strings(result.Configuration.LanguagePairs)
 	return result, nil
+}
+
+func stagedSourceEntries(
+	ctx context.Context,
+	snapshot vcs.IndexSnapshot,
+	maxFileBytes int64,
+	sqlDialect string,
+) ([]source.SnapshotEntry, error) {
+	entries := make([]source.SnapshotEntry, 0, len(snapshot.Entries))
+	for _, entry := range snapshot.Entries {
+		item := source.SnapshotEntry{Path: entry.Path, Mode: entry.Mode}
+		base := filepath.Base(filepath.FromSlash(entry.Path))
+		_, supported := language.DetectWithSQLDialect(entry.Path, sqlDialect)
+		needsContent := supported || filepath.Ext(entry.Path) == "" || base == ".gitignore" || base == ".moriignore"
+		if needsContent && entry.Mode != "120000" && entry.Mode != "160000" {
+			limit := maxFileBytes
+			if base == ".gitignore" || base == ".moriignore" {
+				limit = 1024 * 1024
+			}
+			content, size, err := vcs.ReadIndexBlob(ctx, snapshot, entry, limit)
+			if err != nil {
+				return nil, err
+			}
+			item.Content = content
+			item.Size = size
+		}
+		entries = append(entries, item)
+	}
+	return entries, nil
 }
 
 const maxPriorityPathRules = 32

@@ -143,6 +143,13 @@ func (matcher *ignoreMatcher) loadFile(
 		)
 	}
 
+	return matcher.loadContent(path, base, content)
+}
+
+func (matcher *ignoreMatcher) loadContent(path string, base string, content []byte) (string, error) {
+	if len(content) > maxIgnoreBytes {
+		return "", fmt.Errorf("ignore file %s exceeds %d bytes", displayPath(matcher.cwd, path), maxIgnoreBytes)
+	}
 	scanner := bufio.NewScanner(bytes.NewReader(content))
 	lineNumber := 0
 	for scanner.Scan() {
@@ -164,7 +171,10 @@ func (matcher *ignoreMatcher) loadFile(
 	if err := scanner.Err(); err != nil {
 		return "", fmt.Errorf("read %s: %w", displayPath(matcher.cwd, path), err)
 	}
-	return fmt.Sprintf("%x", sha256.Sum256(content)), nil
+	digest := fmt.Sprintf("%x", sha256.Sum256(content))
+	matcher.files[displayPath(matcher.cwd, path)] = digest
+	matcher.loaded[filepath.Clean(base)] = struct{}{}
+	return digest, nil
 }
 
 func parseIgnoreRule(base string, line string) (ignoreRule, bool, error) {
