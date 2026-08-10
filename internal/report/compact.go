@@ -31,6 +31,14 @@ func Compact(writer io.Writer, report model.Report) error {
 			return err
 		}
 	}
+	if receipt := report.Configuration.ReviewReceipt; receipt != nil {
+		if _, err := fmt.Fprintf(
+			writer, "review receipt: %s; %d focused group(s); %s\n",
+			terminalSafe(receipt.Status), receipt.FocusedMatchGroups, terminalSafe(shortDigest(receipt.Digest)),
+		); err != nil {
+			return err
+		}
+	}
 	for index, group := range report.Groups {
 		locations := compactGroupLocations(group)
 		focus := ""

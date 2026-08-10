@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/Cyberlane/mori/v0.28.0/schemas/mori-report-v18.schema.json",
-  "title": "Mori structural similarity report schema 18",
+  "$id": "https://raw.githubusercontent.com/Cyberlane/mori/v0.29.0/schemas/mori-report-v19.schema.json",
+  "title": "Mori structural similarity report schema 19",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,7 +12,7 @@
     "file_coverage", "coverage", "configuration"
   ],
   "properties": {
-    "schema_version": {"const": 18},
+    "schema_version": {"const": 19},
     "tool": {"$ref": "#/$defs/tool"},
     "threshold": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
     "files": {"$ref": "#/$defs/nonNegativeInteger"},
@@ -303,6 +303,17 @@
         "untracked_included": {"const": false}
       }
     },
+    "reviewReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "schema_version", "digest", "focused_match_groups"],
+      "properties": {
+        "status": {"const": "compatible"},
+        "schema_version": {"const": 1},
+        "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "focused_match_groups": {"type": "integer", "minimum": 1}
+      }
+    },
     "configuration": {
       "type": "object",
       "additionalProperties": false,
@@ -344,7 +355,8 @@
         "baseline_profile_status": {"enum": ["compatible", "legacy"]},
         "stdin_path": {"type": "string"},
         "focus": {"$ref": "#/$defs/focus"},
-        "input": {"$ref": "#/$defs/inputSnapshot"}
+        "input": {"$ref": "#/$defs/inputSnapshot"},
+        "review_receipt": {"$ref": "#/$defs/reviewReceipt"}
       }
     }
   }

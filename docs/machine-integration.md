@@ -29,17 +29,19 @@ presentation only, not scores, fingerprints, counts, or schema version.
 
 ## Versioned JSON contract
 
-Schema 18 is described by the Draft 2020-12 artifact at
-[`schemas/mori-report-v18.schema.json`](../schemas/mori-report-v18.schema.json).
+Schema 19 is described by the Draft 2020-12 artifact at
+[`schemas/mori-report-v19.schema.json`](../schemas/mori-report-v19.schema.json).
 Official releases include the same file and its SHA-256 checksum.
 Consumers should select a validator that supports Draft 2020-12, require
-`schema_version` to equal `18`, and reject or explicitly handle unknown report
+`schema_version` to equal `19`, and reject or explicitly handle unknown report
 versions.
 
-Schema 18 adds immutable Git-index input provenance, named project scopes, and
-per-path focused coverage. Schema 17 added the optional stdin overlay field.
-The current normalization version is 12 and the baseline contract remains
-schema 3. Under `--staged`, the index digest covers the exact tracked baseline
+Schema 19 adds optional compatible staged-review receipt evidence. Schema 18
+added immutable Git-index input provenance, named project scopes, and per-path
+focused coverage. Schema 17 added the optional stdin overlay field.
+The current normalization version is 12 and the baseline contract is schema 4.
+Schema 4 adds the `false-positive` review classification without changing
+matching or suppression semantics. Under `--staged`, the index digest covers the exact tracked baseline
 blob as well as source, ignore, and configuration inputs; there is no separate
 report field or schema change for that correction.
 

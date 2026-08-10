@@ -7,6 +7,24 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Baseline schema 4 adds `false-positive` as a durable review classification.
+  Schema-3 baselines remain readable for suppression with their profile
+  evidence intact, but require explicit migration before mutation.
+- Added local staged-review receipts, stored under private Git metadata by
+  default and owner-only on POSIX filesystems, that bind an explicit focused
+  finding acknowledgment to the exact HEAD, Git-index digest, scan profile,
+  Mori and normalization versions, and complete sorted finding identities.
+  Compatible receipts change only focused-match policy exit status; findings
+  remain visible. Machine-readable reports advance to schema 19 to expose
+  compatible receipt evidence.
+- Added original MIT Swift calibration cases for presentation chains and
+  memberwise initializer shapes, including a renamed positive and reviewed
+  unrelated false positives. They document the current structural limit;
+  normalization remains version 12 because identifier or literal heuristics
+  would not justify a safe scoring change.
+
 ## [0.28.1] - 2026-08-11
 
 ### Fixed
@@ -15,7 +33,7 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   stage-zero Git-index snapshot as source, ignore rules, and configuration.
   Missing, external, non-regular, oversized, or malformed staged baselines
   fail closed instead of falling back to working-tree bytes. Report schema
-  remains 18, baseline schema remains 3, and normalization remains 12.
+  remained 18, baseline schema remained 3, and normalization remained 12.
 
 ## [0.28.0] - 2026-08-10
 

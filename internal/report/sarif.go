@@ -110,6 +110,16 @@ func SARIF(writer io.Writer, report model.Report) error {
 		results = append(results, sarifWarningResults(warning)...)
 	}
 
+	reportProperties := map[string]any{
+		"moriReportSchemaVersion": report.SchemaVersion,
+		"scanProfileDigest":       report.Configuration.ScanProfileDigest,
+		"stdinPath":               report.Configuration.StdinPath,
+	}
+	if receipt := report.Configuration.ReviewReceipt; receipt != nil {
+		reportProperties["reviewReceiptStatus"] = receipt.Status
+		reportProperties["reviewReceiptDigest"] = receipt.Digest
+		reportProperties["reviewReceiptFocusedMatchGroups"] = receipt.FocusedMatchGroups
+	}
 	log := sarifLog{
 		Version: sarifVersion,
 		Schema:  sarifSchema,
@@ -149,12 +159,8 @@ func SARIF(writer io.Writer, report model.Report) error {
 					"warningCount":            len(report.Warnings),
 				},
 			}},
-			Results: results,
-			Properties: map[string]any{
-				"moriReportSchemaVersion": report.SchemaVersion,
-				"scanProfileDigest":       report.Configuration.ScanProfileDigest,
-				"stdinPath":               report.Configuration.StdinPath,
-			},
+			Results:    results,
+			Properties: reportProperties,
 		}},
 	}
 	encoder := json.NewEncoder(writer)

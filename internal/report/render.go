@@ -91,6 +91,18 @@ func Text(writer io.Writer, report model.Report) error {
 			return err
 		}
 	}
+	if receipt := report.Configuration.ReviewReceipt; receipt != nil {
+		if _, err := fmt.Fprintf(
+			writer,
+			"staged review receipt: %s (%d focused group(s), schema %d, %s)\n",
+			terminalSafe(receipt.Status),
+			receipt.FocusedMatchGroups,
+			receipt.SchemaVersion,
+			terminalSafe(receipt.Digest),
+		); err != nil {
+			return err
+		}
+	}
 	if len(report.Configuration.IgnoreFiles) > 0 {
 		if _, err := fmt.Fprintf(
 			writer,

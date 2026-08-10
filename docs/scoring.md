@@ -212,7 +212,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 18,
+  "schema_version": 19,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -369,7 +369,13 @@ focused-path evidence with required and covered totals. These report and
 candidate-surface changes leave normalization at version 12 and baseline
 schema at version 3. The selected scope and roots participate in the baseline
 scan-profile digest. The complete current contract is published as
-[`schemas/mori-report-v18.schema.json`](../schemas/mori-report-v18.schema.json).
+[`schemas/mori-report-v19.schema.json`](../schemas/mori-report-v19.schema.json).
+
+Schema 19 adds optional `configuration.review_receipt` evidence for a
+compatible local staged-review acknowledgment. The report still includes all
+focused findings; the receipt changes only `--fail-on-focused-match` policy.
+Any change to HEAD, index bytes, the scan profile, tool or normalization
+version, or the complete focused identity set invalidates it.
 
 Normalization version 10 adds Java and C# function boundaries and canonical
 syntax mappings, makes redundant parentheses transparent, and adds the
@@ -432,11 +438,12 @@ mori baseline add \
   .
 ```
 
-Baseline schema 3 records an explicit `identity_scope`, deterministic
+Baseline schema 4 records an explicit `identity_scope`, deterministic
 `scan_profile_digest`, canonical profile fields, and optional durable
 `classification` and `note` values. Supported classifications are
 `intentional`, `necessary-duplication`, `test-fixture`, `generated`, and
-`other`. `baseline edit` updates or clears metadata without altering
+`false-positive`; `other` remains available for reviewed cases that do not fit
+a more precise classification. `baseline edit` updates or clears metadata without altering
 acceptance, and `baseline remove` revokes every accepted entry using one
 content identity.
 
@@ -448,10 +455,10 @@ the identity in the active complete scan.
 
 `baseline update` computes and prints replacement counts but does not write a
 file unless `--accept-all` is explicit. Existing notes and classifications are
-preserved for retained entries. Schema-1 and schema-2 baselines remain readable
+preserved for retained entries. Schema-1 through schema-3 baselines remain readable
 for suppression, with a visible legacy-profile warning, but mutation is
 refused until `baseline migrate --accept-profile` explicitly binds the current
-complete scan profile. A schema-3 profile mismatch fails closed until options
+complete scan profile. A schema-4 profile mismatch fails closed until options
 match or that explicit migration is performed.
 
 The file also records the Mori version, normalization version, threshold,
@@ -468,3 +475,18 @@ unlimited report internally so bounded display retention cannot make the
 baseline incomplete. Every mutating baseline command refuses truncation and
 warnings by default. After review, repeat `--allow-warning KIND` only for each
 intentionally accepted warning category.
+
+For a one-commit staged exception that should not become durable suppression,
+first inspect the complete staged report, then record explicit acceptance:
+
+```sh
+mori review acknowledge --staged --accept-focused .
+mori scan --staged --fail-on-focused-match \
+  --review-receipt "$(git rev-parse --git-path mori/staged-review.json)" .
+```
+
+The receipt is local state under private Git metadata by default and uses
+owner-only file permissions on POSIX filesystems. It stores no source or
+timestamp, does not suppress findings, and becomes stale after the commit
+because HEAD changes. A missing, malformed, or stale requested receipt fails
+closed.

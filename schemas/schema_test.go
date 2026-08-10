@@ -19,7 +19,7 @@ func TestCurrentReportSchemaMatchesPublicModel(t *testing.T) {
 	if !ok {
 		t.Fatal("resolve schema test path")
 	}
-	schemaPath := filepath.Join(filepath.Dir(currentFile), "mori-report-v18.schema.json")
+	schemaPath := filepath.Join(filepath.Dir(currentFile), "mori-report-v19.schema.json")
 	content, err := os.ReadFile(schemaPath)
 	if err != nil {
 		t.Fatalf("read schema: %v", err)

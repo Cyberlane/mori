@@ -18,7 +18,7 @@ import (
 )
 
 // SchemaVersion is the current baseline file format.
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 // MaxDocumentBytes bounds one baseline document before decoding.
 const MaxDocumentBytes int64 = 16 * 1024 * 1024
@@ -38,6 +38,7 @@ var classifications = map[string]struct{}{
 	"necessary-duplication": {},
 	"test-fixture":          {},
 	"generated":             {},
+	"false-positive":        {},
 	"other":                 {},
 }
 
@@ -136,9 +137,9 @@ func Decode(content []byte) (Set, error) {
 	if err := json.Unmarshal(content, &stored); err != nil {
 		return Set{}, fmt.Errorf("decode baseline: %w", err)
 	}
-	if stored.SchemaVersion != 1 && stored.SchemaVersion != 2 && stored.SchemaVersion != SchemaVersion {
+	if stored.SchemaVersion != 1 && stored.SchemaVersion != 2 && stored.SchemaVersion != 3 && stored.SchemaVersion != SchemaVersion {
 		return Set{}, fmt.Errorf(
-			"baseline schema version %d is unsupported; expected 1, 2, or %d",
+			"baseline schema version %d is unsupported; expected 1, 2, 3, or %d",
 			stored.SchemaVersion,
 			SchemaVersion,
 		)
@@ -163,7 +164,7 @@ func Decode(content []byte) (Set, error) {
 		if entry.ID == "" {
 			return Set{}, fmt.Errorf("baseline entry %d has no ID", index+1)
 		}
-		if stored.SchemaVersion == SchemaVersion {
+		if stored.SchemaVersion >= 3 {
 			if err := ValidateClassification(entry.Classification); err != nil {
 				return Set{}, fmt.Errorf("baseline entry %d: %w", index+1, err)
 			}
@@ -180,9 +181,9 @@ func Decode(content []byte) (Set, error) {
 		threshold:     stored.Threshold,
 		entries:       entries,
 	}
-	if stored.SchemaVersion == SchemaVersion {
+	if stored.SchemaVersion >= 3 {
 		if stored.ScanProfile == nil || stored.ScanProfileDigest == "" {
-			return Set{}, errors.New("baseline schema 3 requires scan-profile evidence")
+			return Set{}, fmt.Errorf("baseline schema %d requires scan-profile evidence", stored.SchemaVersion)
 		}
 		profile := normalizedProfile(*stored.ScanProfile)
 		if err := validateProfile(profile); err != nil {
@@ -261,14 +262,14 @@ func ValidateScope(scope Scope) error {
 func ValidateClassification(value string) error {
 	if _, ok := classifications[value]; !ok {
 		return fmt.Errorf(
-			"baseline classification %q is unsupported; expected intentional, necessary-duplication, test-fixture, generated, other, or empty",
+			"baseline classification %q is unsupported; expected intentional, necessary-duplication, test-fixture, generated, false-positive, other, or empty",
 			value,
 		)
 	}
 	return nil
 }
 
-// New returns an empty schema-3 baseline using one reviewed scan profile.
+// New returns an empty schema-4 baseline using one reviewed scan profile.
 func New(scope Scope, profile ScanProfile) (Set, error) {
 	if err := ValidateScope(scope); err != nil {
 		return Set{}, err
@@ -297,8 +298,8 @@ func (set Set) Legacy() bool {
 	return set.schemaVersion < SchemaVersion
 }
 
-// ProfileDigest returns the stored scan-profile digest, or an empty string for
-// legacy schema files.
+// ProfileDigest returns stored scan-profile evidence when the loaded schema
+// contains it, including schema 3 while it remains readable as legacy.
 func (set Set) ProfileDigest() string {
 	return set.profileDigest
 }

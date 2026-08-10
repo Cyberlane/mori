@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 18
+const SchemaVersion = 19
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -250,43 +250,44 @@ type CoverageSummary struct {
 // EffectiveConfig records the scan inputs needed to reproduce discovery and
 // pair selection.
 type EffectiveConfig struct {
-	Profile           string               `json:"profile,omitempty"`
-	Scope             string               `json:"scope,omitempty"`
-	ScopeRoots        []string             `json:"scope_roots,omitempty"`
-	ConfigPath        string               `json:"config_path,omitempty"`
-	IgnoreFiles       []string             `json:"ignore_files"`
-	IgnoreEvidence    []IgnoreFileEvidence `json:"ignore_file_evidence"`
-	RespectIgnore     bool                 `json:"respect_ignore"`
-	ExcludeGenerated  bool                 `json:"exclude_generated"`
-	Excludes          []string             `json:"excludes"`
-	MinTokens         int                  `json:"min_tokens"`
-	MaxGroups         int                  `json:"max_groups"`
-	MaxOccurrences    int                  `json:"max_occurrences"`
-	MaxPairs          int                  `json:"max_pairs"`
-	MaxFileBytes      int64                `json:"max_file_bytes"`
-	ComparisonDomain  string               `json:"comparison_domain"`
-	SQLDialect        string               `json:"sql_dialect"`
-	EmbeddedSQL       bool                 `json:"embedded_sql"`
-	StatementBlocks   bool                 `json:"statement_blocks"`
-	BlockStatements   int                  `json:"block_statements"`
-	MaxBlocksPerFunc  int                  `json:"max_blocks_per_function"`
-	Ranking           string               `json:"ranking"`
-	PriorityPaths     []PriorityPathRule   `json:"priority_paths"`
-	SameLanguageOnly  bool                 `json:"same_language_only"`
-	CrossLanguageOnly bool                 `json:"cross_language_only"`
-	LanguagePairs     []string             `json:"language_pairs"`
-	RequireCoverage   bool                 `json:"require_coverage"`
-	MinFileCoverage   float64              `json:"min_file_coverage"`
-	MaxZeroFiles      int                  `json:"max_zero_fragment_files"`
-	FailOnWarning     bool                 `json:"fail_on_warning"`
-	FailOnDiagnostic  bool                 `json:"fail_on_parse_diagnostic"`
-	BaselinePath      string               `json:"baseline_path,omitempty"`
-	ScanProfileDigest string               `json:"scan_profile_digest"`
-	BaselineDigest    string               `json:"baseline_profile_digest,omitempty"`
-	BaselineStatus    string               `json:"baseline_profile_status,omitempty"`
-	StdinPath         string               `json:"stdin_path,omitempty"`
-	Focus             *FocusConfig         `json:"focus,omitempty"`
-	Input             *InputSnapshot       `json:"input,omitempty"`
+	Profile           string                 `json:"profile,omitempty"`
+	Scope             string                 `json:"scope,omitempty"`
+	ScopeRoots        []string               `json:"scope_roots,omitempty"`
+	ConfigPath        string                 `json:"config_path,omitempty"`
+	IgnoreFiles       []string               `json:"ignore_files"`
+	IgnoreEvidence    []IgnoreFileEvidence   `json:"ignore_file_evidence"`
+	RespectIgnore     bool                   `json:"respect_ignore"`
+	ExcludeGenerated  bool                   `json:"exclude_generated"`
+	Excludes          []string               `json:"excludes"`
+	MinTokens         int                    `json:"min_tokens"`
+	MaxGroups         int                    `json:"max_groups"`
+	MaxOccurrences    int                    `json:"max_occurrences"`
+	MaxPairs          int                    `json:"max_pairs"`
+	MaxFileBytes      int64                  `json:"max_file_bytes"`
+	ComparisonDomain  string                 `json:"comparison_domain"`
+	SQLDialect        string                 `json:"sql_dialect"`
+	EmbeddedSQL       bool                   `json:"embedded_sql"`
+	StatementBlocks   bool                   `json:"statement_blocks"`
+	BlockStatements   int                    `json:"block_statements"`
+	MaxBlocksPerFunc  int                    `json:"max_blocks_per_function"`
+	Ranking           string                 `json:"ranking"`
+	PriorityPaths     []PriorityPathRule     `json:"priority_paths"`
+	SameLanguageOnly  bool                   `json:"same_language_only"`
+	CrossLanguageOnly bool                   `json:"cross_language_only"`
+	LanguagePairs     []string               `json:"language_pairs"`
+	RequireCoverage   bool                   `json:"require_coverage"`
+	MinFileCoverage   float64                `json:"min_file_coverage"`
+	MaxZeroFiles      int                    `json:"max_zero_fragment_files"`
+	FailOnWarning     bool                   `json:"fail_on_warning"`
+	FailOnDiagnostic  bool                   `json:"fail_on_parse_diagnostic"`
+	BaselinePath      string                 `json:"baseline_path,omitempty"`
+	ScanProfileDigest string                 `json:"scan_profile_digest"`
+	BaselineDigest    string                 `json:"baseline_profile_digest,omitempty"`
+	BaselineStatus    string                 `json:"baseline_profile_status,omitempty"`
+	StdinPath         string                 `json:"stdin_path,omitempty"`
+	Focus             *FocusConfig           `json:"focus,omitempty"`
+	Input             *InputSnapshot         `json:"input,omitempty"`
+	ReviewReceipt     *ReviewReceiptEvidence `json:"review_receipt,omitempty"`
 }
 
 // InputSnapshot identifies the immutable input view used for a scan.
@@ -297,6 +298,15 @@ type InputSnapshot struct {
 	IndexDigest         string `json:"index_digest,omitempty"`
 	WorkingTreeIncluded bool   `json:"working_tree_included"`
 	UntrackedIncluded   bool   `json:"untracked_included"`
+}
+
+// ReviewReceiptEvidence records a compatible local acknowledgment of the
+// exact focused findings from an immutable staged scan.
+type ReviewReceiptEvidence struct {
+	Status             string `json:"status"`
+	SchemaVersion      int    `json:"schema_version"`
+	Digest             string `json:"digest"`
+	FocusedMatchGroups int    `json:"focused_match_groups"`
 }
 
 // IgnoreFileEvidence identifies the exact ignore content used during source
