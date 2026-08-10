@@ -12,6 +12,12 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Baseline schema 4 adds `false-positive` as a durable review classification.
   Schema-3 baselines remain readable for suppression with their profile
   evidence intact, but require explicit migration before mutation.
+- Added owner-only, local staged-review receipts that bind an explicit focused
+  finding acknowledgment to the exact HEAD, Git-index digest, scan profile,
+  Mori and normalization versions, and complete sorted finding identities.
+  Compatible receipts change only focused-match policy exit status; findings
+  remain visible. Machine-readable reports advance to schema 19 to expose
+  compatible receipt evidence.
 
 ## [0.28.1] - 2026-08-11
 

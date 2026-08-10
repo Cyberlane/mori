@@ -25,6 +25,7 @@ import (
 	"github.com/Cyberlane/mori/internal/normalize"
 	"github.com/Cyberlane/mori/internal/pathutil"
 	"github.com/Cyberlane/mori/internal/report"
+	"github.com/Cyberlane/mori/internal/reviewreceipt"
 	"github.com/Cyberlane/mori/internal/source"
 	"github.com/Cyberlane/mori/internal/vcs"
 	"github.com/bmatcuk/doublestar/v4"
@@ -89,6 +90,8 @@ func RunWithInput(
 		return runInit(args[1:], stdout, stderr)
 	case "baseline":
 		return runBaseline(ctx, args[1:], stdout, stderr)
+	case "review":
+		return runReview(ctx, args[1:], stdout, stderr)
 	case "languages":
 		return runLanguages(args[1:], stdout, stderr)
 	case "skill":
@@ -171,6 +174,8 @@ type scanOptions struct {
 	stdinContent       []byte
 	staged             bool
 	stagedSnapshot     *vcs.IndexSnapshot
+	reviewReceiptPath  string
+	acceptFocused      bool
 }
 
 func defaultScanOptions() scanOptions {
@@ -208,7 +213,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 	flags.StringVar(&options.format, "format", options.format, "output format: text, compact, json, sarif, or html")
 	flags.StringVar(&options.color, "color", options.color, "terminal color: auto, always, or never")
 	flags.BoolVar(&options.redactPaths, "redact-paths", options.redactPaths, "replace source and configuration paths with stable placeholders in output")
-	if baselineAction == "" {
+	if baselineAction == "" || baselineAction == "acknowledge" {
 		flags.StringVar(
 			&options.stdinPath,
 			"stdin-path",
@@ -216,6 +221,13 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 			"analyze bounded stdin as the unsaved content of one discovered source path",
 		)
 		flags.BoolVar(&options.staged, "staged", options.staged, "analyze the immutable Git index instead of working-tree files")
+	}
+	if baselineAction == "" {
+		flags.StringVar(&options.reviewReceiptPath, "review-receipt", options.reviewReceiptPath, "local receipt that acknowledges the exact staged focused findings")
+	}
+	if baselineAction == "acknowledge" {
+		flags.StringVar(&options.reviewReceiptPath, "receipt", options.reviewReceiptPath, "local receipt file to write")
+		flags.BoolVar(&options.acceptFocused, "accept-focused", options.acceptFocused, "explicitly acknowledge every focused structural match in this staged scan")
 	}
 	flags.StringVar(
 		&options.comparisonDomain,
@@ -992,6 +1004,9 @@ func validateScanOptions(options scanOptions) error {
 	if options.failOnMatch && options.failOnFocusedMatch {
 		return errors.New("--fail-on-match and --fail-on-focused-match cannot be used together")
 	}
+	if options.reviewReceiptPath != "" && (!options.staged || !options.failOnFocusedMatch) {
+		return errors.New("--review-receipt requires --staged and --fail-on-focused-match")
+	}
 	if options.failOnFocusedMatch && len(options.focusPaths) == 0 && options.changedSince == "" &&
 		len(options.changedWorktrees) == 0 && !options.staged {
 		return errors.New("--fail-on-focused-match requires --focus-path, --changed-since, --changed-worktree, or --staged")
@@ -1055,7 +1070,13 @@ func runScan(
 		fmt.Fprintf(stderr, "mori: load baseline: %v\n", err)
 		return exitError
 	}
-	result, err := executeScan(ctx, paths, options, suppress, baselineWarnings)
+	scanOptions := options
+	if options.reviewReceiptPath != "" {
+		// Receipt validation must see every focused identity even when display
+		// retention is bounded.
+		scanOptions.maxGroups = 0
+	}
+	result, err := executeScan(ctx, paths, scanOptions, suppress, baselineWarnings)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: %v\n", err)
 		return exitError
@@ -1074,6 +1095,28 @@ func runScan(
 	}
 	result.Configuration.BaselineStatus = baselineStatus
 	result.Configuration.BaselineDigest = baselineDigest
+	if options.reviewReceiptPath != "" {
+		receipt, err := reviewreceipt.Load(options.reviewReceiptPath)
+		if err != nil {
+			fmt.Fprintf(stderr, "mori: load review receipt: %v\n", err)
+			return exitError
+		}
+		if err := reviewreceipt.Validate(receipt, receiptEvidence(result)); err != nil {
+			fmt.Fprintf(stderr, "mori: validate review receipt: %v\n", err)
+			return exitError
+		}
+		result.Configuration.ReviewReceipt = &model.ReviewReceiptEvidence{
+			Status:             "compatible",
+			SchemaVersion:      reviewreceipt.SchemaVersion,
+			Digest:             reviewreceipt.Digest(receipt),
+			FocusedMatchGroups: len(receipt.FocusedMatchIDs),
+		}
+		result.Configuration.MaxGroups = options.maxGroups
+		if options.maxGroups > 0 && len(result.Groups) > options.maxGroups {
+			result.Groups = result.Groups[:options.maxGroups]
+			result.Truncated = true
+		}
+	}
 
 	err = renderScanReport(stdout, result, options)
 	if err != nil {
@@ -1086,10 +1129,124 @@ func runScan(
 	if options.failOnMatch && result.TotalMatchGroups > 0 {
 		return exitFindings
 	}
-	if options.failOnFocusedMatch && result.TotalFocusedMatchGroups > 0 {
+	if options.failOnFocusedMatch && result.TotalFocusedMatchGroups > 0 && result.Configuration.ReviewReceipt == nil {
 		return exitFindings
 	}
 	return exitSuccess
+}
+
+func runReview(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) == 0 || args[0] != "acknowledge" {
+		return usageError(stderr, "review requires the acknowledge subcommand")
+	}
+	options, paths, code, ok := parseScanOptions("review acknowledge", args[1:], stderr, "acknowledge")
+	if !ok {
+		return code
+	}
+	if !options.staged || options.stagedSnapshot == nil {
+		return usageError(stderr, "review acknowledge requires --staged")
+	}
+	if !options.acceptFocused {
+		return usageError(stderr, "review acknowledge is preview-only unless --accept-focused is explicit")
+	}
+	if options.failOnMatch || options.failOnFocusedMatch {
+		return usageError(stderr, "failure-policy flags cannot be used with review acknowledge")
+	}
+	if options.reviewReceiptPath == "" {
+		path, err := vcs.LocalMetadataPath(ctx, *options.stagedSnapshot, "mori/staged-review.json")
+		if err != nil {
+			return commandError(stderr, "resolve review receipt", err)
+		}
+		options.reviewReceiptPath = path
+	}
+	metadataDirectory, err := vcs.LocalMetadataPath(ctx, *options.stagedSnapshot, "mori")
+	if err != nil {
+		return commandError(stderr, "resolve review receipt directory", err)
+	}
+	if !pathWithin(metadataDirectory, options.reviewReceiptPath) {
+		return usageError(stderr, "--receipt must be inside this worktree's private Git metadata directory")
+	}
+	options.maxGroups = 0
+	options.maxOccurrences = 0
+	suppress, baselineWarnings, baselineStatus, baselineDigest, err := loadSuppression(
+		ctx,
+		options.baselinePath,
+		options.stagedSnapshot,
+	)
+	if err != nil {
+		return commandError(stderr, "load baseline", err)
+	}
+	result, err := executeScan(ctx, paths, options, suppress, baselineWarnings)
+	if err != nil {
+		return commandError(stderr, "scan staged review", err)
+	}
+	if baselineStatus == "loaded" && baselineDigest != result.Configuration.ScanProfileDigest {
+		return commandError(stderr, "load baseline", fmt.Errorf(
+			"baseline scan profile %s differs from active profile %s",
+			baselineDigest,
+			result.Configuration.ScanProfileDigest,
+		))
+	}
+	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
+		return code
+	}
+	if code := enforceMutationCompleteness(stderr, options, result, "review acknowledgment"); code != exitSuccess {
+		return code
+	}
+	receipt, err := reviewreceipt.New(receiptEvidence(result))
+	if err != nil {
+		return commandError(stderr, "create review receipt", err)
+	}
+	if err := reviewreceipt.Write(options.reviewReceiptPath, receipt); err != nil {
+		return commandError(stderr, "write review receipt", err)
+	}
+	if _, err := fmt.Fprintf(
+		stdout,
+		"staged review acknowledged: %s (%d focused structural match group(s); receipt %s)\n",
+		displayCLIPath(options.reviewReceiptPath),
+		len(receipt.FocusedMatchIDs),
+		reviewreceipt.Digest(receipt),
+	); err != nil {
+		return exitError
+	}
+	return exitSuccess
+}
+
+func pathWithin(directory string, path string) bool {
+	directory, err := filepath.Abs(directory)
+	if err != nil {
+		return false
+	}
+	path, err = filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	relative, err := filepath.Rel(directory, path)
+	return err == nil && relative != "." && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+}
+
+func receiptEvidence(result model.Report) reviewreceipt.Evidence {
+	input := result.Configuration.Input
+	headCommit := ""
+	indexDigest := ""
+	if input != nil {
+		headCommit = input.HeadCommit
+		indexDigest = input.IndexDigest
+	}
+	ids := make([]string, 0, result.TotalFocusedMatchGroups)
+	for _, group := range result.Groups {
+		if group.Focused {
+			ids = append(ids, group.ID)
+		}
+	}
+	return reviewreceipt.Evidence{
+		Tool:                 result.Tool,
+		NormalizationVersion: result.Tool.NormalizationVersion,
+		HeadCommit:           headCommit,
+		IndexDigest:          indexDigest,
+		ScanProfileDigest:    result.Configuration.ScanProfileDigest,
+		FocusedMatchIDs:      ids,
+	}
 }
 
 func renderScanReport(stdout io.Writer, result model.Report, options scanOptions) error {
@@ -1267,7 +1424,7 @@ func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, std
 		}
 		return exitSuccess
 	}
-	if code := enforceBaselineCompleteness(stderr, options, result); code != exitSuccess {
+	if code := enforceMutationCompleteness(stderr, options, result, "baseline mutation"); code != exitSuccess {
 		return code
 	}
 	if found && existing.Legacy() {
@@ -1334,7 +1491,7 @@ func runBaselineAdd(ctx context.Context, args []string, stdout io.Writer, stderr
 	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
 		return code
 	}
-	if code := enforceBaselineCompleteness(stderr, options, result); code != exitSuccess {
+	if code := enforceMutationCompleteness(stderr, options, result, "baseline mutation"); code != exitSuccess {
 		return code
 	}
 	profile, err := baselineScanProfile(options, result.Configuration.IgnoreEvidence)
@@ -1414,7 +1571,7 @@ func runBaselineMigrate(ctx context.Context, args []string, stdout io.Writer, st
 	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
 		return code
 	}
-	if code := enforceBaselineCompleteness(stderr, options, result); code != exitSuccess {
+	if code := enforceMutationCompleteness(stderr, options, result, "baseline mutation"); code != exitSuccess {
 		return code
 	}
 	profile, err := baselineScanProfile(options, result.Configuration.IgnoreEvidence)
@@ -1562,7 +1719,7 @@ func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stde
 	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
 		return code
 	}
-	if code := enforceBaselineCompleteness(stderr, options, result); code != exitSuccess {
+	if code := enforceMutationCompleteness(stderr, options, result, "baseline mutation"); code != exitSuccess {
 		return code
 	}
 	profile, err := baselineScanProfile(options, result.Configuration.IgnoreEvidence)
@@ -1663,13 +1820,14 @@ func rejectBaselineFocus(options scanOptions, action string) error {
 	return nil
 }
 
-func enforceBaselineCompleteness(
+func enforceMutationCompleteness(
 	stderr io.Writer,
 	options scanOptions,
 	result model.Report,
+	subject string,
 ) int {
 	if result.Truncated {
-		if _, err := fmt.Fprintln(stderr, "mori: baseline mutation refused: report is truncated"); err != nil {
+		if _, err := fmt.Fprintf(stderr, "mori: %s refused: report is truncated\n", subject); err != nil {
 			return exitError
 		}
 		return exitCoverage
@@ -1699,7 +1857,8 @@ func enforceBaselineCompleteness(
 	for _, kind := range kinds {
 		if _, err := fmt.Fprintf(
 			stderr,
-			"mori: baseline mutation refused: %d disallowed %s warning(s); review and repeat --allow-warning %s if intentional\n",
+			"mori: %s refused: %d disallowed %s warning(s); review and repeat --allow-warning %s if intentional\n",
+			subject,
 			disallowed[kind],
 			kind,
 			kind,
@@ -2790,6 +2949,7 @@ func writeRootUsage(writer io.Writer) error {
 		"  mori baseline migrate --baseline <path> --accept-profile [options] [path ...]\n",
 		"  mori baseline update --baseline <path> [options] [path ...]\n",
 		"  mori baseline prune --baseline <path> [options] [path ...]\n",
+		"  mori review acknowledge --staged --accept-focused [options] [path ...]\n",
 		"  mori languages\n",
 		"  mori skill install (--project <path> | --global | --target <path>)\n",
 		"  mori skill --help\n",

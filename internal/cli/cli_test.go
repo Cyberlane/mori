@@ -2044,6 +2044,85 @@ func TestRunScanStagedUsesIndexedBaseline(t *testing.T) {
 	}
 }
 
+func TestStagedReviewReceiptAcknowledgesWithoutSuppressingAndFailsStale(t *testing.T) {
+	root := t.TempDir()
+	cliTestGit(t, root, "init", "--initial-branch=main")
+	cliTestGit(t, root, "config", "user.name", "Mori Test")
+	cliTestGit(t, root, "config", "user.email", "mori@example.invalid")
+	write := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+	write(".mori.json", `{"threshold":1,"min_tokens":1,"same_language_only":true}`)
+	write("left.go", "package sample\nfunc Left(v int) int { return v + 1 }\n")
+	write("right.go", "package sample\nfunc Right(x int) int { return x + 1 }\n")
+	cliTestGit(t, root, "add", ".mori.json", "left.go", "right.go")
+	cliTestGit(t, root, "commit", "-m", "base")
+	write("left.go", "package sample\n// reviewed staged change\nfunc Left(v int) int { return v + 1 }\n")
+	cliTestGit(t, root, "add", "left.go")
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--staged", "--fail-on-focused-match", ".",
+	}, &stdout, &stderr)
+	if code != exitFindings {
+		t.Fatalf("unacknowledged exit = %d, stderr = %q", code, stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"review", "acknowledge", "--staged", "--accept-focused", ".",
+	}, &stdout, &stderr)
+	if code != exitSuccess || !strings.Contains(stdout.String(), "1 focused structural match") {
+		t.Fatalf("acknowledge exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+	receiptPath := strings.TrimSpace(cliTestGit(t, root, "rev-parse", "--git-path", "mori/staged-review.json"))
+	if !filepath.IsAbs(receiptPath) {
+		receiptPath = filepath.Join(root, receiptPath)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"scan", "--staged", "--fail-on-focused-match", "--review-receipt", receiptPath, "--format", "json", ".",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("acknowledged exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode acknowledged report: %v", err)
+	}
+	if result.TotalFocusedMatchGroups != 1 || len(result.Groups) != 1 ||
+		result.Configuration.ReviewReceipt == nil || result.Configuration.ReviewReceipt.Status != "compatible" {
+		t.Fatalf("acknowledged report = %#v", result)
+	}
+
+	write("right.go", "package sample\n// changes the exact index digest\nfunc Right(x int) int { return x + 1 }\n")
+	cliTestGit(t, root, "add", "right.go")
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"scan", "--staged", "--fail-on-focused-match", "--review-receipt", receiptPath, ".",
+	}, &stdout, &stderr)
+	if code != exitError || !strings.Contains(stderr.String(), "index digest is stale") {
+		t.Fatalf("stale exit = %d, stderr = %q", code, stderr.String())
+	}
+}
+
 func TestRunScanStagedRejectsBaselineOutsideIndex(t *testing.T) {
 	root := t.TempDir()
 	cliTestGit(t, root, "init", "--initial-branch=main")

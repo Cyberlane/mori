@@ -212,7 +212,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 18,
+  "schema_version": 19,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -369,7 +369,13 @@ focused-path evidence with required and covered totals. These report and
 candidate-surface changes leave normalization at version 12 and baseline
 schema at version 3. The selected scope and roots participate in the baseline
 scan-profile digest. The complete current contract is published as
-[`schemas/mori-report-v18.schema.json`](../schemas/mori-report-v18.schema.json).
+[`schemas/mori-report-v19.schema.json`](../schemas/mori-report-v19.schema.json).
+
+Schema 19 adds optional `configuration.review_receipt` evidence for a
+compatible local staged-review acknowledgment. The report still includes all
+focused findings; the receipt changes only `--fail-on-focused-match` policy.
+Any change to HEAD, index bytes, the scan profile, tool or normalization
+version, or the complete focused identity set invalidates it.
 
 Normalization version 10 adds Java and C# function boundaries and canonical
 syntax mappings, makes redundant parentheses transparent, and adds the
@@ -469,3 +475,17 @@ unlimited report internally so bounded display retention cannot make the
 baseline incomplete. Every mutating baseline command refuses truncation and
 warnings by default. After review, repeat `--allow-warning KIND` only for each
 intentionally accepted warning category.
+
+For a one-commit staged exception that should not become durable suppression,
+first inspect the complete staged report, then record explicit acceptance:
+
+```sh
+mori review acknowledge --staged --accept-focused .
+mori scan --staged --fail-on-focused-match \
+  --review-receipt "$(git rev-parse --git-path mori/staged-review.json)" .
+```
+
+The receipt is owner-only local state under Git metadata by default. It stores
+no source or timestamp, does not suppress findings, and becomes stale after the
+commit because HEAD changes. A missing, malformed, or stale requested receipt
+fails closed.

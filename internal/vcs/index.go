@@ -37,6 +37,24 @@ func ResolveIndex(ctx context.Context, start string) (IndexSnapshot, error) {
 	})
 }
 
+// LocalMetadataPath resolves one safe path inside this worktree's private Git
+// metadata. Linked worktrees are handled by Git rather than by assuming .git is
+// a directory.
+func LocalMetadataPath(ctx context.Context, snapshot IndexSnapshot, relative string) (string, error) {
+	if err := validateRelativeGitPath(relative); err != nil {
+		return "", errors.New("unsafe Git metadata path")
+	}
+	output, err := run(ctx, snapshot.options, snapshot.Root, "rev-parse", "--git-path", filepath.ToSlash(relative))
+	if err != nil {
+		return "", fmt.Errorf("resolve Git metadata path: %w", err)
+	}
+	path := filepath.Clean(strings.TrimSpace(string(output)))
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(snapshot.Root, path)
+	}
+	return path, nil
+}
+
 func resolveIndex(ctx context.Context, start string, options resolverOptions) (IndexSnapshot, error) {
 	if options.executable == "" {
 		options.executable = "git"

@@ -160,7 +160,7 @@ jobs:
             -timestamp "$timestamp"
 
       - name: Stage versioned JSON Schema
-        run: cp schemas/mori-report-v18.schema.json dist/
+        run: cp schemas/mori-report-v19.schema.json dist/
 
       - name: Package VS Code extension
         env:
@@ -274,7 +274,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --pattern "$archive" \
             --pattern "mori-vscode_*.vsix" \
-            --pattern mori-report-v18.schema.json \
+            --pattern mori-report-v19.schema.json \
             --pattern checksums.txt \
             --dir dist
 
@@ -294,7 +294,7 @@ jobs:
             ../skills/mori-review-similarity \
             extracted/mori-review-similarity
 
-          schema=mori-report-v18.schema.json
+          schema=mori-report-v19.schema.json
           expected="$(awk -v name="$schema" '$2 == name || $2 == "./" name { print $1 }' checksums.txt)"
           if [[ -z "$expected" ]]; then
             echo "No checksum found for $schema." >&2
@@ -305,7 +305,7 @@ jobs:
             echo "Checksum mismatch for $schema." >&2
             exit 1
           fi
-          cmp ../schemas/mori-report-v18.schema.json "$schema"
+          cmp ../schemas/mori-report-v19.schema.json "$schema"
 
           extension="mori-vscode_${version}.vsix"
           expected="$(awk -v name="$extension" '$2 == name || $2 == "./" name { print $1 }' checksums.txt)"

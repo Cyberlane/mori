@@ -288,7 +288,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `18`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `19`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while
@@ -407,6 +407,14 @@ Prefer selective `baseline add` after inspecting the identity. Use
 revoke acceptance. `baseline update` is preview-only unless `--accept-all` is
 explicit. Mutations use complete internal reports and reject warnings unless
 each reviewed kind is repeated with `--allow-warning`.
+
+When the owner explicitly accepts focused findings for exactly one staged
+commit and durable suppression would be misleading, use `mori review
+acknowledge --staged --accept-focused`. The default owner-only receipt lives
+under Git metadata. Pass it to the hook with `--review-receipt`; require a
+compatible receipt in schema-19 evidence. It changes only the focused-match
+policy exit status, never hides findings, and any HEAD, index, profile, tool,
+normalization, or focused-identity change invalidates it.
 
 Schema-4 baselines bind acceptance to the effective scan-profile digest and
 support `false-positive` as a precise durable classification.
