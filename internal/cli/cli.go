@@ -307,7 +307,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 	)
 	if baselineAction == "" {
 		flags.BoolVar(&options.includeFocused, "include-focused", options.includeFocused, "include focused files that ordinary ignore rules would omit")
-		flags.BoolVar(&options.requireFocus, "require-focused-coverage", options.requireFocus, "exit with status 4 unless every non-deleted focused file is analyzed")
+		flags.BoolVar(&options.requireFocus, "require-focused-coverage", options.requireFocus, "exit with status 4 unless every supported non-deleted focused file is analyzed")
 	}
 	flags.BoolVar(
 		&options.requireCoverage,
@@ -1738,7 +1738,7 @@ func enforceCoveragePolicies(
 				covered, required = focus.CoveredFocusFiles, focus.RequiredFocusFiles
 			}
 			failures = append(failures, fmt.Sprintf(
-				"focused file coverage %d/%d leaves %d non-deleted path(s) unanalyzed",
+				"focused file coverage %d/%d leaves %d supported non-deleted path(s) unanalyzed",
 				covered, required, required-covered,
 			))
 		}
@@ -2221,17 +2221,19 @@ func annotateFocusCoverage(
 			focus.PathEvidence = append(focus.PathEvidence, evidence)
 			continue
 		}
-		focus.RequiredFocusFiles++
 		if _, ok := analyzed[key]; ok {
+			focus.RequiredFocusFiles++
 			evidence.Status = "analyzed"
 			focus.CoveredFocusFiles++
 		} else if coverage, ok := excluded[key]; ok {
+			focus.RequiredFocusFiles++
 			evidence.Status = coverage.Status
 			evidence.Reason = coverage.ZeroReason
 		} else if _, supported := language.DetectWithSQLDialect(item.path, options.sqlDialect); !supported {
 			evidence.Status = "unsupported"
-			evidence.Reason = "unsupported source extension or shebang"
+			evidence.Reason = "not a supported source path; excluded from the focused coverage denominator"
 		} else {
+			focus.RequiredFocusFiles++
 			evidence.Status = "not_discovered"
 			evidence.Reason = "excluded, ignored, missing, or outside the selected roots"
 		}

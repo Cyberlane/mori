@@ -170,6 +170,24 @@ func TestProjectUpgradeCoordinatesPinAndAgentSkill(t *testing.T) {
 	}
 }
 
+func TestProjectUpgradeFlagsLegacyStagedAutomation(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	directory := filepath.Join(root, "Scripts")
+	if err := os.Mkdir(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	content := "git diff --cached --name-only\narguments=(scan --focus-path file.go)\nmori \"${arguments[@]}\" .\n"
+	if err := os.WriteFile(filepath.Join(directory, "mori-pre-commit.sh"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	component := inspectProjectAutomation(root)
+	if component.Status != "review" || !strings.Contains(component.Action, "--staged") ||
+		!strings.Contains(component.Detail, "custom staged-path enumeration") {
+		t.Fatalf("automation component = %#v", component)
+	}
+}
+
 func TestSetupRefusesSymlinkConfig(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation is not generally available")

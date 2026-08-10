@@ -187,7 +187,11 @@ func inspectProjectUpgrade(ctx context.Context, root string, mode string) (proje
 		plan.Drift = true
 	}
 	plan.Components = append(plan.Components, baselineComponent)
-	plan.Components = append(plan.Components, inspectProjectAutomation(root))
+	automation := inspectProjectAutomation(root)
+	if automation.Status == "review" {
+		plan.Drift = true
+	}
+	plan.Components = append(plan.Components, automation)
 	return plan, nil
 }
 
@@ -253,18 +257,45 @@ func inspectProjectAutomation(root string) projectUpgradeComponent {
 		".github/workflows/*.yml", ".github/workflows/*.yaml", ".pre-commit-config.yaml",
 		"lefthook.yml", "lefthook.yaml", "Scripts/*mori*", "scripts/*mori*",
 	}
-	paths := make([]string, 0)
+	type detectedFile struct {
+		path string
+		info os.FileInfo
+	}
+	files := make([]detectedFile, 0)
+	legacyStagedFocus := false
 	for _, pattern := range patterns {
 		matches, _ := filepath.Glob(filepath.Join(root, filepath.FromSlash(pattern)))
 		for _, match := range matches {
 			info, err := os.Lstat(match)
-			if err == nil && info.Mode().IsRegular() {
-				paths = append(paths, displayCLIPath(match))
+			if err != nil || !info.Mode().IsRegular() {
+				continue
+			}
+			duplicate := false
+			for _, existing := range files {
+				if os.SameFile(info, existing.info) {
+					duplicate = true
+					break
+				}
+			}
+			if duplicate {
+				continue
+			}
+			files = append(files, detectedFile{path: match, info: info})
+			if info.Size() <= 1024*1024 {
+				content, readErr := os.ReadFile(match)
+				if readErr == nil && bytes.Contains(content, []byte("mori")) &&
+					bytes.Contains(content, []byte("git diff --cached")) &&
+					!bytes.Contains(content, []byte("--staged")) {
+					legacyStagedFocus = true
+				}
 			}
 		}
 	}
+	paths := make([]string, 0, len(files))
+	for _, file := range files {
+		paths = append(paths, displayCLIPath(file.path))
+	}
 	sort.Strings(paths)
-	paths = compactStrings(paths)
 	component := projectUpgradeComponent{Name: "automation", Status: "advisory"}
 	if len(paths) == 0 {
 		component.Detail = "no conventional Mori automation files detected"
@@ -272,6 +303,11 @@ func inspectProjectAutomation(root string) projectUpgradeComponent {
 	}
 	component.Detail = fmt.Sprintf("detected %d automation file(s): %s", len(paths), strings.Join(paths, ", "))
 	component.Action = "review project-specific automation if release notes change invocation policy"
+	if legacyStagedFocus {
+		component.Status = "review"
+		component.Detail += "; found custom staged-path enumeration without native --staged input"
+		component.Action = "review migration to mori scan --staged --include-focused --require-focused-coverage"
+	}
 	return component
 }
 

@@ -237,7 +237,7 @@ its own revision. Dynamic Git revisions are intentionally not project config.
 index digest under `configuration.input`. Combine it with `--include-focused`
 to bypass ordinary ignore rules for changed files while retaining explicit
 excludes, generated-source policy, and resource bounds. Add
-`--require-focused-coverage` when every non-deleted focused path must be
+`--require-focused-coverage` when every supported non-deleted focused path must be
 analyzed; failures still write the report and exit with status `4`.
 
 See [Scan selection controls](scan-selection.md) for the complete validation,

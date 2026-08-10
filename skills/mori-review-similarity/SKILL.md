@@ -318,7 +318,7 @@ revision or date from the version string. Inspect:
   and how many focused files were actually discovered. In multi-worktree mode,
   verify every `worktrees` entry and its independent requested base and full
   commits; do not infer nested-repository coverage from the parent entry;
-- `configuration.focus.path_evidence`: require every non-deleted focused path
+- `configuration.focus.path_evidence`: require every supported non-deleted focused path
   to be `analyzed` in strict review, and report generated, resource,
   unsupported, or undiscovered statuses instead of collapsing them;
 - `configuration.input`: for staged scans, verify the Git-index digest, HEAD,

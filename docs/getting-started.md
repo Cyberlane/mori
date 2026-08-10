@@ -86,7 +86,8 @@ mori scan --staged --format compact \
 Staged mode reads tracked source, ignore rules, and configuration from one Git
 index snapshot. It records a digest and does not include unstaged or untracked
 content. Focused coverage reports every staged path and exits `4` if a
-non-deleted path was not analyzed.
+supported non-deleted path was not analyzed; unsupported paths remain evidence
+but do not enter the denominator.
 
 ## Explore across languages
 
