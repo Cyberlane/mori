@@ -331,7 +331,7 @@ revision or date from the version string. Inspect:
 - `configuration.profile`: record the selected named defaults and verify the
   neighboring effective fields rather than assuming the profile was unmodified;
 - `configuration.scan_profile_digest`, `baseline_profile_digest`, and
-  `baseline_profile_status`: require exact schema-3 profile compatibility when
+  `baseline_profile_status`: require exact schema-4 profile compatibility when
   a baseline suppresses findings;
 - `configuration.ignore_file_evidence`: confirm that each loaded ignore source
   has exact SHA-256 content evidence included in the scan-profile digest;
@@ -408,9 +408,10 @@ revoke acceptance. `baseline update` is preview-only unless `--accept-all` is
 explicit. Mutations use complete internal reports and reject warnings unless
 each reviewed kind is repeated with `--allow-warning`.
 
-Schema-3 baselines bind acceptance to the effective scan-profile digest.
+Schema-4 baselines bind acceptance to the effective scan-profile digest and
+support `false-positive` as a precise durable classification.
 Require `configuration.baseline_profile_status` to be `compatible` in strict
-gates. Schema-1 and schema-2 baselines remain readable with a warning, but use
+gates. Schema-1 through schema-3 baselines remain readable with a warning, but use
 `baseline migrate --accept-profile` before mutation. Content scope is the
 default: one accepted normalized content-pair identity can suppress identical
 copies in new locations. Use path scope when copied code in a new file must

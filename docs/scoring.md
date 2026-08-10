@@ -432,11 +432,12 @@ mori baseline add \
   .
 ```
 
-Baseline schema 3 records an explicit `identity_scope`, deterministic
+Baseline schema 4 records an explicit `identity_scope`, deterministic
 `scan_profile_digest`, canonical profile fields, and optional durable
 `classification` and `note` values. Supported classifications are
 `intentional`, `necessary-duplication`, `test-fixture`, `generated`, and
-`other`. `baseline edit` updates or clears metadata without altering
+`false-positive`; `other` remains available for reviewed cases that do not fit
+a more precise classification. `baseline edit` updates or clears metadata without altering
 acceptance, and `baseline remove` revokes every accepted entry using one
 content identity.
 
@@ -448,10 +449,10 @@ the identity in the active complete scan.
 
 `baseline update` computes and prints replacement counts but does not write a
 file unless `--accept-all` is explicit. Existing notes and classifications are
-preserved for retained entries. Schema-1 and schema-2 baselines remain readable
+preserved for retained entries. Schema-1 through schema-3 baselines remain readable
 for suppression, with a visible legacy-profile warning, but mutation is
 refused until `baseline migrate --accept-profile` explicitly binds the current
-complete scan profile. A schema-3 profile mismatch fails closed until options
+complete scan profile. A schema-4 profile mismatch fails closed until options
 match or that explicit migration is performed.
 
 The file also records the Mori version, normalization version, threshold,

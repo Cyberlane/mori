@@ -7,6 +7,12 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Baseline schema 4 adds `false-positive` as a durable review classification.
+  Schema-3 baselines remain readable for suppression with their profile
+  evidence intact, but require explicit migration before mutation.
+
 ## [0.28.1] - 2026-08-11
 
 ### Fixed
@@ -15,7 +21,7 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   stage-zero Git-index snapshot as source, ignore rules, and configuration.
   Missing, external, non-regular, oversized, or malformed staged baselines
   fail closed instead of falling back to working-tree bytes. Report schema
-  remains 18, baseline schema remains 3, and normalization remains 12.
+  remained 18, baseline schema remained 3, and normalization remained 12.
 
 ## [0.28.0] - 2026-08-10
 

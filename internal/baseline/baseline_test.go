@@ -91,7 +91,7 @@ func TestWriteIsDeterministicAndRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(content), `"schema_version": 3`) ||
+	if !strings.Contains(string(content), `"schema_version": 4`) ||
 		!strings.Contains(string(content), `"identity_scope": "content"`) {
 		t.Fatalf("baseline schema/scope missing:\n%s", content)
 	}
@@ -104,6 +104,29 @@ func TestWriteIsDeterministicAndRoundTrips(t *testing.T) {
 	}
 	if !set.Has("aaaa") || !set.Has("bbbb") {
 		t.Fatal("round-tripped entries are missing")
+	}
+}
+
+func TestLoadSchemaThreeRetainsProfileAsLegacy(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "baseline.json")
+	profile := testProfile(0.7)
+	if err := Write(path, model.Report{Threshold: profile.Threshold}, ScopePath, profile, nil); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	writeFixture(t, path, strings.Replace(string(content), `"schema_version": 4`, `"schema_version": 3`, 1))
+
+	set, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load schema three: %v", err)
+	}
+	if !set.Legacy() || set.ProfileDigest() != Digest(profile) || set.Compatible(profile) {
+		t.Fatalf("schema-three state = legacy %t, digest %q, compatible %t", set.Legacy(), set.ProfileDigest(), set.Compatible(profile))
 	}
 }
 
@@ -300,6 +323,17 @@ func TestWritePreservesMetadataAndRejectsTamperedProfile(t *testing.T) {
 	writeFixture(t, path, tampered)
 	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "digest") {
 		t.Fatalf("tampered Load error = %v", err)
+	}
+}
+
+func TestFalsePositiveIsADurableClassification(t *testing.T) {
+	t.Parallel()
+
+	if err := ValidateClassification("false-positive"); err != nil {
+		t.Fatalf("ValidateClassification: %v", err)
+	}
+	if err := ValidateClassification("false_negative"); err == nil || !strings.Contains(err.Error(), "false-positive") {
+		t.Fatalf("invalid classification error = %v", err)
 	}
 }
 

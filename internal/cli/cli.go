@@ -1640,7 +1640,7 @@ func baselineProfileLabel(
 	profile baseline.ScanProfile,
 ) string {
 	if !found {
-		return "new schema-3 profile " + baseline.Digest(profile)
+		return fmt.Sprintf("new schema-%d profile %s", baseline.SchemaVersion, baseline.Digest(profile))
 	}
 	if set.Legacy() {
 		return "legacy profile unavailable; migration required before mutation"
