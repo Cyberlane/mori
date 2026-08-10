@@ -14,8 +14,11 @@
 | Tree-sitter C++ grammar | 0.23.4 | Copyright (c) 2014 Max Brunsfeld | MIT |
 | Tree-sitter C# grammar | 0.23.5 | Copyright (c) 2014-2023 Max Brunsfeld, Damien Guard, Amaan Qureshi, and contributors | MIT |
 | Tree-sitter Go grammar | 0.25.0 | Copyright (c) 2014 Max Brunsfeld | MIT |
+| Tree-sitter GDScript grammar (`github.com/PrestonKnopp/tree-sitter-gdscript`) | 6.1.0 source at `d2a0ee914d297b873a40dd4596bd1f7157ebc52b` | Copyright (c) 2016 Max Brunsfeld | MIT |
 | Tree-sitter Java grammar | 0.23.5 | Copyright (c) 2017 Ayman Nadeem | MIT |
 | Tree-sitter JavaScript grammar | 0.25.0 | Copyright (c) 2014 Max Brunsfeld | MIT |
+| Tree-sitter Lua grammar | 0.5.0 | Copyright (c) 2021 Munif Tanjim | MIT |
+| Tree-sitter Luau grammar | 1.2.0 | Copyright (c) 2023 Amaan Qureshi | MIT |
 | Tree-sitter Hack grammar (`github.com/slackhq/tree-sitter-hack`) | source at `1a7ded90288189746c54861ac144ede97df95081` (archived upstream) | Copyright (c) 2020 Antonio de Jesus Ochoa Solano | MIT |
 | Tree-sitter PHP grammar | 0.24.2 | Copyright (c) 2017 Josh Vera, GitHub; Copyright (c) 2019 Max Brunsfeld, Amaan Qureshi, Christian Frøystad, Caleb White | MIT |
 | Tree-sitter TypeScript/TSX grammars | 0.23.2 | Copyright (c) 2017 Max Brunsfeld | MIT |

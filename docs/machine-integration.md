@@ -26,7 +26,7 @@ Consumers should select a validator that supports Draft 2020-12, require
 versions.
 
 Schema 17 originally added only the optional `configuration.stdin_path` field.
-The current normalization version is 11 and the baseline contract remains
+The current normalization version is 12 and the baseline contract remains
 schema 3.
 
 ## SARIF contract

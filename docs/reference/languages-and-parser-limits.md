@@ -10,9 +10,12 @@ binary.
 | C++ | c-cpp | code | `.cc`, `.cpp`, `.cxx`, `.hh`, `.hpp`, `.hxx` | — |
 | C# | csharp | code | `.cs` | — |
 | Go | go | code | `.go` | — |
+| GDScript | gdscript | code | `.gd` | — |
 | Hack | php-hack | code | `.hack`, legacy marked `.php` | — |
 | Java | java | code | `.java` | — |
 | JavaScript / JSX | javascript | code | `.js`, `.jsx`, `.mjs`, `.cjs` | `node`, `nodejs` |
+| Lua | lua-luau | code | `.lua` | `lua`, `lua5.1`–`lua5.4`, `luajit` |
+| Luau | lua-luau | code | `.luau` | — |
 | PHP | php-hack | code | `.php`, `.phtml` | — |
 | Python | python | code | `.py`, `.pyi` | `python`, `python3` |
 | Rust | rust | code | `.rs` | — |
@@ -45,6 +48,11 @@ kinds or comparison domains.
 - C: function definitions. `.h` defaults to C; use a C++-specific header suffix
   when C++ parsing is required.
 - C++: function definitions and lambdas.
+- Lua and Luau: named/local function declarations and anonymous function
+  definitions. They share a review family but retain distinct concrete IDs.
+- GDScript: function definitions and lambdas. C# files in Godot projects are
+  handled by the existing C# grammar; Mori does not parse Godot scenes or
+  resources as code.
 - C#: implemented methods, constructors, destructors, operators, accessors,
   local functions, anonymous methods, and lambdas.
 - Swift: implemented functions, initializers, deinitializers, and closures.
@@ -67,6 +75,10 @@ requires `:` for several glob-qualifier forms.
 The Hack parser is a checksum-pinned MIT snapshot from the archived
 `slackhq/tree-sitter-hack` repository. Newer Hack syntax may produce visible
 diagnostics until Mori deliberately maintains or replaces that grammar.
+
+The GDScript parser is a checksum-pinned MIT snapshot of upstream tag `v6.1.0`.
+Its generated C sources are kept in the repository so ordinary builds never
+download or regenerate a grammar.
 
 Generic SQL extensions can produce diagnostics. The PostgreSQL parser targets
 PostgreSQL 18.3 but does not extract PL/pgSQL bodies. Embedded SQL recognizes

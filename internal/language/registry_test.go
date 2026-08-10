@@ -15,9 +15,12 @@ func TestEveryGrammarHasCompatibleABI(t *testing.T) {
 		"cpp":        14,
 		"csharp":     15,
 		"go":         15,
+		"gdscript":   14,
 		"hack":       13,
 		"java":       14,
 		"javascript": 15,
+		"lua":        15,
+		"luau":       14,
 		"php":        15,
 		"python":     15,
 		"postgresql": 15,
@@ -87,6 +90,7 @@ func TestDetect(t *testing.T) {
 		"install.SH":     "bash",
 		"Program.CS":     "csharp",
 		"main.go":        "go",
+		"player.GD":      "gdscript",
 		"legacy.php":     "php",
 		"template.PHTML": "php",
 		"module.HACK":    "hack",
@@ -96,6 +100,8 @@ func TestDetect(t *testing.T) {
 		"component.tsx":  "tsx",
 		"module.pyi":     "python",
 		"lib.rs":         "rust",
+		"module.lua":     "lua",
+		"module.LUAU":    "luau",
 		"queries.SQL":    "sql",
 		"service.SWIFT":  "swift",
 		"plugin.zsh":     "zsh",
@@ -153,6 +159,7 @@ func TestDetectShebang(t *testing.T) {
 		"#!/opt/homebrew/bin/zsh -f": "zsh",
 		"#!/usr/bin/env node":        "javascript",
 		"#!/usr/bin/python3 -u":      "python",
+		"#!/usr/bin/env lua5.4":      "lua",
 	}
 	for line, expected := range tests {
 		spec, ok := DetectShebang(line)

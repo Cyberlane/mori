@@ -1453,7 +1453,7 @@ func TestBaselineMigrationIsExplicitAndWarningsBlockMutation(t *testing.T) {
 	if err := os.WriteFile(legacyPath, []byte(`{
   "schema_version": 2,
   "mori_version": "0.20.0",
-  "normalization_version": 11,
+  "normalization_version": 12,
   "identity_scope": "content",
   "threshold": 0.7,
   "entries": []

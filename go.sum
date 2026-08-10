@@ -10,6 +10,10 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
+github.com/tree-sitter-grammars/tree-sitter-lua v0.5.0 h1:4YHMdo2TzpbhHe3nfdI4qruBGeFGIwfYGfxZJW/tnjc=
+github.com/tree-sitter-grammars/tree-sitter-lua v0.5.0/go.mod h1:hIOfn+lxpU4SRrtejLVrU2+8SAoRwNC01m3XaR/Cw0A=
+github.com/tree-sitter-grammars/tree-sitter-luau v1.2.0 h1:fwzn9TiLmMdGlur6RhAx37xeBVoz/TfYd3gu57wzPTk=
+github.com/tree-sitter-grammars/tree-sitter-luau v1.2.0/go.mod h1:9dKLNhjq9gvcL9z6hgcDscLDIJE1Q7R002LYiqp6xFk=
 github.com/tree-sitter/go-tree-sitter v0.25.0 h1:sx6kcg8raRFCvc9BnXglke6axya12krCJF5xJ2sftRU=
 github.com/tree-sitter/go-tree-sitter v0.25.0/go.mod h1:r77ig7BikoZhHrrsjAnv8RqGti5rtSyvDHPzgTPsUuU=
 github.com/tree-sitter/tree-sitter-bash v0.25.1 h1:ZD3MK4oDB5lAsFztqbdcyYEd24pxDtx3g9UOWA062rE=

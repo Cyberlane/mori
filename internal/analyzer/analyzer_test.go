@@ -169,6 +169,64 @@ func TestAnalyzeCCPPPositiveAndNearbyNegative(t *testing.T) {
 	}
 }
 
+func TestAnalyzeLuaLuauAndGDScriptPositiveAndNearbyNegative(t *testing.T) {
+	t.Parallel()
+	luaRoot := t.TempDir()
+	writeAnalyzerFixture(t, luaRoot, "validate.lua", `local function validate(value)
+  if value == nil then return false end
+  return string.find(value, "@") ~= nil
+end
+`)
+	writeAnalyzerFixture(t, luaRoot, "validate.luau", `local function check(candidate: string): boolean
+  if candidate == nil then return false end
+  return string.find(candidate, "@") ~= nil
+end
+`)
+	luaResult := analyzeTwoFileFixture(t, luaRoot, Options{Threshold: 0.70, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{{Left: "lua", Right: "luau"}}})
+	if luaResult.TotalMatchGroups != 1 || len(luaResult.Groups) != 1 || luaResult.Groups[0].Similarity < 0.89 || luaResult.Groups[0].Similarity > 0.91 {
+		t.Fatalf("Lua/Luau positive result = %#v", luaResult)
+	}
+
+	gdRoot := t.TempDir()
+	writeAnalyzerFixture(t, gdRoot, "clamp.gd", `func clamp_value(value, minimum, maximum):
+    if value < minimum:
+        return minimum
+    if value > maximum:
+        return maximum
+    return value
+`)
+	writeAnalyzerFixture(t, gdRoot, "clamp.py", `def clamp_number(item, lower, upper):
+    if item < lower:
+        return lower
+    if item > upper:
+        return upper
+    return item
+`)
+	gdResult := analyzeTwoFileFixture(t, gdRoot, Options{Threshold: 0.65, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{{Left: "gdscript", Right: "python"}}})
+	if gdResult.TotalMatchGroups != 1 || len(gdResult.Groups) != 1 || gdResult.Groups[0].Similarity < 0.68 || gdResult.Groups[0].Similarity > 0.70 {
+		t.Fatalf("GDScript/Python positive result = %#v", gdResult)
+	}
+
+	negative := t.TempDir()
+	writeAnalyzerFixture(t, negative, "clamp.gd", `func clamp_value(value, minimum, maximum):
+    if value < minimum:
+        return minimum
+    if value > maximum:
+        return maximum
+    return value
+`)
+	writeAnalyzerFixture(t, negative, "sum.py", `def sum_values(values):
+    total = 0
+    for value in values:
+        total += value
+    return total
+`)
+	negativeResult := analyzeTwoFileFixture(t, negative, Options{Threshold: 0.65, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{{Left: "gdscript", Right: "python"}}})
+	if negativeResult.TotalMatchGroups != 0 {
+		t.Fatalf("GDScript/Python nearby-negative result = %#v", negativeResult)
+	}
+}
+
 func analyzePHPHackFixture(t *testing.T, root string, threshold float64) model.Report {
 	t.Helper()
 	return analyzeTwoFileFixture(t, root, Options{

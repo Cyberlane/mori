@@ -7,9 +7,12 @@ import (
 	"sort"
 	"strings"
 
+	tree_sitter_gdscript "github.com/Cyberlane/mori/internal/grammar/gdscript"
 	tree_sitter_hack "github.com/Cyberlane/mori/internal/grammar/hack"
 	tree_sitter_postgresql "github.com/Cyberlane/mori/internal/grammar/postgresql"
 	tree_sitter_swift "github.com/Cyberlane/mori/internal/grammar/swift"
+	tree_sitter_lua "github.com/tree-sitter-grammars/tree-sitter-lua/bindings/go"
+	tree_sitter_luau "github.com/tree-sitter-grammars/tree-sitter-luau/bindings/go"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tree_sitter_bash "github.com/tree-sitter/tree-sitter-bash/bindings/go"
 	tree_sitter_c_sharp "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
@@ -177,6 +180,19 @@ var specs = []Spec{
 		excludeNestedBoundaries: true,
 	},
 	{
+		ID:               "gdscript",
+		Family:           "gdscript",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "GDScript",
+		Extensions:       []string{".gd"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_gdscript.Language())
+		},
+		fragmentKinds:           kinds("function_definition", "lambda"),
+		excludeNestedBoundaries: true,
+	},
+	{
 		ID:               "go",
 		Family:           "go",
 		ComparisonDomain: "code",
@@ -220,6 +236,33 @@ var specs = []Spec{
 			return tree_sitter.NewLanguage(tree_sitter_javascript.Language())
 		},
 		fragmentKinds:           javascriptFunctions,
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "lua",
+		Family:           "lua-luau",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Lua",
+		Extensions:       []string{".lua"},
+		Shebangs:         []string{"lua", "lua5.1", "lua5.2", "lua5.3", "lua5.4", "luajit"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_lua.Language())
+		},
+		fragmentKinds:           kinds("function_declaration", "function_definition"),
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "luau",
+		Family:           "lua-luau",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Luau",
+		Extensions:       []string{".luau"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_luau.Language())
+		},
+		fragmentKinds:           kinds("function_declaration", "function_definition"),
 		excludeNestedBoundaries: true,
 	},
 	{

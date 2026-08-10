@@ -17,7 +17,7 @@ import (
 // Version identifies the normalization contract used to build feature bags.
 // Bump it whenever the selected comparison-unit contract, feature vocabulary,
 // weights, canonical mappings, or semantic-hint list changes.
-const Version = 11
+const Version = 12
 
 const (
 	maxOrderedCallFeatures = 8
@@ -531,6 +531,7 @@ var canonicalKinds = map[string]string{
 	"deinit_declaration":              "function",
 	"lambda_literal":                  "function",
 	"lambda_expression":               "function",
+	"lambda":                          "function",
 	"local_function_statement":        "function",
 	"operator_declaration":            "function",
 
@@ -634,6 +635,7 @@ var canonicalKinds = map[string]string{
 
 	// Parameters, blocks, and bindings.
 	"block":                        "block",
+	"body":                         "block",
 	"compound_statement":           "block",
 	"constructor_body":             "block",
 	"formal_parameters":            "parameters",

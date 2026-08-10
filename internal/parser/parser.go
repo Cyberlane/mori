@@ -470,8 +470,48 @@ func fragmentName(node *tree_sitter.Node, content []byte, fragmentKind string) s
 			}
 		}
 	}
+	if value := assignmentAncestorName(node, content); value != "" {
+		return value
+	}
 
 	return fmt.Sprintf("anonymous@%d", node.StartPosition().Row+1)
+}
+
+func assignmentAncestorName(node *tree_sitter.Node, content []byte) string {
+	ancestor := node.Parent()
+	for depth := 0; ancestor != nil && depth < 4; depth++ {
+		if ancestor.Kind() == "assignment_statement" {
+			for index := uint(0); index < ancestor.NamedChildCount(); index++ {
+				child := ancestor.NamedChild(index)
+				if child != nil && child.Kind() == "variable_list" {
+					return firstIdentifier(child, content)
+				}
+			}
+		}
+		ancestor = ancestor.Parent()
+	}
+	return ""
+}
+
+func firstIdentifier(root *tree_sitter.Node, content []byte) string {
+	if root == nil {
+		return ""
+	}
+	stack := []*tree_sitter.Node{root}
+	for len(stack) > 0 {
+		node := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		switch node.Kind() {
+		case "identifier", "field_identifier":
+			return cleanName(node.Utf8Text(content))
+		}
+		for index := int(node.NamedChildCount()) - 1; index >= 0; index-- {
+			if child := node.NamedChild(uint(index)); child != nil {
+				stack = append(stack, child)
+			}
+		}
+	}
+	return ""
 }
 
 func declaratorName(node *tree_sitter.Node, content []byte) string {

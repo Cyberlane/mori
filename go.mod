@@ -22,6 +22,11 @@ require (
 	github.com/wippyai/tree-sitter-sql v0.0.4
 )
 
+require (
+	github.com/tree-sitter-grammars/tree-sitter-lua v0.5.0
+	github.com/tree-sitter-grammars/tree-sitter-luau v1.2.0
+)
+
 require github.com/mattn/go-pointer v0.0.1 // indirect
 
 // The tagged Zsh binding imports this historical path in its own Go test.
