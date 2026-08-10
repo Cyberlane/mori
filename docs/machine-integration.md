@@ -16,6 +16,13 @@ human review. It is deliberately not a machine contract and has no schema
 version. Paths and report text are HTML-escaped, source bodies are not embedded,
 and no external scripts, fonts, images, or network requests are used.
 
+For a report that will leave the project boundary, add `--redact-paths`. Mori
+then replaces every exact source, warning, coverage, configuration, ignore,
+stdin, baseline, and focus path with a deterministic placeholder such as
+`<path-004>.go`. Extensions are retained for context; source text, literal
+values, and path-to-placeholder mappings are not emitted. Redaction changes
+presentation only, not scores, fingerprints, counts, or schema version.
+
 ## Versioned JSON contract
 
 Schema 17 is described by the Draft 2020-12 artifact at

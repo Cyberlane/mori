@@ -129,6 +129,7 @@ type scanOptions struct {
 	workers            int
 	format             string
 	color              string
+	redactPaths        bool
 	sameLanguageOnly   bool
 	crossLanguageOnly  bool
 	failOnMatch        bool
@@ -192,6 +193,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 	flags.IntVar(&options.workers, "workers", options.workers, "parallel parser workers")
 	flags.StringVar(&options.format, "format", options.format, "output format: text, json, sarif, or html")
 	flags.StringVar(&options.color, "color", options.color, "terminal color: auto, always, or never")
+	flags.BoolVar(&options.redactPaths, "redact-paths", options.redactPaths, "replace source and configuration paths with stable placeholders in output")
 	if baselineAction == "" {
 		flags.StringVar(
 			&options.stdinPath,
@@ -846,6 +848,9 @@ func runScan(
 }
 
 func renderScanReport(stdout io.Writer, result model.Report, options scanOptions) error {
+	if options.redactPaths {
+		redactReportPaths(&result)
+	}
 	switch options.format {
 	case "json":
 		return report.JSON(stdout, result)
