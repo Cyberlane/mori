@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-08-10
+
 ### Added
 
 - Added selective `baseline add`, `baseline remove`, and `baseline edit`
@@ -437,7 +439,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/Cyberlane/mori/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/Cyberlane/mori/compare/v0.19.1...v0.20.0
 [0.19.1]: https://github.com/Cyberlane/mori/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/Cyberlane/mori/compare/v0.18.0...v0.19.0
