@@ -281,10 +281,12 @@ legacy scalar Git focus fields remain unchanged for a single
 `--changed-since` worktree.
 
 Staged discovery builds a bounded virtual tree from stage-zero index entries,
-reads source and ignore blobs by object ID, and hashes the ordered mode/OID/path
-inventory. It never writes Git objects and never falls back to working-tree or
-untracked bytes. Named scope roots are resolved inside the configuration
-project and become part of baseline compatibility.
+reads source, ignore, configuration, and baseline blobs by object ID, and
+hashes the ordered mode/OID/path inventory. A baseline must resolve to a
+tracked regular file inside the same worktree and is bounded to 16 MiB. Staged
+analysis never writes Git objects and never falls back to working-tree,
+external, or untracked bytes. Named scope roots are resolved inside the
+configuration project and become part of baseline compatibility.
 
 When focus is active, focused groups form the first bucket. Within each bucket,
 and for every scan without focus, group ordering is:

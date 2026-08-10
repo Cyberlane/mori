@@ -7,6 +7,14 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Staged scans now load configured or explicit baselines from the same
+  stage-zero Git-index snapshot as source, ignore rules, and configuration.
+  Missing, external, non-regular, oversized, or malformed staged baselines
+  fail closed instead of falling back to working-tree bytes. Report schema
+  remains 18, baseline schema remains 3, and normalization remains 12.
+
 ## [0.28.0] - 2026-08-10
 
 ### Added

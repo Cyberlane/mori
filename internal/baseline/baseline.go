@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -18,6 +19,9 @@ import (
 
 // SchemaVersion is the current baseline file format.
 const SchemaVersion = 3
+
+// MaxDocumentBytes bounds one baseline document before decoding.
+const MaxDocumentBytes int64 = 16 * 1024 * 1024
 
 // Scope controls whether acceptance follows normalized content everywhere or
 // only the reviewed pair of source paths.
@@ -109,9 +113,23 @@ type document struct {
 // contract is not compatible with the current binary. Schema 1 is interpreted
 // using its original content-addressed behavior.
 func Load(path string) (Set, error) {
-	content, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return Set{}, fmt.Errorf("read baseline: %w", err)
+	}
+	defer file.Close()
+	content, err := io.ReadAll(io.LimitReader(file, MaxDocumentBytes+1))
+	if err != nil {
+		return Set{}, fmt.Errorf("read baseline: %w", err)
+	}
+	return Decode(content)
+}
+
+// Decode validates and loads one bounded baseline document from trusted input
+// bytes such as a stage-zero Git index blob.
+func Decode(content []byte) (Set, error) {
+	if int64(len(content)) > MaxDocumentBytes {
+		return Set{}, fmt.Errorf("read baseline: document exceeds %d bytes", MaxDocumentBytes)
 	}
 
 	var stored document

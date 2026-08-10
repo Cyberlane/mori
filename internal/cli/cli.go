@@ -1046,7 +1046,11 @@ func runScan(
 		options.stdinContent = content
 		options.focusPaths = append(options.focusPaths, options.stdinPath)
 	}
-	suppress, baselineWarnings, baselineStatus, baselineDigest, err := loadSuppression(options.baselinePath)
+	suppress, baselineWarnings, baselineStatus, baselineDigest, err := loadSuppression(
+		ctx,
+		options.baselinePath,
+		options.stagedSnapshot,
+	)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: load baseline: %v\n", err)
 		return exitError
@@ -1851,7 +1855,9 @@ func baselineScanProfile(
 }
 
 func loadSuppression(
+	ctx context.Context,
 	path string,
+	snapshot *vcs.IndexSnapshot,
 ) (
 	func(string, model.Location, model.Location) bool,
 	[]model.Warning,
@@ -1862,7 +1868,7 @@ func loadSuppression(
 	if path == "" {
 		return nil, nil, "", "", nil
 	}
-	set, err := baseline.Load(path)
+	set, err := loadBaselineInput(ctx, path, snapshot)
 	if err != nil {
 		return nil, nil, "", "", err
 	}
@@ -1874,6 +1880,43 @@ func loadSuppression(
 		}}, "legacy", "", nil
 	}
 	return set.Match, nil, "loaded", set.ProfileDigest(), nil
+}
+
+func loadBaselineInput(
+	ctx context.Context,
+	path string,
+	snapshot *vcs.IndexSnapshot,
+) (baseline.Set, error) {
+	if snapshot == nil {
+		return baseline.Load(path)
+	}
+	relative, err := vcs.RelativeIndexPath(*snapshot, path)
+	if err != nil {
+		return baseline.Set{}, fmt.Errorf("resolve staged baseline: %w", err)
+	}
+	entry, found := vcs.IndexEntryForPath(*snapshot, relative)
+	if !found {
+		return baseline.Set{}, fmt.Errorf(
+			"staged baseline %q is not present in the Git index",
+			displayCLIPath(path),
+		)
+	}
+	if entry.Mode != "100644" && entry.Mode != "100755" {
+		return baseline.Set{}, fmt.Errorf("staged baseline %q is not a regular file", displayCLIPath(path))
+	}
+	content, size, err := vcs.ReadIndexBlob(ctx, *snapshot, entry, baseline.MaxDocumentBytes)
+	if err != nil {
+		return baseline.Set{}, err
+	}
+	if content == nil {
+		return baseline.Set{}, fmt.Errorf(
+			"staged baseline %q is %d bytes; limit is %d",
+			displayCLIPath(path),
+			size,
+			baseline.MaxDocumentBytes,
+		)
+	}
+	return baseline.Decode(content)
 }
 
 func executeScan(

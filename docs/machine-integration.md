@@ -39,7 +39,9 @@ versions.
 Schema 18 adds immutable Git-index input provenance, named project scopes, and
 per-path focused coverage. Schema 17 added the optional stdin overlay field.
 The current normalization version is 12 and the baseline contract remains
-schema 3.
+schema 3. Under `--staged`, the index digest covers the exact tracked baseline
+blob as well as source, ignore, and configuration inputs; there is no separate
+report field or schema change for that correction.
 
 ## SARIF contract
 

@@ -6,7 +6,7 @@ different file or `--no-config` to disable configuration loading.
 
 Unknown fields, malformed JSON, non-regular files, and files larger than one
 MiB are errors. Relative `baseline` paths resolve from the configuration
-file's directory. A selected profile supplies defaults, explicit configuration
+file's directory, and baseline documents are bounded to 16 MiB. A selected profile supplies defaults, explicit configuration
 fields override profile values, and explicit command-line values override
 both. Repeated `--exclude` and `--language-pair` values are additive. A
 command-line `--comparison-domain` overrides the configured domain. `--sql-dialect`
@@ -232,9 +232,12 @@ explicit locally available Git revision, and repeatable
 `--changed-worktree PATH=REVISION` values give every additional Git worktree
 its own revision. Dynamic Git revisions are intentionally not project config.
 
-`--staged` is also CLI-only. It reads tracked sources, ignore files, and
-`.mori.json` from one immutable Git-index snapshot and records the HEAD and
-index digest under `configuration.input`. Combine it with `--include-focused`
+`--staged` is also CLI-only. It reads tracked sources, ignore files,
+`.mori.json`, and any configured or explicit baseline from one immutable
+Git-index snapshot and records the HEAD and index digest under
+`configuration.input`. A staged baseline must be a tracked regular file inside
+that worktree and no larger than 16 MiB; Mori fails closed rather than reading
+an untracked, external, or working-tree copy. Combine staged mode with `--include-focused`
 to bypass ordinary ignore rules for changed files while retaining explicit
 excludes, generated-source policy, and resource bounds. Add
 `--require-focused-coverage` when every supported non-deleted focused path must be
