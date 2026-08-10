@@ -2,7 +2,7 @@
   "name": "mori-vscode",
   "displayName": "Mori Structural Review",
   "description": "Review Mori structural-similarity leads while editing.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "Cyberlane",
   "license": "MIT",
   "icon": "icon.png",
