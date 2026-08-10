@@ -843,6 +843,30 @@ func TestRunRejectsInvalidThreshold(t *testing.T) {
 	}
 }
 
+func TestRunRejectsInvalidCoveragePolicies(t *testing.T) {
+	t.Parallel()
+
+	for name, args := range map[string][]string{
+		"coverage above one":  {"--min-file-coverage", "1.1"},
+		"coverage NaN":        {"--min-file-coverage", "NaN"},
+		"zero files below -1": {"--max-zero-fragment-files", "-2"},
+	} {
+		name, args := name, args
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			arguments := append([]string{"scan"}, args...)
+			arguments = append(arguments, ".")
+			code := Run(context.Background(), arguments, &stdout, &stderr)
+			if code != exitUsage || !strings.Contains(stderr.String(), "coverage") &&
+				!strings.Contains(stderr.String(), "zero-fragment") {
+				t.Fatalf("exit/stderr = %d/%q", code, stderr.String())
+			}
+		})
+	}
+}
+
 func TestRunRejectsIncompatibleLanguageDomains(t *testing.T) {
 	t.Parallel()
 
@@ -1131,6 +1155,118 @@ func TestRunRequireCoverageCanBeConfiguredAndOverridden(t *testing.T) {
 		"scan", "--config", configPath, "--require-coverage=false", root,
 	}, &stdout, &stderr); code != exitSuccess {
 		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+}
+
+func TestRunEnforcesStrictFileCoveragePolicies(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		"productive.go": "package sample\nfunc Productive() { println(\"ok\") }\n",
+		"empty-a.go":    "package sample\nconst A = 1\n",
+		"empty-b.go":    "package sample\nconst B = 2\n",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--format", "json", "--min-tokens", "1",
+		"--min-file-coverage", "1", "--max-zero-fragment-files", "0", root,
+	}, &stdout, &stderr)
+	if code != exitCoverage ||
+		!strings.Contains(stderr.String(), "file coverage 1/3") ||
+		!strings.Contains(stderr.String(), "2 zero-fragment file(s)") {
+		t.Fatalf("exit/stderr = %d/%q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if result.Coverage.SupportedFiles != 3 || result.Coverage.AnalyzedFiles != 3 ||
+		result.Coverage.FragmentFiles != 1 || result.Coverage.ZeroFragmentFiles != 2 {
+		t.Fatalf("coverage = %+v", result.Coverage)
+	}
+	for _, file := range result.FileCoverage {
+		if file.FragmentCount == 0 && file.ZeroReason != "no_boundaries" {
+			t.Fatalf("zero-fragment file = %+v", file)
+		}
+	}
+	if result.Configuration.MinFileCoverage != 1 || result.Configuration.MaxZeroFiles != 0 {
+		t.Fatalf("configuration = %+v", result.Configuration)
+	}
+}
+
+func TestRunCoverageWarningsAndParseDiagnosticsFailIndependently(t *testing.T) {
+	t.Parallel()
+
+	t.Run("warning", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "unsupported.fish")
+		if err := os.WriteFile(path, []byte("echo hello\n"), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := Run(context.Background(), []string{
+			"scan", "--format", "json", "--fail-on-warning", path,
+		}, &stdout, &stderr)
+		if code != exitCoverage || !strings.Contains(stderr.String(), "warning(s) were reported") {
+			t.Fatalf("exit/stderr = %d/%q", code, stderr.String())
+		}
+	})
+
+	t.Run("parse diagnostic", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "broken.go")
+		if err := os.WriteFile(path, []byte("package sample\nfunc Broken( {\n"), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := Run(context.Background(), []string{
+			"scan", "--format", "json", "--min-tokens", "1",
+			"--fail-on-parse-diagnostic", path,
+		}, &stdout, &stderr)
+		if code != exitCoverage || !strings.Contains(stderr.String(), "parse diagnostic(s)") {
+			t.Fatalf("exit/stderr = %d/%q", code, stderr.String())
+		}
+	})
+}
+
+func TestBaselineUpdateDoesNotBypassStrictCoveragePolicies(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(root, "constants.go"),
+		[]byte("package sample\nconst Value = 1\n"),
+		0o600,
+	); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	baselinePath := filepath.Join(root, "baseline.json")
+	const original = "unchanged\n"
+	if err := os.WriteFile(baselinePath, []byte(original), 0o600); err != nil {
+		t.Fatalf("WriteFile baseline: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"baseline", "update", "--baseline", baselinePath,
+		"--min-file-coverage", "1", root,
+	}, &stdout, &stderr)
+	if code != exitCoverage {
+		t.Fatalf("exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	content, err := os.ReadFile(baselinePath)
+	if err != nil {
+		t.Fatalf("ReadFile baseline: %v", err)
+	}
+	if string(content) != original {
+		t.Fatalf("baseline changed to %q", content)
 	}
 }
 

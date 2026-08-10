@@ -26,6 +26,10 @@ type scanProfile struct {
 	sameLanguageOnly  bool
 	crossLanguageOnly bool
 	requireCoverage   bool
+	minFileCoverage   float64
+	maxZeroFiles      int
+	failOnWarning     bool
+	failOnDiagnostic  bool
 	excludeGenerated  bool
 }
 
@@ -43,6 +47,7 @@ func resolveScanProfile(value string) (scanProfile, error) {
 			sameLanguageOnly: true,
 			requireCoverage:  true,
 			excludeGenerated: true,
+			maxZeroFiles:     -1,
 		},
 		profileExplore: {
 			name:           profileExplore,
@@ -51,6 +56,7 @@ func resolveScanProfile(value string) (scanProfile, error) {
 			maxGroups:      100,
 			maxOccurrences: 20,
 			ranking:        analyzer.RankingStructural,
+			maxZeroFiles:   -1,
 		},
 		profileSQL: {
 			name:             profileSQL,
@@ -62,6 +68,7 @@ func resolveScanProfile(value string) (scanProfile, error) {
 			ranking:          analyzer.RankingReview,
 			requireCoverage:  true,
 			excludeGenerated: true,
+			maxZeroFiles:     -1,
 		},
 	}
 	profile, ok := profiles[value]
@@ -89,6 +96,10 @@ func applyScanProfile(options *scanOptions, value string) error {
 	options.sameLanguageOnly = profile.sameLanguageOnly
 	options.crossLanguageOnly = profile.crossLanguageOnly
 	options.requireCoverage = profile.requireCoverage
+	options.minFileCoverage = profile.minFileCoverage
+	options.maxZeroFiles = profile.maxZeroFiles
+	options.failOnWarning = profile.failOnWarning
+	options.failOnDiagnostic = profile.failOnDiagnostic
 	options.excludeGenerated = profile.excludeGenerated
 	return nil
 }
@@ -109,6 +120,10 @@ func renderProfileConfig(value string) ([]byte, error) {
 		SameLanguageOnly:  pointer(profile.sameLanguageOnly),
 		CrossLanguageOnly: pointer(profile.crossLanguageOnly),
 		RequireCoverage:   pointer(profile.requireCoverage),
+		MinFileCoverage:   pointer(profile.minFileCoverage),
+		MaxZeroFiles:      pointer(profile.maxZeroFiles),
+		FailOnWarning:     pointer(profile.failOnWarning),
+		FailOnDiagnostic:  pointer(profile.failOnDiagnostic),
 		ExcludeGenerated:  pointer(profile.excludeGenerated),
 	}
 	content, err := json.MarshalIndent(settings, "", "  ")

@@ -97,10 +97,15 @@ func Text(writer io.Writer, report model.Report) error {
 	analyzedFiles := 0
 	generatedAnalyzed := 0
 	generatedExcluded := 0
+	resourceSkipped := 0
 	zeroFragmentFiles := make([]model.FileCoverage, 0)
 	for _, coverage := range report.FileCoverage {
 		if coverage.Status == "excluded_generated" {
 			generatedExcluded++
+			continue
+		}
+		if coverage.Status != "analyzed" {
+			resourceSkipped++
 			continue
 		}
 		analyzedFiles++
@@ -114,11 +119,13 @@ func Text(writer io.Writer, report model.Report) error {
 		}
 	}
 	if analyzedFiles > 0 {
+		coveragePercent := float64(filesWithFragments) / float64(analyzedFiles) * 100
 		if _, err := fmt.Fprintf(
 			writer,
-			"coverage: %d of %d analyzed file(s) produced comparison fragments at the current token floor\n",
+			"coverage: %d/%d analyzed file(s) produced comparison fragments at the current token floor (%.1f%%)\n",
 			filesWithFragments,
 			analyzedFiles,
+			coveragePercent,
 		); err != nil {
 			return err
 		}
@@ -129,6 +136,15 @@ func Text(writer io.Writer, report model.Report) error {
 			"generated sources: %d analyzed, %d excluded\n",
 			generatedAnalyzed,
 			generatedExcluded,
+		); err != nil {
+			return err
+		}
+	}
+	if resourceSkipped > 0 {
+		if _, err := fmt.Fprintf(
+			writer,
+			"supported sources skipped by resource limits: %d\n",
+			resourceSkipped,
 		); err != nil {
 			return err
 		}
@@ -148,14 +164,36 @@ func Text(writer io.Writer, report model.Report) error {
 				}
 				break
 			}
+			reason := coverage.ZeroReason
+			if reason == "" {
+				reason = "unknown"
+			}
 			if _, err := fmt.Fprintf(
 				writer,
-				"  - %s [%s]\n",
+				"  - %s [%s; %s]\n",
 				terminalSafe(coverage.Path),
 				terminalSafe(coverage.Language),
+				terminalSafe(reason),
 			); err != nil {
 				return err
 			}
+		}
+	}
+	if len(report.Coverage.UnsupportedExtensions) > 0 {
+		parts := make([]string, 0, len(report.Coverage.UnsupportedExtensions))
+		for _, unsupported := range report.Coverage.UnsupportedExtensions {
+			parts = append(parts, fmt.Sprintf(
+				"%s (%d)",
+				terminalSafe(unsupported.Extension),
+				unsupported.FileCount,
+			))
+		}
+		if _, err := fmt.Fprintf(
+			writer,
+			"unsupported extensions: %s\n",
+			strings.Join(parts, ", "),
+		); err != nil {
+			return err
 		}
 	}
 

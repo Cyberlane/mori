@@ -7,6 +7,21 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added `--min-file-coverage`, `--max-zero-fragment-files`,
+  `--fail-on-warning`, and `--fail-on-parse-diagnostic`, with equivalent strict
+  project configuration. Scan and baseline operations evaluate the same
+  policies before returning success or modifying a baseline.
+- Added deterministic coverage-summary totals, aggregate unsupported-extension
+  counts, pre-token-floor boundary counts, and machine-readable reasons for
+  every zero-fragment supported file.
+
+### Changed
+
+- Machine-readable reports now use schema version 14. Normalization remains
+  version 8 and baseline schema remains version 2.
+
 ## [0.19.1] - 2026-08-09
 
 ### Fixed

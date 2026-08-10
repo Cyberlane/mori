@@ -214,6 +214,9 @@ Store repeatable project settings in `.mori.json`:
   "comparison_domain": "code",
   "ranking": "review",
   "same_language_only": true,
+	"min_file_coverage": 0.95,
+	"max_zero_fragment_files": 2,
+	"fail_on_parse_diagnostic": true,
   "exclude_generated": true,
   "exclude": ["**/*_test.go"]
 }
@@ -283,19 +286,30 @@ surface ordinary local syntax symmetry.
 
 Mori emits a `coverage` warning when a scan discovers no supported files or
 extracts no comparison fragments. Such a result is not evidence that the
-repository has no duplication. Use `--require-coverage` in automation to write
-the report and exit with status `4` when either condition occurs:
+repository has no duplication. Use strict coverage policies in automation to
+write the report and exit with status `4` when its evidence is insufficient:
 
 ```sh
-mori scan --format json --require-coverage .
+mori scan --format json \
+  --require-coverage \
+  --min-file-coverage 0.95 \
+  --max-zero-fragment-files 2 \
+  --fail-on-parse-diagnostic \
+  .
 ```
 
-Schema-13 reports embed deterministic `tool` build provenance, the selected
-profile, comparison
-selection, domain and fragment-kind metadata, exact focus metadata, and a
-per-file coverage inventory including generated-source classification. They do
-not include a scan timestamp, hostname, username, source body, diff, or Git
-remote.
+`--min-file-coverage` divides fragment-producing files by analyzed supported
+files. Generated exclusions do not enter that denominator.
+`--max-zero-fragment-files` accepts `-1` to disable the policy, and
+`--fail-on-warning` or `--fail-on-parse-diagnostic` make incomplete inputs
+fatal independently. Baseline update and prune evaluate the same policies
+before modifying a baseline.
+
+Schema-14 reports embed deterministic `tool` build provenance, the selected
+profile, comparison selection, domain and fragment-kind metadata, exact focus
+metadata, a coverage summary, per-file zero-fragment reasons, and aggregate
+unsupported-extension counts. They do not include a scan timestamp, hostname,
+username, source body, diff, or Git remote.
 
 Fail a CI job when Mori finds a match at your threshold:
 
@@ -303,8 +317,8 @@ Fail a CI job when Mori finds a match at your threshold:
 mori scan --threshold 0.85 --require-coverage --fail-on-match .
 ```
 
-With `--fail-on-match`, Mori exits with status `3` when it finds a match.
-Coverage failure takes precedence and exits with status `4`.
+With `--fail-on-match`, Mori exits with status `3` when it finds a match. Any
+strict coverage-policy failure takes precedence and exits with status `4`.
 
 For change review, keep the full repository comparison universe while putting
 groups that touch changed files first:
@@ -335,7 +349,7 @@ mori scan \
 `--changed-worktree PATH=REVISION` values describe the other worktrees. Mori
 requires every discovered file to belong to a resolved root, never inherits a
 parent revision for a nested repository, and records each root's requested
-base, full resolved commits, changed paths, and deleted paths in schema-13 JSON.
+base, full resolved commits, changed paths, and deleted paths in schema-14 JSON.
 Use only repeated `--changed-worktree` values when every scanned root should be
 explicit. Excluding and scanning a nested worktree separately remains valid;
 never interpret an excluded repository as unchanged. Mori bounds one scan to

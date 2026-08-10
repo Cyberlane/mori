@@ -48,6 +48,7 @@ type Result struct {
 	Warnings    []model.Warning
 	IgnoreFiles []string
 	Excluded    []model.FileCoverage
+	Unsupported []model.UnsupportedExtension
 }
 
 var defaultExcludedDirectories = map[string]struct{}{
@@ -83,11 +84,14 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 	}
 
 	result := Result{
-		Files:    make([]File, 0),
-		Warnings: make([]model.Warning, 0),
-		Excluded: make([]model.FileCoverage, 0),
+		Files:       make([]File, 0),
+		Warnings:    make([]model.Warning, 0),
+		Excluded:    make([]model.FileCoverage, 0),
+		Unsupported: make([]model.UnsupportedExtension, 0),
 	}
 	seen := make(map[string]struct{})
+	unsupportedSeen := make(map[string]struct{})
+	unsupportedCounts := make(map[string]int)
 	ignores := newIgnoreMatcher(cwd)
 
 	for _, requestedPath := range paths {
@@ -137,7 +141,7 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 			) {
 				continue
 			}
-			addFile(&result, seen, cwd, absolutePath, true, options)
+			addFile(&result, seen, unsupportedSeen, unsupportedCounts, cwd, absolutePath, true, options)
 			continue
 		}
 
@@ -194,7 +198,7 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 			if options.IgnoreFiles && ignores.ignored(path, false) {
 				return nil
 			}
-			addFile(&result, seen, cwd, path, false, options)
+			addFile(&result, seen, unsupportedSeen, unsupportedCounts, cwd, path, false, options)
 			return nil
 		})
 		if walkErr != nil {
@@ -210,6 +214,12 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 		}
 	}
 	result.IgnoreFiles = ignores.paths()
+	for extension, count := range unsupportedCounts {
+		result.Unsupported = append(result.Unsupported, model.UnsupportedExtension{
+			Extension: extension,
+			FileCount: count,
+		})
+	}
 
 	sort.Slice(result.Files, func(i, j int) bool {
 		return result.Files[i].DisplayPath < result.Files[j].DisplayPath
@@ -222,6 +232,9 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 	})
 	sort.Slice(result.Excluded, func(i, j int) bool {
 		return result.Excluded[i].Path < result.Excluded[j].Path
+	})
+	sort.Slice(result.Unsupported, func(i, j int) bool {
+		return result.Unsupported[i].Extension < result.Unsupported[j].Extension
 	})
 	return result, nil
 }
@@ -239,6 +252,8 @@ func ValidatePatterns(patterns []string) error {
 func addFile(
 	result *Result,
 	seen map[string]struct{},
+	unsupportedSeen map[string]struct{},
+	unsupportedCounts map[string]int,
 	cwd string,
 	path string,
 	explicit bool,
@@ -247,6 +262,7 @@ func addFile(
 	spec, supported := language.DetectWithSQLDialect(path, options.SQLDialect)
 	needsShebang := !supported && filepath.Ext(path) == ""
 	if !supported && !needsShebang {
+		recordUnsupported(path, unsupportedSeen, unsupportedCounts)
 		if explicit {
 			result.Warnings = append(result.Warnings, model.Warning{
 				Path:    displayPath(cwd, path),
@@ -293,6 +309,7 @@ func addFile(
 		}
 		spec, supported = language.DetectShebang(firstLine)
 		if !supported {
+			recordUnsupported(path, unsupportedSeen, unsupportedCounts)
 			if explicit {
 				result.Warnings = append(result.Warnings, model.Warning{
 					Path:    displayPath(cwd, path),
@@ -322,6 +339,14 @@ func addFile(
 				options.MaxFileBytes,
 			),
 		})
+		result.Excluded = append(result.Excluded, model.FileCoverage{
+			Path:             displayPath(cwd, path),
+			Language:         spec.ID,
+			LanguageFamily:   spec.Family,
+			ComparisonDomain: analysisDomain,
+			Status:           "skipped_resource",
+			ZeroReason:       "resource_limit",
+		})
 		return
 	}
 	generated, marker, err := detectGeneratedHeader(path, info)
@@ -344,6 +369,7 @@ func addFile(
 			Status:           "excluded_generated",
 			Generated:        true,
 			GeneratedMarker:  marker,
+			ZeroReason:       "generated_excluded",
 		})
 		return
 	}
@@ -357,6 +383,23 @@ func addFile(
 		MaxBytes:       options.MaxFileBytes,
 		Info:           info,
 	})
+}
+
+func recordUnsupported(
+	path string,
+	seen map[string]struct{},
+	counts map[string]int,
+) {
+	extension := strings.ToLower(filepath.Ext(path))
+	if extension == "" {
+		return
+	}
+	cleanPath := filepath.Clean(path)
+	if _, exists := seen[cleanPath]; exists {
+		return
+	}
+	seen[cleanPath] = struct{}{}
+	counts[extension]++
 }
 
 const maxGeneratedHeaderBytes = 8192

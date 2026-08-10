@@ -28,6 +28,14 @@ func File(
 	return FileWithOptions(ctx, file, Options{MinTokens: minTokens})
 }
 
+// Coverage records fragment-boundary evidence before the token floor is
+// applied. It lets callers distinguish files with no boundaries from files
+// whose boundaries were all too small.
+type Coverage struct {
+	CandidateFragments int
+	BelowTokenFloor    int
+}
+
 // Options controls opt-in fragment extraction. Defaults preserve the
 // function- and query-level comparison contract used by earlier releases.
 type Options struct {
@@ -45,12 +53,23 @@ func FileWithOptions(
 	file source.File,
 	options Options,
 ) ([]model.Fragment, []model.Warning) {
+	fragments, warnings, _ := FileWithCoverage(ctx, file, options)
+	return fragments, warnings
+}
+
+// FileWithCoverage parses one file and also returns pre-filter coverage
+// evidence for strict file-coverage policies.
+func FileWithCoverage(
+	ctx context.Context,
+	file source.File,
+	options Options,
+) ([]model.Fragment, []model.Warning, Coverage) {
 	content, err := readSource(ctx, file.Path, file.MaxBytes, file.Info)
 	if err != nil {
 		return nil, []model.Warning{{
 			Path:    file.DisplayPath,
 			Message: diagnostic.Message(err),
-		}}
+		}}, Coverage{}
 	}
 
 	treeParser := tree_sitter.NewParser()
@@ -60,7 +79,7 @@ func FileWithOptions(
 		return nil, []model.Warning{{
 			Path:    file.DisplayPath,
 			Message: fmt.Sprintf("configure %s parser: %v", file.Language.ID, err),
-		}}
+		}}, Coverage{}
 	}
 
 	parserInput := content
@@ -72,7 +91,7 @@ func FileWithOptions(
 		return nil, []model.Warning{{
 			Path:    file.DisplayPath,
 			Message: "parser returned no syntax tree",
-		}}
+		}}, Coverage{}
 	}
 	if file.Language.ID == "tsx" || file.Language.ID == "javascript" {
 		if repaired := repairJSXParserInput(tree.RootNode(), parserInput); repaired != nil {
@@ -104,13 +123,15 @@ func FileWithOptions(
 	if options.EmbeddedSQL && file.Language.ID == "go" {
 		return embeddedSQLFragments(ctx, root, content, file, options)
 	}
+	coverage := Coverage{}
 	warnings := make([]model.Warning, 0, 1)
 	fragments := make([]model.Fragment, 0)
 	skippedFragments := 0
 	if fragmentKind := file.Language.TopLevelFragmentKind(root); fragmentKind != "" {
+		coverage.CandidateFragments++
 		if root.HasError() {
 			skippedFragments++
-		} else if _, err := appendFragment(
+		} else if included, err := appendFragment(
 			ctx,
 			root,
 			content,
@@ -123,7 +144,9 @@ func FileWithOptions(
 			return nil, []model.Warning{{
 				Path:    file.DisplayPath,
 				Message: diagnostic.Message(err),
-			}}
+			}}, coverage
+		} else if !included {
+			coverage.BelowTokenFloor++
 		}
 	}
 	if err := collect(
@@ -135,11 +158,12 @@ func FileWithOptions(
 		&fragments,
 		&warnings,
 		&skippedFragments,
+		&coverage,
 	); err != nil {
 		return nil, append(warnings, model.Warning{
 			Path:    file.DisplayPath,
 			Message: diagnostic.Message(err),
-		})
+		}), coverage
 	}
 	annotateNesting(fragments)
 	if root.HasError() {
@@ -154,7 +178,7 @@ func FileWithOptions(
 			Diagnostics:      diagnostics,
 		})
 	}
-	return fragments, warnings
+	return fragments, warnings, coverage
 }
 
 func collect(
@@ -166,6 +190,7 @@ func collect(
 	fragments *[]model.Fragment,
 	warnings *[]model.Warning,
 	skippedFragments *int,
+	coverage *Coverage,
 ) error {
 	if node == nil {
 		return nil
@@ -179,11 +204,15 @@ func collect(
 			return err
 		}
 		current := cursor.Node()
-		if file.Language.AcceptsFragmentBoundary(current) &&
+		accepted := file.Language.AcceptsFragmentBoundary(current)
+		if accepted {
+			coverage.CandidateFragments++
+		}
+		if accepted &&
 			(current.HasError() || hasInvalidAncestor(current)) {
 			(*skippedFragments)++
-		} else if file.Language.AcceptsFragmentBoundary(current) {
-			if _, err := appendFragment(
+		} else if accepted {
+			included, err := appendFragment(
 				ctx,
 				current,
 				content,
@@ -192,8 +221,12 @@ func collect(
 				file.Language.FragmentKind,
 				"",
 				fragments,
-			); err != nil {
+			)
+			if err != nil {
 				return err
+			}
+			if !included {
+				coverage.BelowTokenFloor++
 			}
 			if options.StatementBlocks {
 				blockWarnings, err := appendStatementBlocks(

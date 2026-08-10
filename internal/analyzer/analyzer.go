@@ -38,6 +38,7 @@ type Options struct {
 	FocusActive       bool
 	Suppress          func(id string, left model.Location, right model.Location) bool
 	ExcludedCoverage  []model.FileCoverage
+	Unsupported       []model.UnsupportedExtension
 	Ranking           string
 	PriorityPaths     []model.PriorityPathRule
 	EmbeddedSQL       bool
@@ -126,17 +127,30 @@ func Analyze(
 	}
 	if len(files) == 0 {
 		message := "no supported source files were discovered; no similarity assessment was performed"
-		if len(options.ExcludedCoverage) > 0 {
+		generatedExcluded := 0
+		for _, coverage := range options.ExcludedCoverage {
+			if coverage.Status == "excluded_generated" {
+				generatedExcluded++
+			}
+		}
+		if generatedExcluded == len(options.ExcludedCoverage) && generatedExcluded > 0 {
 			message = fmt.Sprintf(
 				"all %d supported source file(s) were classified as generated and excluded; no similarity assessment was performed",
-				len(options.ExcludedCoverage),
+				generatedExcluded,
 			)
+		} else if len(options.ExcludedCoverage) > 0 {
+			message = "no supported source files were analyzed; no similarity assessment was performed"
 		}
 		report.Warnings = append(report.Warnings, model.Warning{
 			Kind:    "coverage",
 			Message: message,
 		})
 		sortWarnings(report.Warnings)
+		report.Coverage = summarizeReportCoverage(
+			report.FileCoverage,
+			report.Warnings,
+			options.Unsupported,
+		)
 		return report, nil
 	}
 
@@ -160,7 +174,7 @@ func Analyze(
 				if ctx.Err() != nil {
 					return
 				}
-				fragments, warnings := parser.FileWithOptions(ctx, job.file, parser.Options{
+				fragments, warnings, parserCoverage := parser.FileWithCoverage(ctx, job.file, parser.Options{
 					MinTokens:        options.MinTokens,
 					EmbeddedSQL:      options.EmbeddedSQL,
 					SQLDialect:       options.SQLDialect,
@@ -172,7 +186,7 @@ func Analyze(
 					index:     job.index,
 					fragments: fragments,
 					warnings:  warnings,
-					coverage:  summarizeCoverage(job.file, fragments, warnings),
+					coverage:  summarizeCoverage(job.file, fragments, warnings, parserCoverage),
 				}
 			}
 		}()
@@ -254,6 +268,11 @@ func Analyze(
 		return report, compareErr
 	}
 	collector.finish()
+	report.Coverage = summarizeReportCoverage(
+		report.FileCoverage,
+		report.Warnings,
+		options.Unsupported,
+	)
 
 	return report, nil
 }
@@ -262,6 +281,7 @@ func summarizeCoverage(
 	file source.File,
 	fragments []model.Fragment,
 	warnings []model.Warning,
+	parserCoverage parser.Coverage,
 ) model.FileCoverage {
 	coverage := model.FileCoverage{
 		Path:             file.DisplayPath,
@@ -272,6 +292,8 @@ func summarizeCoverage(
 		Generated:        file.Generated,
 		GeneratedMarker:  file.Marker,
 		FragmentCount:    len(fragments),
+		CandidateCount:   parserCoverage.CandidateFragments,
+		BelowTokenFloor:  parserCoverage.BelowTokenFloor,
 	}
 	if coverage.ComparisonDomain == "" {
 		coverage.ComparisonDomain = file.Language.ComparisonDomain
@@ -280,7 +302,73 @@ func summarizeCoverage(
 		coverage.SkippedFragments += warning.SkippedFragments
 		coverage.ParseDiagnostics += warning.TotalDiagnostics
 	}
+	if coverage.FragmentCount == 0 {
+		coverage.ZeroReason = zeroFragmentReason(coverage, warnings)
+	}
 	return coverage
+}
+
+func zeroFragmentReason(coverage model.FileCoverage, warnings []model.Warning) string {
+	for _, warning := range warnings {
+		if warning.Kind == "parse" || warning.SkippedFragments > 0 || warning.TotalDiagnostics > 0 {
+			return "invalid_fragments"
+		}
+	}
+	for _, warning := range warnings {
+		if warning.Path == coverage.Path {
+			return "resource_limit"
+		}
+	}
+	if coverage.CandidateCount > 0 &&
+		coverage.BelowTokenFloor == coverage.CandidateCount {
+		return "below_token_floor"
+	}
+	return "no_boundaries"
+}
+
+func summarizeReportCoverage(
+	files []model.FileCoverage,
+	warnings []model.Warning,
+	unsupported []model.UnsupportedExtension,
+) model.CoverageSummary {
+	summary := model.CoverageSummary{
+		UnsupportedExtensions: append([]model.UnsupportedExtension{}, unsupported...),
+		WarningCount:          len(warnings),
+	}
+	warningFiles := make(map[string]struct{})
+	parseFiles := make(map[string]struct{})
+	for _, warning := range warnings {
+		if warning.Path != "" {
+			warningFiles[warning.Path] = struct{}{}
+		}
+		if warning.Kind == "parse" || warning.TotalDiagnostics > 0 {
+			if warning.Path != "" {
+				parseFiles[warning.Path] = struct{}{}
+			}
+			summary.ParseDiagnosticCount += warning.TotalDiagnostics
+		}
+	}
+	for _, file := range files {
+		summary.SupportedFiles++
+		switch file.Status {
+		case "excluded_generated":
+			summary.GeneratedExcluded++
+			continue
+		case "analyzed":
+			// Included below.
+		default:
+			continue
+		}
+		summary.AnalyzedFiles++
+		if file.FragmentCount > 0 {
+			summary.FragmentFiles++
+		} else {
+			summary.ZeroFragmentFiles++
+		}
+	}
+	summary.WarningFiles = len(warningFiles)
+	summary.ParseDiagnosticFiles = len(parseFiles)
+	return summary
 }
 
 func compareWithinFamilies(fragments []model.Fragment, collector *matchCollector) error {

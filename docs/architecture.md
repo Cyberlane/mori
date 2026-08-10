@@ -243,15 +243,16 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-11 reports expose deterministic binary provenance, the selected scan
+Schema-14 reports expose deterministic binary provenance, the selected scan
 profile, comparison selection, comparison domains, fragment kinds, optional
 exact focus metadata, grouped
 content-pair identities, fragment fingerprints, occurrence samples and exact
 counts, nesting metadata, structured parser
 diagnostics, effective configuration, ignore sources, and separate baseline
 suppression counts for identities and source-location pairs.
-They also include a deterministic per-file coverage inventory so supported
-files with no comparison fragments remain visible.
+They also include a deterministic coverage summary and per-file inventory so
+supported files with no comparison fragments remain visible with an exact
+reason and pre-token-floor boundary counts.
 Multi-worktree focus adds a deterministic `configuration.focus.worktrees`
 array with a display root and full Git resolution for every worktree. The
 legacy scalar Git focus fields remain unchanged for a single
