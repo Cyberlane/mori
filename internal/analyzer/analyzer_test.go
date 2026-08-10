@@ -42,8 +42,8 @@ func TestAnalyzeCrossLanguageExamples(t *testing.T) {
 		t.Fatalf("Analyze second run: %v", err)
 	}
 
-	if first.Files != 4 || first.Fragments != 4 {
-		t.Fatalf("files/fragments = %d/%d, want 4/4", first.Files, first.Fragments)
+	if first.Files != 6 || first.Fragments != 6 {
+		t.Fatalf("files/fragments = %d/%d, want 6/6", first.Files, first.Fragments)
 	}
 	if len(first.Groups) < 2 {
 		t.Fatalf("groups = %d, want at least 2", len(first.Groups))
@@ -84,6 +84,96 @@ func TestAnalyzeCrossLanguageExamples(t *testing.T) {
 			t.Fatalf("right evidence does not align with profile B: %#v", group)
 		}
 	}
+}
+
+func TestAnalyzeJavaCSharpPositiveAndNearbyNegative(t *testing.T) {
+	t.Parallel()
+
+	positive := t.TempDir()
+	writeAnalyzerFixture(t, positive, "Eligibility.java", `
+final class Eligibility {
+  static boolean mayPublish(Document document) {
+    if (document == null) return false;
+    if (!approved(document)) return false;
+    return containsPublicTag(document) && activeAuthor(document);
+  }
+}
+`)
+	writeAnalyzerFixture(t, positive, "Eligibility.cs", `
+static class Eligibility {
+  static bool MayPublish(Document document) {
+    if (document == null) return false;
+    if (!Approved(document)) return false;
+    return ContainsPublicTag(document) && ActiveAuthor(document);
+  }
+}
+`)
+	positiveResult := analyzeLanguageExpansionFixture(t, positive, 0.70)
+	if positiveResult.CandidatePairs != 1 || positiveResult.TotalMatchGroups != 1 ||
+		len(positiveResult.Groups) != 1 || positiveResult.Groups[0].Similarity < 0.88 ||
+		positiveResult.Groups[0].Similarity > 0.91 {
+		t.Fatalf("Java/C# positive result = %#v", positiveResult)
+	}
+
+	negative := t.TempDir()
+	writeAnalyzerFixture(t, negative, "Search.java", `
+final class Search {
+  static int binarySearch(int[] values, int target) {
+    int low = 0;
+    int high = values.length - 1;
+    while (low <= high) {
+      int middle = (low + high) / 2;
+      if (values[middle] == target) return middle;
+      if (values[middle] < target) low = middle + 1;
+      else high = middle - 1;
+    }
+    return -1;
+  }
+}
+`)
+	writeAnalyzerFixture(t, negative, "Receipt.cs", `
+static class Receipt {
+  static string Render(Order order) {
+    if (order == null) return "";
+    var customer = Normalize(order.Customer.DisplayName);
+    var address = Normalize(order.Customer.Address);
+    var reference = FormatReference(order.Number);
+    try {
+      return string.Concat(customer, address, reference);
+    } catch (FormatException) {
+      return reference;
+    }
+  }
+}
+`)
+	negativeResult := analyzeLanguageExpansionFixture(t, negative, 0.70)
+	if negativeResult.CandidatePairs != 1 || negativeResult.TotalMatchGroups != 0 ||
+		len(negativeResult.Groups) != 0 {
+		t.Fatalf("Java/C# nearby-negative result = %#v", negativeResult)
+	}
+}
+
+func writeAnalyzerFixture(t *testing.T, root string, name string, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile(%s): %v", name, err)
+	}
+}
+
+func analyzeLanguageExpansionFixture(t *testing.T, root string, threshold float64) model.Report {
+	t.Helper()
+	discovered := source.Discover([]string{root}, source.Options{MaxFileBytes: 1024 * 1024})
+	if len(discovered.Warnings) != 0 || len(discovered.Files) != 2 {
+		t.Fatalf("discovery = %#v", discovered)
+	}
+	result, err := Analyze(context.Background(), discovered.Files, nil, Options{
+		Threshold: threshold, MinTokens: 12, MaxGroups: 10, MaxOccurrences: 10,
+		MaxPairs: 10, Workers: 2, CrossLanguageOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	return result
 }
 
 func TestCrossLanguageUsesFamiliesAndExplicitPairsUseGrammarIDs(t *testing.T) {

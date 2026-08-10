@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Cyberlane/mori/internal/language"
+	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/source"
 )
 
@@ -154,6 +155,167 @@ helper "$source_dir"
 	}
 	if changed[1].Fingerprint == fragments[1].Fingerprint {
 		t.Fatal("function-body edit did not change function fingerprint")
+	}
+}
+
+func TestJavaExtractsImplementedFunctionsAndNestedLambdas(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "Service.java")
+	content := `
+interface Worker {
+  int requirement(int value);
+}
+
+record Profile(int value) {
+  Profile {
+    if (value < 0) throw new IllegalArgumentException();
+  }
+}
+
+final class Service {
+  private final int value;
+
+  Service(int value) {
+    this.value = value;
+  }
+
+  int process(int input) {
+    java.util.function.Function<Integer, Integer> transform = item -> {
+      return item + 1;
+    };
+    return transform.apply(input);
+  }
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.Detect(path)
+	if !ok || spec.ID != "java" {
+		t.Fatalf("Java grammar = %q/%t", spec.ID, ok)
+	}
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "Service.java", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 4 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want four/none", fragments, warnings)
+	}
+	names := make(map[string]model.Fragment)
+	for _, fragment := range fragments {
+		names[fragment.Location.Name] = fragment
+	}
+	for _, name := range []string{"Profile", "Service", "process", "transform"} {
+		if _, exists := names[name]; !exists {
+			t.Errorf("missing Java fragment %q in %#v", name, names)
+		}
+	}
+	if _, exists := names["requirement"]; exists {
+		t.Fatal("bodyless Java interface method became a comparison fragment")
+	}
+	if nested := names["transform"]; nested.NestingDepth != 1 ||
+		nested.Parent == nil || nested.Parent.Name != "process" {
+		t.Fatalf("nested Java lambda = %#v", nested)
+	}
+}
+
+func TestCSharpExtractsImplementedFunctionLikeBoundaries(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "Service.cs")
+	content := `
+interface IWorker {
+  int Requirement(int value);
+}
+
+sealed class Service {
+  private int _value;
+
+  public Service(int value) {
+    _value = value;
+  }
+
+  ~Service() {
+    Cleanup();
+  }
+
+  public int Process(int input) {
+    System.Func<int, int> transform = item => item + 1;
+    int Local(int item) { return item * 2; }
+    return transform(Local(input));
+  }
+
+  public int Value {
+    get { return _value; }
+    set => _value = value;
+  }
+
+  public static Service operator +(Service left, Service right) =>
+    new Service(left._value + right._value);
+
+  private void Cleanup() {}
+}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.Detect(path)
+	if !ok || spec.ID != "csharp" {
+		t.Fatalf("C# grammar = %q/%t", spec.ID, ok)
+	}
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "Service.cs", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 9 {
+		t.Fatalf("fragments/warnings = %#v/%#v, want nine/none", fragments, warnings)
+	}
+	names := make(map[string][]model.Fragment)
+	for _, fragment := range fragments {
+		names[fragment.Location.Name] = append(names[fragment.Location.Name], fragment)
+	}
+	for _, name := range []string{"Service", "Process", "transform", "Local", "get", "set", "Cleanup"} {
+		if len(names[name]) == 0 {
+			t.Errorf("missing C# fragment %q in %#v", name, names)
+		}
+	}
+	if len(names["Requirement"]) != 0 {
+		t.Fatal("bodyless C# interface method became a comparison fragment")
+	}
+	for _, name := range []string{"transform", "Local"} {
+		nested := names[name][0]
+		if nested.NestingDepth != 1 || nested.Parent == nil || nested.Parent.Name != "Process" {
+			t.Fatalf("nested C# %s = %#v", name, nested)
+		}
+	}
+}
+
+func TestJavaAndCSharpMalformedFunctionsRemainVisible(t *testing.T) {
+	t.Parallel()
+
+	fixtures := map[string]string{
+		"Broken.java": `class Broken { int work( { return 1; } }`,
+		"Broken.cs":   `class Broken { int Work( { return 1; } }`,
+	}
+	for name, content := range fixtures {
+		name, content := name, content
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), name)
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatalf("WriteFile: %v", err)
+			}
+			spec, ok := language.Detect(path)
+			if !ok {
+				t.Fatalf("language not detected for %s", name)
+			}
+			_, warnings := File(context.Background(), source.File{
+				Path: path, DisplayPath: name, Language: spec,
+			}, 1)
+			if len(warnings) != 1 || warnings[0].Kind != "parse" ||
+				warnings[0].TotalDiagnostics == 0 {
+				t.Fatalf("warnings = %#v, want visible parse diagnostics", warnings)
+			}
+		})
 	}
 }
 

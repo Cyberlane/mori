@@ -48,6 +48,15 @@ Swift-to-other-language comparisons without preserving application-specific
 names or literal values; it does not model Swift types, dispatch, ownership,
 effects, or runtime behavior.
 
+Java and C# each use their own review family. Mori maps their implemented
+function-like declarations, parameters, blocks, bindings, calls, member
+access, construction, expressions, and control transfers into the same
+canonical code vocabulary. Redundant parentheses are transparent. Qualified
+Java method calls receive an anonymous member-access wrapper so their receiver
+shape aligns with other grammars without preserving receiver or method names.
+These mappings do not model types, overload resolution, dispatch, exceptions,
+effects, or runtime behavior.
+
 The normalizer has a version constant for persisted review artifacts. Any
 change to the feature vocabulary, weights, canonical mappings, or
 semantic-hint list increments that version.
@@ -206,7 +215,7 @@ The top-level shape is:
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 9
+    "normalization_version": 10
   },
   "threshold": 0.85,
   "files": 4,
@@ -346,6 +355,13 @@ unsaved-buffer overlays. It changes reporting only: normalization remains
 version 9 and baseline schema remains version 3. The complete versioned
 contract is published as
 [`schemas/mori-report-v17.schema.json`](../schemas/mori-report-v17.schema.json).
+
+Normalization version 10 adds Java and C# function boundaries and canonical
+syntax mappings, makes redundant parentheses transparent, and adds the
+anonymous member wrapper for qualified Java method calls. Report schema 17 and
+baseline schema 3 are unchanged. Scores, fingerprints, and accepted identities
+can change, so older-normalization baselines fail closed and require deliberate
+review and regeneration.
 
 Schema 9 added a deterministic `file_coverage` array with one entry per analyzed
 or generated-excluded supported file. Each entry records its language, review

@@ -18,6 +18,9 @@ outside its reviewed range or rank. Every source change, label change, or range
 change requires human review; the evaluator does not create ground truth.
 Reference movements in the initial manifest were replayed with the official
 v0.22.0 binary and normalization version 8 over the same ten labeled cases.
+Cases for languages added after that release omit reference movement until a
+compatible pinned reference is available; they still enforce reviewed current
+score ranges and ranks.
 
 Classifications:
 

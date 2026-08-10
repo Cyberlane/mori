@@ -25,7 +25,9 @@
   "main": "./extension.js",
   "activationEvents": [
     "onCommand:mori.refreshDiagnostics",
+    "onLanguage:csharp",
     "onLanguage:go",
+    "onLanguage:java",
     "onLanguage:javascript",
     "onLanguage:javascriptreact",
     "onLanguage:python",

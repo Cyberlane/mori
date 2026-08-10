@@ -97,7 +97,10 @@ Code languages extract function-like boundaries. Bash/POSIX shell and Zsh also
 extract a whole-file `script` boundary containing only top-level executable
 statements; named function bodies remain separate and are excluded from that
 script profile. Script fragments compare only with scripts, never functions.
-Swift extracts implemented
+Java extracts implemented methods, constructors, compact constructors, and
+lambdas, while excluding bodyless methods. C# extracts implemented methods,
+constructors, destructors, operators, accessors, local functions, anonymous
+methods, and lambdas, while excluding bodyless members. Swift extracts implemented
 functions, initializers, deinitializers, and closures; bodyless protocol
 requirements, computed properties, accessors, and subscripts are not separate
 comparison units. Generic SQL and explicitly selected PostgreSQL each extract
@@ -147,7 +150,10 @@ overlap.
 
 Operation families are intentionally small and curated. Bash/POSIX shell and
 Zsh additionally share canonical word, variable-reference, and glob aliases
-while retaining separate parsers. Swift maps its declarations, expressions,
+while retaining separate parsers. Java and C# map declarations, parameters,
+calls, member access, construction, expressions, and control transfers into
+the existing language-neutral families. Qualified Java calls use an anonymous
+member shape rather than preserving receiver or method names. Swift maps its declarations, expressions,
 arguments, identifiers, and control transfers into existing language-neutral
 families. Generic SQL and PostgreSQL additionally map
 query clauses, relational structure, and data-manipulation operations. All are

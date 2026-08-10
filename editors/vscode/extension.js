@@ -5,7 +5,9 @@ const { spawn } = require("child_process");
 const vscode = require("vscode");
 
 const supportedLanguages = new Set([
+  "csharp",
   "go",
+  "java",
   "javascript",
   "javascriptreact",
   "python",
