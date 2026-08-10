@@ -7,6 +7,23 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added selective `baseline add`, `baseline remove`, and `baseline edit`
+  operations with durable review notes and classifications.
+- Added explicit `baseline migrate --accept-profile`, deterministic scan-profile
+  digests, profile compatibility reporting, and reviewed warning exceptions for
+  complete baseline operations. Digests include exact loaded ignore-file paths
+  and SHA-256 content evidence.
+
+### Changed
+
+- `baseline update` is now preview-only unless `--accept-all` is explicit, and
+  retained entries preserve their review metadata.
+- Machine-readable reports now use schema version 15. Baselines now use schema
+  version 3; schemas 1 and 2 remain readable but require explicit migration
+  before mutation. Normalization remains version 8.
+
 ## [0.20.0] - 2026-08-10
 
 ### Added

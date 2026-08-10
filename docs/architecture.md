@@ -209,13 +209,17 @@ limits.
 
 ### `internal/baseline`
 
-Baseline files are versioned JSON review artifacts. Schema 2 stores an explicit
+Baseline files are versioned JSON review artifacts. Schema 3 stores an explicit
 `content` or `path` identity scope, stable content-pair IDs, the normalization
-version, the writing Mori version, the scan threshold, and locations for human
-context. Schema 1 remains readable as content scope. Loading fails closed on a
-missing file, unsupported schema, or normalization-version mismatch. Writes
-are sorted and atomic; pruning removes stale entries without accepting newly
-discovered ones.
+version, the writing Mori version, a canonical scan profile and its SHA-256
+digest, exact loaded ignore-file content digests, durable classifications and
+notes, and locations for human context.
+Schemas 1 and 2 remain readable but require explicit profile migration before
+mutation. Loading fails closed on a missing file, unsupported schema,
+normalization-version mismatch, tampered profile evidence, or an active profile
+mismatch. Writes are sorted and atomic; selective add/remove/edit operations
+preserve review metadata, preview-first replacement requires `--accept-all`,
+and pruning removes stale entries without accepting newly discovered ones.
 
 ### `internal/vcs`
 
@@ -243,13 +247,13 @@ features, sorted by count and feature name.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-14 reports expose deterministic binary provenance, the selected scan
+Schema-15 reports expose deterministic binary provenance, the selected scan
 profile, comparison selection, comparison domains, fragment kinds, optional
 exact focus metadata, grouped
 content-pair identities, fragment fingerprints, occurrence samples and exact
 counts, nesting metadata, structured parser
-diagnostics, effective configuration, ignore sources, and separate baseline
-suppression counts for identities and source-location pairs.
+diagnostics, effective configuration, ignore-source content evidence, and
+separate baseline suppression counts for identities and source-location pairs.
 They also include a deterministic coverage summary and per-file inventory so
 supported files with no comparison fragments remain visible with an exact
 reason and pre-token-floor boundary counts.

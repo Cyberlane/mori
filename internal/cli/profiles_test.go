@@ -40,7 +40,7 @@ func TestScanProfilesApplyConservativeDefaults(t *testing.T) {
 			var stderr bytes.Buffer
 			options, _, code, ok := parseScanOptions("scan", []string{
 				"--no-config", "--profile", test.profile,
-			}, &stderr, false)
+			}, &stderr, "")
 			if !ok || code != exitSuccess {
 				t.Fatalf("parse = %t/%d, stderr = %q", ok, code, stderr.String())
 			}
@@ -71,7 +71,7 @@ func TestScanProfilePrecedenceAndSelectionOverrides(t *testing.T) {
 	var stderr bytes.Buffer
 	configured, _, code, ok := parseScanOptions("scan", []string{
 		"--config", path,
-	}, &stderr, false)
+	}, &stderr, "")
 	if !ok || code != exitSuccess {
 		t.Fatalf("configured parse = %t/%d, stderr = %q", ok, code, stderr.String())
 	}
@@ -88,7 +88,7 @@ func TestScanProfilePrecedenceAndSelectionOverrides(t *testing.T) {
 		"--config", path,
 		"--profile", "explore",
 		"--threshold", "0.95",
-	}, &stderr, false)
+	}, &stderr, "")
 	if !ok || code != exitSuccess {
 		t.Fatalf("parse = %t/%d, stderr = %q", ok, code, stderr.String())
 	}
@@ -101,7 +101,7 @@ func TestScanProfilePrecedenceAndSelectionOverrides(t *testing.T) {
 	stderr.Reset()
 	options, _, code, ok = parseScanOptions("scan", []string{
 		"--no-config", "--profile", "review", "--cross-language-only",
-	}, &stderr, false)
+	}, &stderr, "")
 	if !ok || code != exitSuccess || !options.crossLanguageOnly || options.sameLanguageOnly {
 		t.Fatalf("review cross-language override = %t/%d/%#v/%q", ok, code, options, stderr.String())
 	}

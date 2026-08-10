@@ -31,7 +31,7 @@ func TestLoadRejectsMalformedAndMismatchedFiles(t *testing.T) {
 
 	mismatched := filepath.Join(t.TempDir(), "mismatched.json")
 	writeFixture(t, mismatched, `{"schema_version":2,"identity_scope":"content","normalization_version":1,"entries":[]}`)
-	if _, err := Load(mismatched); err == nil || !strings.Contains(err.Error(), "run baseline update") {
+	if _, err := Load(mismatched); err == nil || !strings.Contains(err.Error(), "migrate or regenerate") {
 		t.Fatalf("mismatched Load error = %v", err)
 	}
 }
@@ -75,14 +75,14 @@ func TestWriteIsDeterministicAndRoundTrips(t *testing.T) {
 		},
 	}
 	path := filepath.Join(t.TempDir(), "mori-baseline.json")
-	if err := Write(path, report, ScopeContent); err != nil {
+	if err := Write(path, report, ScopeContent, testProfile(report.Threshold), nil); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 	content, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(content), `"schema_version": 2`) ||
+	if !strings.Contains(string(content), `"schema_version": 3`) ||
 		!strings.Contains(string(content), `"identity_scope": "content"`) {
 		t.Fatalf("baseline schema/scope missing:\n%s", content)
 	}
@@ -101,9 +101,9 @@ func TestWriteIsDeterministicAndRoundTrips(t *testing.T) {
 func TestPathScopeDoesNotSuppressCopiedLocation(t *testing.T) {
 	t.Parallel()
 
-	report := model.Report{Groups: []model.MatchGroup{matchGroup("same", "left.go", "right.go")}}
+	report := model.Report{Threshold: 0.7, Groups: []model.MatchGroup{matchGroup("same", "left.go", "right.go")}}
 	path := filepath.Join(t.TempDir(), "baseline.json")
-	if err := Write(path, report, ScopePath); err != nil {
+	if err := Write(path, report, ScopePath, testProfile(report.Threshold), nil); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 	set, err := Load(path)
@@ -138,7 +138,8 @@ func TestPathScopeUsesExactScoredPairsInsteadOfOccurrenceCrossProduct(t *testing
 		},
 	}
 	path := filepath.Join(t.TempDir(), "baseline.json")
-	if err := Write(path, model.Report{Groups: []model.MatchGroup{group}}, ScopePath); err != nil {
+	report := model.Report{Threshold: 0.7, Groups: []model.MatchGroup{group}}
+	if err := Write(path, report, ScopePath, testProfile(report.Threshold), nil); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 	set, err := Load(path)
@@ -158,8 +159,10 @@ func TestWriteRejectsTruncatedReport(t *testing.T) {
 
 	err := Write(
 		filepath.Join(t.TempDir(), "baseline.json"),
-		model.Report{Truncated: true},
+		model.Report{Truncated: true, Threshold: 0.7},
 		ScopeContent,
+		testProfile(0.7),
+		nil,
 	)
 	if err == nil || !strings.Contains(err.Error(), "truncated report") {
 		t.Fatalf("Write error = %v, want truncated-report error", err)
@@ -178,7 +181,7 @@ func TestPruneKeepsCurrentEntriesWithoutAddingNewOnes(t *testing.T) {
 		matchGroup("keep", "keep.go", "keep.py"),
 		matchGroup("new", "new.go", "new.py"),
 	}}
-	if err := Prune(path, set, report); err != nil {
+	if err := Prune(path, set, report, testProfile(report.Threshold)); err != nil {
 		t.Fatalf("Prune: %v", err)
 	}
 	pruned, err := Load(path)
@@ -216,6 +219,117 @@ func TestLoadRejectsDuplicateIdentities(t *testing.T) {
 	}
 }
 
+func TestScanProfileDigestIsDeterministicAndSensitive(t *testing.T) {
+	t.Parallel()
+
+	left := testProfile(0.7)
+	left.LanguagePairs = []string{"python,go", "rust,go"}
+	left.Excludes = []string{"vendor/**", "**/*_test.go"}
+	left.IgnoreFiles = []IgnoreFile{
+		{Path: ".gitignore", Digest: strings.Repeat("a", 64)},
+		{Path: "src/.moriignore", Digest: strings.Repeat("b", 64)},
+	}
+	right := left
+	right.LanguagePairs = []string{"rust,go", "python,go"}
+	right.Excludes = []string{"**/*_test.go", "vendor/**"}
+	right.IgnoreFiles = []IgnoreFile{left.IgnoreFiles[1], left.IgnoreFiles[0]}
+	if Digest(left) != Digest(right) {
+		t.Fatal("digest changed when set-like fields were reordered")
+	}
+	right.MinTokens++
+	if Digest(left) == Digest(right) {
+		t.Fatal("digest did not change with the token floor")
+	}
+	right = left
+	right.IgnoreFiles = append([]IgnoreFile{}, left.IgnoreFiles...)
+	right.IgnoreFiles[0].Digest = strings.Repeat("c", 64)
+	if Digest(left) == Digest(right) {
+		t.Fatal("digest did not change with ignore-file content")
+	}
+}
+
+func TestWritePreservesMetadataAndRejectsTamperedProfile(t *testing.T) {
+	t.Parallel()
+
+	report := model.Report{Threshold: 0.7, Groups: []model.MatchGroup{
+		matchGroup("keep", "left.go", "right.go"),
+	}}
+	profile := testProfile(report.Threshold)
+	path := filepath.Join(t.TempDir(), "baseline.json")
+	if err := Write(path, report, ScopeContent, profile, nil); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	set, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	note := "reviewed with the maintainer"
+	classification := "intentional"
+	if _, err := Edit(path, set, "keep", &note, &classification); err != nil {
+		t.Fatalf("Edit: %v", err)
+	}
+	set, err = Load(path)
+	if err != nil {
+		t.Fatalf("Load edited: %v", err)
+	}
+	if err := Write(path, report, ScopeContent, profile, &set); err != nil {
+		t.Fatalf("rewrite: %v", err)
+	}
+	preserved, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load rewritten: %v", err)
+	}
+	entries := preserved.Entries()
+	if len(entries) != 1 || entries[0].Note != note || entries[0].Classification != classification {
+		t.Fatalf("entries = %#v", entries)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	tampered := strings.Replace(string(content), `"min_tokens": 12`, `"min_tokens": 13`, 1)
+	writeFixture(t, path, tampered)
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "digest") {
+		t.Fatalf("tampered Load error = %v", err)
+	}
+}
+
+func TestAddAndRemoveOneIdentity(t *testing.T) {
+	t.Parallel()
+
+	profile := testProfile(0.7)
+	set, err := New(ScopeContent, profile)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	report := model.Report{Threshold: 0.7, Groups: []model.MatchGroup{
+		matchGroup("accept", "left.go", "right.go"),
+		matchGroup("leave", "new.go", "copy.go"),
+	}}
+	path := filepath.Join(t.TempDir(), "baseline.json")
+	note := "reviewed"
+	classification := "necessary-duplication"
+	added, updated, err := Add(path, set, report, "accept", &note, &classification, profile)
+	if err != nil || added != 1 || updated != 0 {
+		t.Fatalf("Add = %d/%d/%v", added, updated, err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !loaded.Has("accept") || loaded.Has("leave") {
+		t.Fatalf("selective baseline = %#v", loaded.Entries())
+	}
+	removed, err := Remove(path, loaded, "accept")
+	if err != nil || removed != 1 {
+		t.Fatalf("Remove = %d/%v", removed, err)
+	}
+	empty, err := Load(path)
+	if err != nil || len(empty.Entries()) != 0 {
+		t.Fatalf("empty baseline = %#v/%v", empty.Entries(), err)
+	}
+}
+
 func matchGroup(id string, leftPath string, rightPath string) model.MatchGroup {
 	return model.MatchGroup{
 		ID:         id,
@@ -238,6 +352,20 @@ func matchGroup(id string, leftPath string, rightPath string) model.MatchGroup {
 func location(path string) model.Location {
 	return model.Location{
 		Path: path, Language: "go", LanguageFamily: "go", Name: "function", StartLine: 1, EndLine: 2,
+	}
+}
+
+func testProfile(threshold float64) ScanProfile {
+	return ScanProfile{
+		Threshold:        threshold,
+		MinTokens:        12,
+		MaxPairs:         100,
+		MaxFileBytes:     1024,
+		ComparisonDomain: "code",
+		SQLDialect:       "generic",
+		BlockStatements:  3,
+		MaxBlocksPerFunc: 64,
+		RespectIgnore:    true,
 	}
 }
 

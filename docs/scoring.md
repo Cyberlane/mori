@@ -174,7 +174,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 14,
+  "schema_version": 15,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -199,21 +199,22 @@ The top-level shape is:
   "groups": [],
   "warnings": [],
   "file_coverage": [],
-	"coverage": {
-		"supported_files": 4,
-		"analyzed_files": 4,
-		"fragment_files": 4,
-		"zero_fragment_files": 0,
-		"generated_excluded_files": 0,
-		"warning_files": 0,
-		"warning_count": 0,
-		"parse_diagnostic_files": 0,
-		"parse_diagnostic_count": 0,
-		"unsupported_extensions": []
-	},
+  "coverage": {
+    "supported_files": 4,
+    "analyzed_files": 4,
+    "fragment_files": 4,
+    "zero_fragment_files": 0,
+    "generated_excluded_files": 0,
+    "warning_files": 0,
+    "warning_count": 0,
+    "parse_diagnostic_files": 0,
+    "parse_diagnostic_count": 0,
+    "unsupported_extensions": []
+  },
   "configuration": {
     "profile": "review",
     "ignore_files": [],
+    "ignore_file_evidence": [],
     "respect_ignore": true,
     "excludes": [],
     "min_tokens": 40,
@@ -223,20 +224,21 @@ The top-level shape is:
     "max_file_bytes": 2097152,
     "comparison_domain": "code",
     "sql_dialect": "generic",
-		"embedded_sql": false,
-		"statement_blocks": false,
-		"block_statements": 3,
-		"max_blocks_per_function": 64,
+    "embedded_sql": false,
+    "statement_blocks": false,
+    "block_statements": 3,
+    "max_blocks_per_function": 64,
     "ranking": "review",
     "priority_paths": [],
     "same_language_only": true,
     "cross_language_only": false,
-		"language_pairs": [],
-		"require_coverage": true,
-		"min_file_coverage": 0.95,
-		"max_zero_fragment_files": 2,
-		"fail_on_warning": false,
-		"fail_on_parse_diagnostic": true
+    "language_pairs": [],
+    "require_coverage": true,
+    "min_file_coverage": 0.95,
+    "max_zero_fragment_files": 2,
+    "fail_on_warning": false,
+    "fail_on_parse_diagnostic": true,
+    "scan_profile_digest": "<sha256>"
   }
 }
 ```
@@ -299,6 +301,14 @@ file-level policy without reconstructing totals or receiving a list of
 unsupported paths. Normalization remains version 8 and baseline schema remains
 version 2.
 
+Schema 15 records the active `configuration.scan_profile_digest` and, when a
+baseline is loaded, its digest and compatibility status. The digest covers
+effective candidate selection, threshold, dialect, fragment policy, explicit
+exclusions, loaded ignore-file paths and content, resource bounds, and strict
+coverage policy. Presentation-only ranking, focus, and output bounds are
+excluded. Normalization remains version 8. Baseline schema advances to 3 for
+the same profile evidence and durable entry classifications.
+
 Schema 9 added a deterministic `file_coverage` array with one entry per analyzed
 or generated-excluded supported file. Each entry records its language, review
 family, comparison domain, analysis status, generated-source classification,
@@ -335,18 +345,38 @@ and accepted as intentional structural similarity. This records review
 acceptance, not semantic or behavioral equivalence. Missing or incompatible
 baseline files are errors; Mori never treats a failed load as an empty set.
 
-Create or replace a baseline with an untruncated scan:
+Accept one reviewed identity from a complete scan:
 
 ```sh
-mori baseline update --baseline mori-baseline.json .
+mori baseline add \
+  --baseline mori-baseline.json \
+  --identity <content-pair-id> \
+  --classification intentional \
+  --note 'Reviewed with the owning team' \
+  .
 ```
 
-Baseline schema 2 records an explicit `identity_scope`. The default `content`
-scope accepts a normalized content-pair identity in every location, including
-future identical copies. `baseline update --baseline-scope path` records each
-reviewed source-path pair instead, so a copy in a new file reappears. Schema-1
-baselines load with their original content scope and are written as schema 2 on
-the next update or prune.
+Baseline schema 3 records an explicit `identity_scope`, deterministic
+`scan_profile_digest`, canonical profile fields, and optional durable
+`classification` and `note` values. Supported classifications are
+`intentional`, `necessary-duplication`, `test-fixture`, `generated`, and
+`other`. `baseline edit` updates or clears metadata without altering
+acceptance, and `baseline remove` revokes every accepted entry using one
+content identity.
+
+The default `content` scope accepts a normalized content-pair identity in every
+location, including future identical copies. A path-scoped baseline records
+reviewed source-path pairs instead, so a copy in a new file reappears. In that
+scope, one selective `baseline add --identity` accepts all exact path pairs for
+the identity in the active complete scan.
+
+`baseline update` computes and prints replacement counts but does not write a
+file unless `--accept-all` is explicit. Existing notes and classifications are
+preserved for retained entries. Schema-1 and schema-2 baselines remain readable
+for suppression, with a visible legacy-profile warning, but mutation is
+refused until `baseline migrate --accept-profile` explicitly binds the current
+complete scan profile. A schema-3 profile mismatch fails closed until options
+match or that explicit migration is performed.
 
 The file also records the Mori version, normalization version, threshold,
 stable identities, and human-readable locations. The normalization version
@@ -357,4 +387,6 @@ update` deliberately and review the resulting diff.
 `baseline prune --check` reports stale entries and exits with status `3`
 without modifying the file. Both commands scan without suppression and use an
 unlimited report internally so bounded display retention cannot make the
-baseline incomplete.
+baseline incomplete. Every mutating baseline command refuses truncation and
+warnings by default. After review, repeat `--allow-warning KIND` only for each
+intentionally accepted warning category.

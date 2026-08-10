@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 14
+const SchemaVersion = 15
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -220,35 +220,46 @@ type CoverageSummary struct {
 // EffectiveConfig records the scan inputs needed to reproduce discovery and
 // pair selection.
 type EffectiveConfig struct {
-	Profile           string             `json:"profile,omitempty"`
-	ConfigPath        string             `json:"config_path,omitempty"`
-	IgnoreFiles       []string           `json:"ignore_files"`
-	RespectIgnore     bool               `json:"respect_ignore"`
-	ExcludeGenerated  bool               `json:"exclude_generated"`
-	Excludes          []string           `json:"excludes"`
-	MinTokens         int                `json:"min_tokens"`
-	MaxGroups         int                `json:"max_groups"`
-	MaxOccurrences    int                `json:"max_occurrences"`
-	MaxPairs          int                `json:"max_pairs"`
-	MaxFileBytes      int64              `json:"max_file_bytes"`
-	ComparisonDomain  string             `json:"comparison_domain"`
-	SQLDialect        string             `json:"sql_dialect"`
-	EmbeddedSQL       bool               `json:"embedded_sql"`
-	StatementBlocks   bool               `json:"statement_blocks"`
-	BlockStatements   int                `json:"block_statements"`
-	MaxBlocksPerFunc  int                `json:"max_blocks_per_function"`
-	Ranking           string             `json:"ranking"`
-	PriorityPaths     []PriorityPathRule `json:"priority_paths"`
-	SameLanguageOnly  bool               `json:"same_language_only"`
-	CrossLanguageOnly bool               `json:"cross_language_only"`
-	LanguagePairs     []string           `json:"language_pairs"`
-	RequireCoverage   bool               `json:"require_coverage"`
-	MinFileCoverage   float64            `json:"min_file_coverage"`
-	MaxZeroFiles      int                `json:"max_zero_fragment_files"`
-	FailOnWarning     bool               `json:"fail_on_warning"`
-	FailOnDiagnostic  bool               `json:"fail_on_parse_diagnostic"`
-	BaselinePath      string             `json:"baseline_path,omitempty"`
-	Focus             *FocusConfig       `json:"focus,omitempty"`
+	Profile           string               `json:"profile,omitempty"`
+	ConfigPath        string               `json:"config_path,omitempty"`
+	IgnoreFiles       []string             `json:"ignore_files"`
+	IgnoreEvidence    []IgnoreFileEvidence `json:"ignore_file_evidence"`
+	RespectIgnore     bool                 `json:"respect_ignore"`
+	ExcludeGenerated  bool                 `json:"exclude_generated"`
+	Excludes          []string             `json:"excludes"`
+	MinTokens         int                  `json:"min_tokens"`
+	MaxGroups         int                  `json:"max_groups"`
+	MaxOccurrences    int                  `json:"max_occurrences"`
+	MaxPairs          int                  `json:"max_pairs"`
+	MaxFileBytes      int64                `json:"max_file_bytes"`
+	ComparisonDomain  string               `json:"comparison_domain"`
+	SQLDialect        string               `json:"sql_dialect"`
+	EmbeddedSQL       bool                 `json:"embedded_sql"`
+	StatementBlocks   bool                 `json:"statement_blocks"`
+	BlockStatements   int                  `json:"block_statements"`
+	MaxBlocksPerFunc  int                  `json:"max_blocks_per_function"`
+	Ranking           string               `json:"ranking"`
+	PriorityPaths     []PriorityPathRule   `json:"priority_paths"`
+	SameLanguageOnly  bool                 `json:"same_language_only"`
+	CrossLanguageOnly bool                 `json:"cross_language_only"`
+	LanguagePairs     []string             `json:"language_pairs"`
+	RequireCoverage   bool                 `json:"require_coverage"`
+	MinFileCoverage   float64              `json:"min_file_coverage"`
+	MaxZeroFiles      int                  `json:"max_zero_fragment_files"`
+	FailOnWarning     bool                 `json:"fail_on_warning"`
+	FailOnDiagnostic  bool                 `json:"fail_on_parse_diagnostic"`
+	BaselinePath      string               `json:"baseline_path,omitempty"`
+	ScanProfileDigest string               `json:"scan_profile_digest"`
+	BaselineDigest    string               `json:"baseline_profile_digest,omitempty"`
+	BaselineStatus    string               `json:"baseline_profile_status,omitempty"`
+	Focus             *FocusConfig         `json:"focus,omitempty"`
+}
+
+// IgnoreFileEvidence identifies the exact ignore content used during source
+// discovery without embedding that content in a report.
+type IgnoreFileEvidence struct {
+	Path   string `json:"path"`
+	Digest string `json:"digest"`
 }
 
 // Report is the stable JSON and text reporting model.

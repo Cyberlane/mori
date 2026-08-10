@@ -3,6 +3,7 @@ package source
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/pathutil"
 	"github.com/bmatcuk/doublestar/v4"
 )
@@ -27,7 +29,7 @@ type ignoreRule struct {
 type ignoreMatcher struct {
 	cwd    string
 	rules  []ignoreRule
-	files  map[string]struct{}
+	files  map[string]string
 	loaded map[string]struct{}
 }
 
@@ -45,7 +47,7 @@ func (err ignoreLoadError) Unwrap() error {
 
 func newIgnoreMatcher(cwd string) *ignoreMatcher {
 	return &ignoreMatcher{
-		cwd: cwd, files: make(map[string]struct{}), loaded: make(map[string]struct{}),
+		cwd: cwd, files: make(map[string]string), loaded: make(map[string]struct{}),
 	}
 }
 
@@ -74,10 +76,11 @@ func (matcher *ignoreMatcher) loadDirectory(directory string) error {
 				maxIgnoreBytes,
 			)
 		}
-		if err := matcher.loadFile(path, directory, info); err != nil {
+		digest, err := matcher.loadFile(path, directory, info)
+		if err != nil {
 			return err
 		}
-		matcher.files[displayPath(matcher.cwd, path)] = struct{}{}
+		matcher.files[displayPath(matcher.cwd, path)] = digest
 	}
 	return nil
 }
@@ -110,10 +113,10 @@ func (matcher *ignoreMatcher) loadFile(
 	path string,
 	base string,
 	expectedInfo os.FileInfo,
-) (returnErr error) {
+) (digest string, returnErr error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("read %s: %w", displayPath(matcher.cwd, path), err)
+		return "", fmt.Errorf("read %s: %w", displayPath(matcher.cwd, path), err)
 	}
 	defer func() {
 		if err := file.Close(); err != nil && returnErr == nil {
@@ -123,17 +126,17 @@ func (matcher *ignoreMatcher) loadFile(
 
 	openedInfo, err := file.Stat()
 	if err != nil {
-		return fmt.Errorf("read %s: %w", displayPath(matcher.cwd, path), err)
+		return "", fmt.Errorf("read %s: %w", displayPath(matcher.cwd, path), err)
 	}
 	if !openedInfo.Mode().IsRegular() || !os.SameFile(expectedInfo, openedInfo) {
-		return fmt.Errorf("ignore file %s changed identity while opening", displayPath(matcher.cwd, path))
+		return "", fmt.Errorf("ignore file %s changed identity while opening", displayPath(matcher.cwd, path))
 	}
 	content, err := io.ReadAll(io.LimitReader(file, maxIgnoreBytes+1))
 	if err != nil {
-		return fmt.Errorf("read %s: %w", displayPath(matcher.cwd, path), err)
+		return "", fmt.Errorf("read %s: %w", displayPath(matcher.cwd, path), err)
 	}
 	if len(content) > maxIgnoreBytes {
-		return fmt.Errorf(
+		return "", fmt.Errorf(
 			"ignore file %s exceeds %d bytes while reading",
 			displayPath(matcher.cwd, path),
 			maxIgnoreBytes,
@@ -147,7 +150,7 @@ func (matcher *ignoreMatcher) loadFile(
 		line := strings.TrimSuffix(scanner.Text(), "\r")
 		rule, ok, err := parseIgnoreRule(base, line)
 		if err != nil {
-			return fmt.Errorf(
+			return "", fmt.Errorf(
 				"invalid ignore pattern in %s:%d: %w",
 				displayPath(matcher.cwd, path),
 				lineNumber,
@@ -159,9 +162,9 @@ func (matcher *ignoreMatcher) loadFile(
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("read %s: %w", displayPath(matcher.cwd, path), err)
+		return "", fmt.Errorf("read %s: %w", displayPath(matcher.cwd, path), err)
 	}
-	return nil
+	return fmt.Sprintf("%x", sha256.Sum256(content)), nil
 }
 
 func parseIgnoreRule(base string, line string) (ignoreRule, bool, error) {
@@ -251,6 +254,15 @@ func (matcher *ignoreMatcher) paths() []string {
 	}
 	sortStrings(paths)
 	return paths
+}
+
+func (matcher *ignoreMatcher) evidence() []model.IgnoreFileEvidence {
+	paths := matcher.paths()
+	evidence := make([]model.IgnoreFileEvidence, 0, len(paths))
+	for _, path := range paths {
+		evidence = append(evidence, model.IgnoreFileEvidence{Path: path, Digest: matcher.files[path]})
+	}
+	return evidence
 }
 
 func sortStrings(values []string) {

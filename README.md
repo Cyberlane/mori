@@ -302,13 +302,14 @@ mori scan --format json \
 files. Generated exclusions do not enter that denominator.
 `--max-zero-fragment-files` accepts `-1` to disable the policy, and
 `--fail-on-warning` or `--fail-on-parse-diagnostic` make incomplete inputs
-fatal independently. Baseline update and prune evaluate the same policies
-before modifying a baseline.
+fatal independently. Every scan-backed baseline mutation evaluates the same
+policies before modifying a baseline.
 
-Schema-14 reports embed deterministic `tool` build provenance, the selected
+Schema-15 reports embed deterministic `tool` build provenance, the selected
 profile, comparison selection, domain and fragment-kind metadata, exact focus
-metadata, a coverage summary, per-file zero-fragment reasons, and aggregate
-unsupported-extension counts. They do not include a scan timestamp, hostname,
+metadata, loaded ignore-file paths and SHA-256 content evidence, a coverage
+summary, per-file zero-fragment reasons, and aggregate unsupported-extension
+counts. They do not include a scan timestamp, hostname,
 username, source body, diff, or Git remote.
 
 Fail a CI job when Mori finds a match at your threshold:
@@ -349,27 +350,45 @@ mori scan \
 `--changed-worktree PATH=REVISION` values describe the other worktrees. Mori
 requires every discovered file to belong to a resolved root, never inherits a
 parent revision for a nested repository, and records each root's requested
-base, full resolved commits, changed paths, and deleted paths in schema-14 JSON.
+base, full resolved commits, changed paths, and deleted paths in schema-15 JSON.
 Use only repeated `--changed-worktree` values when every scanned root should be
 explicit. Excluding and scanning a nested worktree separately remains valid;
 never interpret an excluded repository as unchanged. Mori bounds one scan to
 64 explicit worktrees and 100,000 combined changed and deleted paths.
 
-To record intentional candidates and use Mori as a stable CI gate:
+To review and accept intentional candidates incrementally:
 
 ```sh
-mori baseline update --baseline mori-baseline.json --threshold 0.85 .
+mori scan --format json --threshold 0.85 .
+mori baseline add \
+  --baseline mori-baseline.json \
+  --identity <content-pair-id> \
+  --classification intentional \
+  --note 'Reviewed with the owning team' \
+  --threshold 0.85 \
+  .
 mori scan --baseline mori-baseline.json --threshold 0.85 --fail-on-match .
 mori baseline prune --baseline mori-baseline.json --check .
 ```
 
-`baseline update` accepts every candidate in the current untruncated scan, so
-review its file diff before committing it. Baselines are opt-in, and a
-suppressed candidate is reported as both a content-identity count and a
-location-pair count. The default `content` scope follows identical normalized
-content into new locations. Use `baseline update --baseline-scope path` when a
-copy in a new file must appear for review. The conventional file name is
-`mori-baseline.json`; pass it explicitly with `--baseline`.
+`baseline update` is preview-only unless `--accept-all` is explicit.
+`baseline remove` revokes one identity and `baseline edit` changes its durable
+note or classification without changing acceptance. Schema-3 baselines bind
+acceptance to a deterministic digest of the effective selection, threshold,
+dialect, fragment, exclusion, loaded ignore-file content, resource, and
+coverage policies. A mismatched profile fails closed. Schema 1 and 2 remain
+readable for compatibility, but must be explicitly upgraded with
+`baseline migrate --accept-profile` before mutation. Mutating operations refuse
+truncated scans and warnings unless each reviewed warning kind is explicitly
+allowed with `--allow-warning`.
+
+Baselines are opt-in, and a suppressed candidate is reported as both a
+content-identity count and a location-pair count. The default `content` scope
+follows identical normalized content into new locations. Use
+`--baseline-scope path` when a copy in a new file must appear for review; one
+`baseline add --identity` then accepts all currently scored path pairs for that
+content identity. The conventional file name is `mori-baseline.json`; pass it
+explicitly with `--baseline`.
 
 ## Supported Languages
 

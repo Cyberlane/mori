@@ -358,6 +358,14 @@ func TestDiscoverHonorsNestedGitAndMoriIgnoreRules(t *testing.T) {
 	if len(result.IgnoreFiles) != 3 {
 		t.Fatalf("ignore files = %#v, want root git/mori and nested git", result.IgnoreFiles)
 	}
+	if len(result.IgnoreEvidence) != 3 {
+		t.Fatalf("ignore evidence = %#v, want three digests", result.IgnoreEvidence)
+	}
+	for index, evidence := range result.IgnoreEvidence {
+		if evidence.Path != result.IgnoreFiles[index] || len(evidence.Digest) != 64 {
+			t.Fatalf("ignore evidence %d = %#v", index, evidence)
+		}
+	}
 }
 
 func TestDiscoverIgnoreRulesDoNotHideExplicitFile(t *testing.T) {

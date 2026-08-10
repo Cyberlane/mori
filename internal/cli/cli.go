@@ -119,6 +119,14 @@ type scanOptions struct {
 	configPath         string
 	noConfig           bool
 	check              bool
+	acceptAll          bool
+	acceptProfile      bool
+	identity           string
+	note               string
+	noteSet            bool
+	classification     string
+	classificationSet  bool
+	allowedWarnings    stringList
 }
 
 func defaultScanOptions() scanOptions {
@@ -141,7 +149,7 @@ func defaultScanOptions() scanOptions {
 	}
 }
 
-func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
+func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string) {
 	flags.StringVar(&options.profile, "profile", options.profile, "scan profile: review, explore, or sql")
 	flags.Float64Var(&options.threshold, "threshold", options.threshold, "minimum weighted Jaccard score, from 0 to 1")
 	flags.IntVar(&options.minTokens, "min-tokens", options.minTokens, "minimum normalized AST tokens per fragment")
@@ -287,8 +295,22 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 	flags.BoolVar(&options.noIgnore, "no-ignore", !options.respectIgnore, "do not read .gitignore or .moriignore files")
 	flags.StringVar(&options.requestedConfig, "config", options.requestedConfig, "explicit .mori.json configuration path")
 	flags.BoolVar(&options.noConfig, "no-config", options.noConfig, "do not discover or load project configuration")
-	if includeCheck {
+	if baselineAction == "prune" {
 		flags.BoolVar(&options.check, "check", false, "report stale entries without rewriting the baseline")
+	}
+	if baselineAction == "update" {
+		flags.BoolVar(&options.acceptAll, "accept-all", false, "replace the baseline with every candidate in the complete scan")
+	}
+	if baselineAction == "migrate" {
+		flags.BoolVar(&options.acceptProfile, "accept-profile", false, "explicitly accept the active scan profile")
+	}
+	if baselineAction == "add" {
+		flags.StringVar(&options.identity, "identity", "", "content-pair identity to accept")
+		flags.StringVar(&options.note, "note", "", "durable human review note; an empty value clears it")
+		flags.StringVar(&options.classification, "classification", "", "durable review classification")
+	}
+	if baselineAction != "" {
+		flags.Var(&options.allowedWarnings, "allow-warning", "warning kind permitted for this baseline operation; repeatable")
 	}
 }
 
@@ -296,7 +318,7 @@ func parseScanOptions(
 	command string,
 	args []string,
 	stderr io.Writer,
-	includeCheck bool,
+	baselineAction string,
 ) (scanOptions, []string, int, bool) {
 	options, err := configuredScanOptions(args)
 	if err != nil {
@@ -308,7 +330,7 @@ func parseScanOptions(
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	trackedStderr := &errorTrackingWriter{writer: stderr}
 	flags.SetOutput(trackedStderr)
-	options.bindFlags(flags, includeCheck)
+	options.bindFlags(flags, baselineAction)
 	flags.Usage = func() {
 		fmt.Fprintf(trackedStderr, "Usage: mori %s [options] [path ...]\n", command)
 		fmt.Fprintln(trackedStderr, "\nScan functions and top-level SQL queries for structural similarity.")
@@ -333,6 +355,8 @@ func parseScanOptions(
 	flags.Visit(func(value *flag.Flag) {
 		visited[value.Name] = true
 	})
+	options.noteSet = visited["note"]
+	options.classificationSet = visited["classification"]
 	reconcileCLISelection(&options, visited)
 	options.respectIgnore = !options.noIgnore
 	if err := validateScanOptions(options); err != nil {
@@ -623,6 +647,19 @@ func validateScanOptions(options scanOptions) error {
 	if options.maxZeroFiles < -1 {
 		return errors.New("--max-zero-fragment-files must be -1 or greater")
 	}
+	allowedWarningKinds := map[string]struct{}{
+		"baseline": {}, "coverage": {}, "focus": {}, "other": {}, "parse": {},
+	}
+	seenWarningKinds := make(map[string]struct{}, len(options.allowedWarnings))
+	for _, kind := range options.allowedWarnings {
+		if _, ok := allowedWarningKinds[kind]; !ok {
+			return fmt.Errorf("unknown --allow-warning kind %q; expected baseline, coverage, focus, other, or parse", kind)
+		}
+		if _, exists := seenWarningKinds[kind]; exists {
+			return fmt.Errorf("duplicate --allow-warning kind %q", kind)
+		}
+		seenWarningKinds[kind] = struct{}{}
+	}
 	if options.maxGroups < 0 || options.maxOccurrences < 0 || options.maxPairs < 0 ||
 		options.maxFileBytes < 0 {
 		return errors.New("maximum values cannot be negative")
@@ -698,20 +735,34 @@ func validateScanOptions(options scanOptions) error {
 }
 
 func runScan(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
-	options, paths, code, ok := parseScanOptions("scan", args, stderr, false)
+	options, paths, code, ok := parseScanOptions("scan", args, stderr, "")
 	if !ok {
 		return code
 	}
-	suppress, err := loadSuppression(options.baselinePath)
+	suppress, baselineWarnings, baselineStatus, baselineDigest, err := loadSuppression(options.baselinePath)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: load baseline: %v\n", err)
 		return exitError
 	}
-	result, err := executeScan(ctx, paths, options, suppress)
+	result, err := executeScan(ctx, paths, options, suppress, baselineWarnings)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: %v\n", err)
 		return exitError
 	}
+	if baselineStatus == "loaded" {
+		if baselineDigest != result.Configuration.ScanProfileDigest {
+			fmt.Fprintf(
+				stderr,
+				"mori: load baseline: baseline scan profile %s differs from active profile %s; use matching scan options or run baseline migrate --accept-profile\n",
+				baselineDigest,
+				result.Configuration.ScanProfileDigest,
+			)
+			return exitError
+		}
+		baselineStatus = "compatible"
+	}
+	result.Configuration.BaselineStatus = baselineStatus
+	result.Configuration.BaselineDigest = baselineDigest
 
 	if options.format == "json" {
 		err = report.JSON(stdout, result)
@@ -736,9 +787,17 @@ func runScan(ctx context.Context, args []string, stdout io.Writer, stderr io.Wri
 
 func runBaseline(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
-		return usageError(stderr, "baseline requires update or prune")
+		return usageError(stderr, "baseline requires add, remove, edit, migrate, update, or prune")
 	}
 	switch args[0] {
+	case "add":
+		return runBaselineAdd(ctx, args[1:], stdout, stderr)
+	case "remove":
+		return runBaselineRemove(args[1:], stdout, stderr)
+	case "edit":
+		return runBaselineEdit(args[1:], stdout, stderr)
+	case "migrate":
+		return runBaselineMigrate(ctx, args[1:], stdout, stderr)
 	case "update":
 		return runBaselineUpdate(ctx, args[1:], stdout, stderr)
 	case "prune":
@@ -749,12 +808,12 @@ func runBaseline(ctx context.Context, args []string, stdout io.Writer, stderr io
 		}
 		return exitSuccess
 	default:
-		return usageError(stderr, "baseline command must be update or prune")
+		return usageError(stderr, "baseline command must be add, remove, edit, migrate, update, or prune")
 	}
 }
 
 func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
-	options, paths, code, ok := parseScanOptions("baseline update", args, stderr, false)
+	options, paths, code, ok := parseScanOptions("baseline update", args, stderr, "update")
 	if !ok {
 		return code
 	}
@@ -767,7 +826,7 @@ func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, std
 	}
 	options.maxGroups = 0
 	options.maxOccurrences = 0
-	result, err := executeScan(ctx, paths, options, nil)
+	result, err := executeScan(ctx, paths, options, nil, nil)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: %v\n", err)
 		return exitError
@@ -775,8 +834,54 @@ func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, std
 	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
 		return code
 	}
+	profile, err := baselineScanProfile(options, result.Configuration.IgnoreEvidence)
+	if err != nil {
+		return commandError(stderr, "resolve scan profile", err)
+	}
+	existing, found, err := loadOptionalBaseline(options.baselinePath)
+	if err != nil {
+		return commandError(stderr, "load baseline", err)
+	}
 	scope := baseline.Scope(options.baselineScope)
-	if err := baseline.Write(options.baselinePath, result, scope); err != nil {
+	if found {
+		scope = existing.Scope()
+	}
+	preview := baseline.ReplacementPreview(optionalSet(existing, found), result, scope)
+	if _, err := fmt.Fprintf(
+		stdout,
+		"baseline preview: %s (%d new, %d retained, %d removed); %s\n",
+		countLabel(preview.Candidates, "candidate", "candidates"),
+		preview.New,
+		preview.Retained,
+		preview.Removed,
+		baselineProfileLabel(existing, found, profile),
+	); err != nil {
+		return exitError
+	}
+	if !options.acceptAll {
+		if _, err := fmt.Fprintln(stdout, "no file written; rerun with --accept-all after reviewing the preview"); err != nil {
+			return exitError
+		}
+		return exitSuccess
+	}
+	if code := enforceBaselineCompleteness(stderr, options, result); code != exitSuccess {
+		return code
+	}
+	if found && existing.Legacy() {
+		return commandError(stderr, "write baseline", errors.New(
+			"legacy baseline must be explicitly migrated before replacement",
+		))
+	}
+	if found && !existing.Compatible(profile) {
+		return commandError(stderr, "write baseline", errors.New(
+			"baseline scan profile differs from the active scan; run baseline migrate --accept-profile first",
+		))
+	}
+	var previous *baseline.Set
+	if found {
+		previous = &existing
+	}
+	if err := baseline.Write(options.baselinePath, result, scope, profile, previous); err != nil {
 		fmt.Fprintf(stderr, "mori: write baseline: %v\n", err)
 		return exitError
 	}
@@ -794,8 +899,236 @@ func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, std
 	return exitSuccess
 }
 
+func runBaselineAdd(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
+	options, paths, code, ok := parseScanOptions("baseline add", args, stderr, "add")
+	if !ok {
+		return code
+	}
+	if options.baselinePath == "" || options.identity == "" {
+		return usageError(stderr, "--baseline and --identity are required for baseline add")
+	}
+	if err := rejectBaselineFocus(options, "add"); err != nil {
+		return usageError(stderr, err.Error())
+	}
+	if len(options.note) > 4096 {
+		return usageError(stderr, "--note cannot exceed 4096 bytes")
+	}
+	if options.classificationSet {
+		if err := baseline.ValidateClassification(options.classification); err != nil {
+			return usageError(stderr, err.Error())
+		}
+	}
+	set, found, err := loadOptionalBaseline(options.baselinePath)
+	if err != nil {
+		return commandError(stderr, "load baseline", err)
+	}
+	options.maxGroups = 0
+	options.maxOccurrences = 0
+	result, err := executeScan(ctx, paths, options, nil, nil)
+	if err != nil {
+		return commandError(stderr, "scan", err)
+	}
+	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
+		return code
+	}
+	if code := enforceBaselineCompleteness(stderr, options, result); code != exitSuccess {
+		return code
+	}
+	profile, err := baselineScanProfile(options, result.Configuration.IgnoreEvidence)
+	if err != nil {
+		return commandError(stderr, "resolve scan profile", err)
+	}
+	if !found {
+		set, err = baseline.New(baseline.Scope(options.baselineScope), profile)
+		if err != nil {
+			return commandError(stderr, "create baseline", err)
+		}
+	} else if set.Legacy() {
+		return commandError(stderr, "add baseline identity", errors.New(
+			"legacy baseline must be explicitly migrated before mutation",
+		))
+	} else if !set.Compatible(profile) {
+		return commandError(stderr, "add baseline identity", errors.New(
+			"baseline scan profile differs from the active scan",
+		))
+	}
+	var note *string
+	if options.noteSet {
+		note = &options.note
+	}
+	var classification *string
+	if options.classificationSet {
+		classification = &options.classification
+	}
+	added, updated, err := baseline.Add(
+		options.baselinePath,
+		set,
+		result,
+		options.identity,
+		note,
+		classification,
+		profile,
+	)
+	if err != nil {
+		return commandError(stderr, "add baseline identity", err)
+	}
+	if _, err := fmt.Fprintf(
+		stdout,
+		"baseline identity accepted: %s (%d new, %d refreshed)\n",
+		options.identity,
+		added,
+		updated,
+	); err != nil {
+		return exitError
+	}
+	return exitSuccess
+}
+
+func runBaselineMigrate(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
+	options, paths, code, ok := parseScanOptions("baseline migrate", args, stderr, "migrate")
+	if !ok {
+		return code
+	}
+	if options.baselinePath == "" {
+		return usageError(stderr, "--baseline is required for baseline migrate")
+	}
+	if !options.acceptProfile {
+		return usageError(stderr, "baseline migrate requires --accept-profile")
+	}
+	if err := rejectBaselineFocus(options, "migrate"); err != nil {
+		return usageError(stderr, err.Error())
+	}
+	set, err := baseline.Load(options.baselinePath)
+	if err != nil {
+		return commandError(stderr, "load baseline", err)
+	}
+	options.maxGroups = 0
+	options.maxOccurrences = 0
+	result, err := executeScan(ctx, paths, options, nil, nil)
+	if err != nil {
+		return commandError(stderr, "scan", err)
+	}
+	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
+		return code
+	}
+	if code := enforceBaselineCompleteness(stderr, options, result); code != exitSuccess {
+		return code
+	}
+	profile, err := baselineScanProfile(options, result.Configuration.IgnoreEvidence)
+	if err != nil {
+		return commandError(stderr, "resolve scan profile", err)
+	}
+	stale := baseline.Stale(set, result)
+	if err := baseline.Migrate(options.baselinePath, set, profile); err != nil {
+		return commandError(stderr, "migrate baseline", err)
+	}
+	if _, err := fmt.Fprintf(
+		stdout,
+		"baseline migrated to schema %d with profile %s (%s retained; %s currently stale)\n",
+		baseline.SchemaVersion,
+		baseline.Digest(profile),
+		countLabel(len(set.Entries()), "entry", "entries"),
+		countLabel(len(stale), "entry", "entries"),
+	); err != nil {
+		return exitError
+	}
+	return exitSuccess
+}
+
+func runBaselineRemove(args []string, stdout io.Writer, stderr io.Writer) int {
+	path, identity, _, _, _, code, ok := parseBaselineMetadataFlags("remove", args, stderr)
+	if !ok {
+		return code
+	}
+	if path == "" || identity == "" {
+		return usageError(stderr, "--baseline and --identity are required for baseline remove")
+	}
+	set, err := baseline.Load(path)
+	if err != nil {
+		return commandError(stderr, "load baseline", err)
+	}
+	removed, err := baseline.Remove(path, set, identity)
+	if err != nil {
+		return commandError(stderr, "remove baseline identity", err)
+	}
+	if _, err := fmt.Fprintf(stdout, "baseline identity removed: %s (%s)\n", identity, countLabel(removed, "entry", "entries")); err != nil {
+		return exitError
+	}
+	return exitSuccess
+}
+
+func runBaselineEdit(args []string, stdout io.Writer, stderr io.Writer) int {
+	path, identity, note, classification, visited, code, ok := parseBaselineMetadataFlags("edit", args, stderr)
+	if !ok {
+		return code
+	}
+	if path == "" || identity == "" {
+		return usageError(stderr, "--baseline and --identity are required for baseline edit")
+	}
+	if !visited["note"] && !visited["classification"] {
+		return usageError(stderr, "baseline edit requires --note or --classification")
+	}
+	if len(note) > 4096 {
+		return usageError(stderr, "--note cannot exceed 4096 bytes")
+	}
+	var noteValue *string
+	if visited["note"] {
+		noteValue = &note
+	}
+	var classificationValue *string
+	if visited["classification"] {
+		if err := baseline.ValidateClassification(classification); err != nil {
+			return usageError(stderr, err.Error())
+		}
+		classificationValue = &classification
+	}
+	set, err := baseline.Load(path)
+	if err != nil {
+		return commandError(stderr, "load baseline", err)
+	}
+	updated, err := baseline.Edit(path, set, identity, noteValue, classificationValue)
+	if err != nil {
+		return commandError(stderr, "edit baseline identity", err)
+	}
+	if _, err := fmt.Fprintf(stdout, "baseline identity metadata updated: %s (%s)\n", identity, countLabel(updated, "entry", "entries")); err != nil {
+		return exitError
+	}
+	return exitSuccess
+}
+
+func parseBaselineMetadataFlags(
+	action string,
+	args []string,
+	stderr io.Writer,
+) (string, string, string, string, map[string]bool, int, bool) {
+	flags := flag.NewFlagSet("baseline "+action, flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	var path string
+	var identity string
+	var note string
+	var classification string
+	flags.StringVar(&path, "baseline", "", "baseline file to edit")
+	flags.StringVar(&identity, "identity", "", "content-pair identity")
+	if action == "edit" {
+		flags.StringVar(&note, "note", "", "durable human review note; an empty value clears it")
+		flags.StringVar(&classification, "classification", "", "durable review classification; an empty value clears it")
+	}
+	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return "", "", "", "", nil, exitSuccess, false
+		}
+		return "", "", "", "", nil, exitUsage, false
+	}
+	if len(flags.Args()) > 0 {
+		return "", "", "", "", nil, usageError(stderr, "baseline "+action+" does not accept scan paths"), false
+	}
+	visited := make(map[string]bool)
+	flags.Visit(func(value *flag.Flag) { visited[value.Name] = true })
+	return path, identity, note, classification, visited, exitSuccess, true
+}
+
 func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
-	options, paths, code, ok := parseScanOptions("baseline prune", args, stderr, true)
+	options, paths, code, ok := parseScanOptions("baseline prune", args, stderr, "prune")
 	if !ok {
 		return code
 	}
@@ -811,15 +1144,32 @@ func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stde
 		fmt.Fprintf(stderr, "mori: load baseline: %v\n", err)
 		return exitError
 	}
+	if set.Legacy() {
+		return commandError(stderr, "prune baseline", errors.New(
+			"legacy baseline must be explicitly migrated before pruning",
+		))
+	}
 	options.maxGroups = 0
 	options.maxOccurrences = 0
-	result, err := executeScan(ctx, paths, options, nil)
+	result, err := executeScan(ctx, paths, options, nil, nil)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: %v\n", err)
 		return exitError
 	}
 	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
 		return code
+	}
+	if code := enforceBaselineCompleteness(stderr, options, result); code != exitSuccess {
+		return code
+	}
+	profile, err := baselineScanProfile(options, result.Configuration.IgnoreEvidence)
+	if err != nil {
+		return commandError(stderr, "resolve scan profile", err)
+	}
+	if !set.Compatible(profile) {
+		return commandError(stderr, "prune baseline", errors.New(
+			"baseline scan profile differs from the active scan",
+		))
 	}
 	stale := baseline.Stale(set, result)
 	if options.check {
@@ -839,7 +1189,7 @@ func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stde
 		}
 		return exitFindings
 	}
-	if err := baseline.Prune(options.baselinePath, set, result); err != nil {
+	if err := baseline.Prune(options.baselinePath, set, result, profile); err != nil {
 		fmt.Fprintf(stderr, "mori: prune baseline: %v\n", err)
 		return exitError
 	}
@@ -861,6 +1211,100 @@ func countLabel(count int, singular string, plural string) string {
 		return fmt.Sprintf("%d %s", count, singular)
 	}
 	return fmt.Sprintf("%d %s", count, plural)
+}
+
+func loadOptionalBaseline(path string) (baseline.Set, bool, error) {
+	set, err := baseline.Load(path)
+	if err == nil {
+		return set, true, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return baseline.Set{}, false, nil
+	}
+	return baseline.Set{}, false, err
+}
+
+func optionalSet(set baseline.Set, found bool) *baseline.Set {
+	if !found {
+		return nil
+	}
+	return &set
+}
+
+func baselineProfileLabel(
+	set baseline.Set,
+	found bool,
+	profile baseline.ScanProfile,
+) string {
+	if !found {
+		return "new schema-3 profile " + baseline.Digest(profile)
+	}
+	if set.Legacy() {
+		return "legacy profile unavailable; migration required before mutation"
+	}
+	if set.Compatible(profile) {
+		return "profile compatible: " + set.ProfileDigest()
+	}
+	return fmt.Sprintf(
+		"profile mismatch: baseline %s, active %s",
+		set.ProfileDigest(),
+		baseline.Digest(profile),
+	)
+}
+
+func rejectBaselineFocus(options scanOptions, action string) error {
+	if len(options.focusPaths) > 0 || options.changedSince != "" ||
+		len(options.changedWorktrees) > 0 || options.failOnFocusedMatch {
+		return fmt.Errorf("focus options cannot be used with baseline %s", action)
+	}
+	return nil
+}
+
+func enforceBaselineCompleteness(
+	stderr io.Writer,
+	options scanOptions,
+	result model.Report,
+) int {
+	if result.Truncated {
+		if _, err := fmt.Fprintln(stderr, "mori: baseline mutation refused: report is truncated"); err != nil {
+			return exitError
+		}
+		return exitCoverage
+	}
+	allowed := make(map[string]struct{}, len(options.allowedWarnings))
+	for _, kind := range options.allowedWarnings {
+		allowed[kind] = struct{}{}
+	}
+	disallowed := make(map[string]int)
+	for _, warning := range result.Warnings {
+		kind := warning.Kind
+		if kind == "" {
+			kind = "other"
+		}
+		if _, ok := allowed[kind]; !ok {
+			disallowed[kind]++
+		}
+	}
+	if len(disallowed) == 0 {
+		return exitSuccess
+	}
+	kinds := make([]string, 0, len(disallowed))
+	for kind := range disallowed {
+		kinds = append(kinds, kind)
+	}
+	sort.Strings(kinds)
+	for _, kind := range kinds {
+		if _, err := fmt.Fprintf(
+			stderr,
+			"mori: baseline mutation refused: %d disallowed %s warning(s); review and repeat --allow-warning %s if intentional\n",
+			disallowed[kind],
+			kind,
+			kind,
+		); err != nil {
+			return exitError
+		}
+	}
+	return exitCoverage
 }
 
 func hasCoverage(result model.Report) bool {
@@ -931,17 +1375,91 @@ func enforceCoveragePolicies(
 	return exitCoverage
 }
 
+func baselineScanProfile(
+	options scanOptions,
+	ignoreEvidence []model.IgnoreFileEvidence,
+) (baseline.ScanProfile, error) {
+	domain, _, err := resolveComparisonDomain(options.comparisonDomain)
+	if err != nil {
+		return baseline.ScanProfile{}, err
+	}
+	dialect, err := resolveSQLDialect(options.sqlDialect)
+	if err != nil {
+		return baseline.ScanProfile{}, err
+	}
+	resolvedPairs, err := expandLanguagePairs(options.languagePairs)
+	if err != nil {
+		return baseline.ScanProfile{}, err
+	}
+	pairs := make([]string, 0, len(resolvedPairs))
+	for _, pair := range resolvedPairs {
+		left, right := pair.Left, pair.Right
+		if right < left {
+			left, right = right, left
+		}
+		pairs = append(pairs, left+","+right)
+	}
+	excludes := append([]string{}, options.excludes...)
+	sort.Strings(pairs)
+	pairs = compactStrings(pairs)
+	sort.Strings(excludes)
+	excludes = compactStrings(excludes)
+	ignoreFiles := make([]baseline.IgnoreFile, 0, len(ignoreEvidence))
+	for _, evidence := range ignoreEvidence {
+		ignoreFiles = append(ignoreFiles, baseline.IgnoreFile{
+			Path: evidence.Path, Digest: evidence.Digest,
+		})
+	}
+	return baseline.ScanProfile{
+		Threshold:         options.threshold,
+		MinTokens:         options.minTokens,
+		MaxPairs:          options.maxPairs,
+		MaxFileBytes:      options.maxFileBytes,
+		ComparisonDomain:  domain,
+		SQLDialect:        dialect,
+		EmbeddedSQL:       options.embeddedSQL,
+		StatementBlocks:   options.statementBlocks,
+		BlockStatements:   options.blockStatements,
+		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
+		SameLanguageOnly:  options.sameLanguageOnly,
+		CrossLanguageOnly: options.crossLanguageOnly,
+		LanguagePairs:     pairs,
+		ExcludeGenerated:  options.excludeGenerated,
+		Excludes:          excludes,
+		RespectIgnore:     options.respectIgnore,
+		IgnoreFiles:       ignoreFiles,
+		RequireCoverage:   options.requireCoverage,
+		MinFileCoverage:   options.minFileCoverage,
+		MaxZeroFiles:      options.maxZeroFiles,
+		FailOnWarning:     options.failOnWarning,
+		FailOnDiagnostic:  options.failOnDiagnostic,
+	}, nil
+}
+
 func loadSuppression(
 	path string,
-) (func(string, model.Location, model.Location) bool, error) {
+) (
+	func(string, model.Location, model.Location) bool,
+	[]model.Warning,
+	string,
+	string,
+	error,
+) {
 	if path == "" {
-		return nil, nil
+		return nil, nil, "", "", nil
 	}
 	set, err := baseline.Load(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, "", "", err
 	}
-	return set.Match, nil
+	if set.Legacy() {
+		return set.Match, []model.Warning{{
+			Kind:    "baseline",
+			Path:    displayCLIPath(path),
+			Message: "legacy baseline has no scan-profile evidence; run baseline migrate before mutation or strict gating",
+		}}, "legacy", "", nil
+	}
+	return set.Match, nil, "loaded", set.ProfileDigest(), nil
 }
 
 func executeScan(
@@ -949,6 +1467,7 @@ func executeScan(
 	paths []string,
 	options scanOptions,
 	suppress func(string, model.Location, model.Location) bool,
+	initialWarnings []model.Warning,
 ) (model.Report, error) {
 	domain, domainSet, err := resolveComparisonDomain(options.comparisonDomain)
 	if err != nil {
@@ -978,6 +1497,10 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
 	}
+	profile, err := baselineScanProfile(options, discovered.IgnoreEvidence)
+	if err != nil {
+		return model.Report{}, err
+	}
 	changes, worktreeMode, err := resolveChangedWorktrees(
 		ctx,
 		discovered.Files,
@@ -996,6 +1519,7 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, fmt.Errorf("resolve focus: %w", err)
 	}
+	discovered.Warnings = append(discovered.Warnings, initialWarnings...)
 	discovered.Warnings = append(discovered.Warnings, focusWarnings...)
 	pairs, err := expandLanguagePairs(options.languagePairs)
 	if err != nil {
@@ -1031,6 +1555,7 @@ func executeScan(
 		Profile:           options.profile,
 		ConfigPath:        options.configPath,
 		IgnoreFiles:       discovered.IgnoreFiles,
+		IgnoreEvidence:    append([]model.IgnoreFileEvidence{}, discovered.IgnoreEvidence...),
 		RespectIgnore:     options.respectIgnore,
 		ExcludeGenerated:  options.excludeGenerated,
 		Excludes:          append([]string{}, options.excludes...),
@@ -1056,6 +1581,7 @@ func executeScan(
 		FailOnWarning:     options.failOnWarning,
 		FailOnDiagnostic:  options.failOnDiagnostic,
 		BaselinePath:      displayOptionalPath(options.baselinePath),
+		ScanProfileDigest: baseline.Digest(profile),
 		Focus:             focus,
 	}
 	result.Tool = buildinfo.Current()
@@ -1555,6 +2081,10 @@ func writeRootUsage(writer io.Writer) error {
 		"\nUsage:\n",
 		"  mori scan [options] [path ...]\n",
 		"  mori init [--profile review|explore|sql] [--stdout | [--force] [directory]]\n",
+		"  mori baseline add --baseline <path> --identity <id> [options] [path ...]\n",
+		"  mori baseline remove --baseline <path> --identity <id>\n",
+		"  mori baseline edit --baseline <path> --identity <id> [--note <text>] [--classification <kind>]\n",
+		"  mori baseline migrate --baseline <path> --accept-profile [options] [path ...]\n",
 		"  mori baseline update --baseline <path> [options] [path ...]\n",
 		"  mori baseline prune --baseline <path> [options] [path ...]\n",
 		"  mori languages\n",
@@ -1569,7 +2099,7 @@ func writeRootUsage(writer io.Writer) error {
 func writeBaselineUsage(writer io.Writer) error {
 	_, err := fmt.Fprint(
 		writer,
-		"Usage: mori baseline <update|prune> [options] [path ...]\n",
+		"Usage: mori baseline <add|remove|edit|migrate|update|prune> [options] [path ...]\n",
 		"\nBaseline intentional similarity candidates for review workflows.\n",
 		"Use --baseline mori-baseline.json to select the baseline file.\n",
 	)

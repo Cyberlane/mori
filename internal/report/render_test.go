@@ -225,6 +225,27 @@ func TestTextDisclosesPerFileCoverage(t *testing.T) {
 	}
 }
 
+func TestTextDisclosesBaselineProfileEvidence(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	if err := Text(&output, model.Report{
+		Configuration: model.EffectiveConfig{
+			ScanProfileDigest: "active-digest",
+			BaselineDigest:    "stored-digest",
+			BaselineStatus:    "compatible",
+		},
+	}); err != nil {
+		t.Fatalf("Text: %v", err)
+	}
+	if !strings.Contains(
+		output.String(),
+		"baseline profile: compatible (stored-digest); active scan profile active-digest",
+	) {
+		t.Fatalf("output = %q", output.String())
+	}
+}
+
 func TestTextExplainsReviewRanking(t *testing.T) {
 	t.Parallel()
 
