@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Cyberlane/mori/internal/baseline"
 	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/normalize"
 )
@@ -709,6 +710,7 @@ func TestBaselineUpdateAndScanSuppression(t *testing.T) {
 	code := Run(context.Background(), []string{
 		"baseline", "update",
 		"--baseline", baselinePath,
+		"--accept-all",
 		"--threshold", "0.70",
 		"--cross-language-only",
 		"../../examples/email-validation",
@@ -741,6 +743,11 @@ func TestBaselineUpdateAndScanSuppression(t *testing.T) {
 	if result.TotalMatchGroups != 0 || result.SuppressedLocationPairs == 0 || result.Truncated {
 		t.Fatalf("suppressed report = %+v, want no findings and visible suppression", result)
 	}
+	if result.Configuration.BaselineStatus != "compatible" ||
+		result.Configuration.BaselineDigest == "" ||
+		result.Configuration.BaselineDigest != result.Configuration.ScanProfileDigest {
+		t.Fatalf("baseline profile evidence = %+v", result.Configuration)
+	}
 }
 
 func TestBaselinePruneCheckReportsStaleEntries(t *testing.T) {
@@ -752,6 +759,7 @@ func TestBaselinePruneCheckReportsStaleEntries(t *testing.T) {
 	updateArgs := []string{
 		"baseline", "update",
 		"--baseline", baselinePath,
+		"--accept-all",
 		"--threshold", "0.70",
 		"--cross-language-only",
 		"../../examples/email-validation",
@@ -976,7 +984,7 @@ func TestConfigLoadsBeforeCLIOverridesAndLanguagePairsExpand(t *testing.T) {
 		"--comparison-domain", "CODE",
 		"--sql-dialect", "generic",
 		"--no-ignore",
-	}, &stderr, false)
+	}, &stderr, "")
 	if !ok || code != exitSuccess {
 		t.Fatalf("parse = %t/%d, stderr = %q", ok, code, stderr.String())
 	}
@@ -1267,6 +1275,260 @@ func TestBaselineUpdateDoesNotBypassStrictCoveragePolicies(t *testing.T) {
 	}
 	if string(content) != original {
 		t.Fatalf("baseline changed to %q", content)
+	}
+}
+
+func TestBaselineUpdatePreviewsBeforeExplicitAllAcceptance(t *testing.T) {
+	t.Parallel()
+
+	baselinePath := filepath.Join(t.TempDir(), "baseline.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	args := []string{
+		"baseline", "update", "--baseline", baselinePath,
+		"--threshold", "0.70", "--cross-language-only",
+		"../../examples/email-validation",
+	}
+	if code := Run(context.Background(), args, &stdout, &stderr); code != exitSuccess ||
+		!strings.Contains(stdout.String(), "baseline preview") ||
+		!strings.Contains(stdout.String(), "no file written") {
+		t.Fatalf("preview exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(baselinePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("preview baseline stat = %v", err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	args = append(args[:4], append([]string{"--accept-all"}, args[4:]...)...)
+	if code := Run(context.Background(), args, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("accept-all exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(baselinePath); err != nil {
+		t.Fatalf("accepted baseline stat = %v", err)
+	}
+}
+
+func TestBaselineSelectiveAddEditRemoveAndProfileMismatch(t *testing.T) {
+	t.Parallel()
+
+	var scanOut bytes.Buffer
+	var scanErr bytes.Buffer
+	if code := Run(context.Background(), []string{
+		"scan", "--no-config", "--format", "json", "--threshold", "0.70",
+		"--cross-language-only", "../../examples/email-validation",
+	}, &scanOut, &scanErr); code != exitSuccess {
+		t.Fatalf("scan exit/stderr = %d/%q", code, scanErr.String())
+	}
+	var report model.Report
+	if err := json.Unmarshal(scanOut.Bytes(), &report); err != nil || len(report.Groups) < 2 {
+		t.Fatalf("scan report groups/error = %d/%v", len(report.Groups), err)
+	}
+	identity := report.Groups[0].ID
+	baselinePath := filepath.Join(t.TempDir(), "baseline.json")
+	common := []string{
+		"--no-config", "--baseline", baselinePath, "--threshold", "0.70",
+		"--cross-language-only", "../../examples/email-validation",
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	addArgs := append([]string{"baseline", "add", "--identity", identity,
+		"--note", "reviewed", "--classification", "intentional"}, common...)
+	if code := Run(context.Background(), addArgs, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("add exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	set, err := baseline.Load(baselinePath)
+	if err != nil || len(set.Entries()) != 1 || !set.Has(identity) {
+		t.Fatalf("selective set/error = %#v/%v", set.Entries(), err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run(context.Background(), []string{
+		"baseline", "edit", "--baseline", baselinePath, "--identity", identity,
+		"--note", "reviewed again", "--classification", "necessary-duplication",
+	}, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("edit exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	updateArgs := append([]string{"baseline", "update", "--accept-all"}, common...)
+	if code := Run(context.Background(), updateArgs, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("update exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	set, err = baseline.Load(baselinePath)
+	if err != nil {
+		t.Fatalf("Load updated: %v", err)
+	}
+	foundMetadata := false
+	for _, entry := range set.Entries() {
+		if entry.ID == identity && entry.Note == "reviewed again" &&
+			entry.Classification == "necessary-duplication" {
+			foundMetadata = true
+		}
+	}
+	if !foundMetadata {
+		t.Fatalf("metadata not preserved: %#v", set.Entries())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run(context.Background(), []string{
+		"scan", "--no-config", "--baseline", baselinePath, "--threshold", "0.71",
+		"--cross-language-only", "../../examples/email-validation",
+	}, &stdout, &stderr); code != exitError || !strings.Contains(stderr.String(), "profile") {
+		t.Fatalf("mismatch exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run(context.Background(), []string{
+		"baseline", "remove", "--baseline", baselinePath, "--identity", identity,
+	}, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("remove exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	set, err = baseline.Load(baselinePath)
+	if err != nil || set.Has(identity) {
+		t.Fatalf("removed set/error = %#v/%v", set.Entries(), err)
+	}
+}
+
+func TestBaselineProfileDetectsIgnoreFileContentChange(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		"left.go":    "package sample\nfunc Left(value string) string { return value }\n",
+		"right.go":   "package sample\nfunc Right(input string) string { return input }\n",
+		".gitignore": "# reviewed ignore policy\n",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+	var scanOut bytes.Buffer
+	var stderr bytes.Buffer
+	common := []string{
+		"--no-config", "--threshold", "0.70", "--min-tokens", "1",
+		"--same-language-only", root,
+	}
+	if code := Run(context.Background(), append(
+		[]string{"scan", "--format", "json"}, common...,
+	), &scanOut, &stderr); code != exitSuccess {
+		t.Fatalf("scan exit/stderr = %d/%q", code, stderr.String())
+	}
+	var report model.Report
+	if err := json.Unmarshal(scanOut.Bytes(), &report); err != nil || len(report.Groups) == 0 {
+		t.Fatalf("scan report groups/error = %d/%v", len(report.Groups), err)
+	}
+	if len(report.Configuration.IgnoreEvidence) != 1 {
+		t.Fatalf("ignore evidence = %#v", report.Configuration.IgnoreEvidence)
+	}
+	baselinePath := filepath.Join(root, "baseline.json")
+	addArgs := append([]string{
+		"baseline", "add", "--baseline", baselinePath,
+		"--identity", report.Groups[0].ID,
+	}, common...)
+	var stdout bytes.Buffer
+	stderr.Reset()
+	if code := Run(context.Background(), addArgs, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("add exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	if err := os.WriteFile(
+		filepath.Join(root, ".gitignore"),
+		[]byte("# changed ignore policy\n"),
+		0o600,
+	); err != nil {
+		t.Fatalf("rewrite ignore file: %v", err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	scanArgs := append([]string{"scan", "--baseline", baselinePath}, common...)
+	if code := Run(context.Background(), scanArgs, &stdout, &stderr); code != exitError ||
+		!strings.Contains(stderr.String(), "differs from active profile") {
+		t.Fatalf("changed ignore exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestBaselineMigrationIsExplicitAndWarningsBlockMutation(t *testing.T) {
+	t.Parallel()
+
+	legacyPath := filepath.Join(t.TempDir(), "legacy.json")
+	if err := os.WriteFile(legacyPath, []byte(`{
+  "schema_version": 2,
+  "mori_version": "0.20.0",
+  "normalization_version": 8,
+  "identity_scope": "content",
+  "threshold": 0.7,
+  "entries": []
+}`), 0o600); err != nil {
+		t.Fatalf("WriteFile legacy: %v", err)
+	}
+	baseArgs := []string{
+		"baseline", "migrate", "--no-config", "--baseline", legacyPath,
+		"--threshold", "0.70", "--cross-language-only",
+		"../../examples/email-validation",
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := Run(context.Background(), []string{
+		"scan", "--no-config", "--format", "json", "--baseline", legacyPath,
+		"--threshold", "0.70", "--cross-language-only",
+		"../../examples/email-validation",
+	}, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("legacy scan exit/stderr = %d/%q", code, stderr.String())
+	}
+	var legacyReport model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &legacyReport); err != nil {
+		t.Fatalf("decode legacy report: %v", err)
+	}
+	if legacyReport.Configuration.BaselineStatus != "legacy" ||
+		len(legacyReport.Warnings) != 1 || legacyReport.Warnings[0].Kind != "baseline" {
+		t.Fatalf("legacy profile evidence = %+v/%#v", legacyReport.Configuration, legacyReport.Warnings)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run(context.Background(), baseArgs, &stdout, &stderr); code != exitUsage ||
+		!strings.Contains(stderr.String(), "--accept-profile") {
+		t.Fatalf("implicit migration exit/stderr = %d/%q", code, stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	migrateArgs := append(baseArgs[:2], append([]string{"--accept-profile"}, baseArgs[2:]...)...)
+	if code := Run(context.Background(), migrateArgs, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("migration exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	set, err := baseline.Load(legacyPath)
+	if err != nil || set.Legacy() || set.ProfileDigest() == "" {
+		t.Fatalf("migrated set/error = %#v/%v", set, err)
+	}
+
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		"left.go":   "package sample\nfunc Left(value string) string { return value }\n",
+		"right.go":  "package sample\nfunc Right(input string) string { return input }\n",
+		"broken.go": "package sample\nfunc Broken( {\n",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+	warningBaseline := filepath.Join(root, "baseline.json")
+	warningArgs := []string{
+		"baseline", "update", "--no-config", "--accept-all",
+		"--baseline", warningBaseline, "--threshold", "0.70", "--min-tokens", "1",
+		"--same-language-only", root,
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run(context.Background(), warningArgs, &stdout, &stderr); code != exitCoverage ||
+		!strings.Contains(stderr.String(), "disallowed parse warning") {
+		t.Fatalf("warning refusal exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(warningBaseline); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("warning baseline stat = %v", err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	allowedArgs := append(warningArgs[:4], append([]string{"--allow-warning", "parse"}, warningArgs[4:]...)...)
+	if code := Run(context.Background(), allowedArgs, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("allowed warning exit/stdout/stderr = %d/%q/%q", code, stdout.String(), stderr.String())
 	}
 }
 

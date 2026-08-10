@@ -75,6 +75,21 @@ func Text(writer io.Writer, report model.Report) error {
 			return err
 		}
 	}
+	if report.Configuration.BaselineStatus != "" {
+		digest := report.Configuration.BaselineDigest
+		if digest == "" {
+			digest = "unavailable"
+		}
+		if _, err := fmt.Fprintf(
+			writer,
+			"baseline profile: %s (%s); active scan profile %s\n",
+			terminalSafe(report.Configuration.BaselineStatus),
+			terminalSafe(digest),
+			terminalSafe(report.Configuration.ScanProfileDigest),
+		); err != nil {
+			return err
+		}
+	}
 	if len(report.Configuration.IgnoreFiles) > 0 {
 		if _, err := fmt.Fprintf(
 			writer,

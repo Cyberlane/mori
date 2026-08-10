@@ -44,11 +44,12 @@ type Options struct {
 
 // Result contains deterministic discovery output and recoverable warnings.
 type Result struct {
-	Files       []File
-	Warnings    []model.Warning
-	IgnoreFiles []string
-	Excluded    []model.FileCoverage
-	Unsupported []model.UnsupportedExtension
+	Files          []File
+	Warnings       []model.Warning
+	IgnoreFiles    []string
+	IgnoreEvidence []model.IgnoreFileEvidence
+	Excluded       []model.FileCoverage
+	Unsupported    []model.UnsupportedExtension
 }
 
 var defaultExcludedDirectories = map[string]struct{}{
@@ -217,6 +218,7 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 		}
 	}
 	result.IgnoreFiles = ignores.paths()
+	result.IgnoreEvidence = ignores.evidence()
 	for extension, count := range unsupportedCounts {
 		result.Unsupported = append(result.Unsupported, model.UnsupportedExtension{
 			Extension: extension,
