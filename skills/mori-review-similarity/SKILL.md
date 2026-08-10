@@ -132,8 +132,10 @@ mori scan \
 
 Confirm `configuration.input.mode` is `git-index`, retain its HEAD and index
 digest, and require both working-tree inclusion flags to be false. Staged mode
-reads tracked source, ignore rules, and `.mori.json` from that same snapshot;
-it must never be described as including unstaged or untracked content.
+reads tracked source, ignore rules, `.mori.json`, and any baseline from that
+same snapshot; a baseline must be a tracked regular file inside the worktree.
+It must never be described as including unstaged, external, or untracked
+content.
 `--include-focused` bypasses ordinary ignore rules for focused files but not
 explicit excludes, generated policy, unsupported syntax, or resource limits.
 
@@ -322,7 +324,8 @@ revision or date from the version string. Inspect:
   to be `analyzed` in strict review, and report generated, resource,
   unsupported, or undiscovered statuses instead of collapsing them;
 - `configuration.input`: for staged scans, verify the Git-index digest, HEAD,
-  and false working-tree and untracked inclusion flags;
+  and false working-tree and untracked inclusion flags; the index digest also
+  binds any loaded baseline blob;
 - `configuration.scope` and `scope_roots`: verify the selected named project
   surface and remember that these fields participate in baseline compatibility;
 - `configuration.profile`: record the selected named defaults and verify the

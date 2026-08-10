@@ -419,6 +419,7 @@ Use `--baseline <path>` to suppress candidates that maintainers have reviewed
 and accepted as intentional structural similarity. This records review
 acceptance, not semantic or behavioral equivalence. Missing or incompatible
 baseline files are errors; Mori never treats a failed load as an empty set.
+Baseline documents are bounded to 16 MiB before JSON decoding.
 
 Accept one reviewed identity from a complete scan:
 

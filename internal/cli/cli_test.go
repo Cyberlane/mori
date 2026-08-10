@@ -1977,6 +1977,148 @@ func TestRunScanStagedUsesIndexSourcesConfigAndIgnoreRules(t *testing.T) {
 	}
 }
 
+func TestRunScanStagedUsesIndexedBaseline(t *testing.T) {
+	root := t.TempDir()
+	cliTestGit(t, root, "init", "--initial-branch=main")
+	cliTestGit(t, root, "config", "user.name", "Mori Test")
+	cliTestGit(t, root, "config", "user.email", "mori@example.invalid")
+	write := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+	write("left.go", "package sample\nfunc Left(v int) int { return v + 1 }\n")
+	write("right.go", "package sample\nfunc Right(v int) int { return v + 1 }\n")
+	cliTestGit(t, root, "add", "left.go", "right.go")
+	cliTestGit(t, root, "commit", "-m", "base")
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+
+	baselinePath := filepath.Join(root, "mori-baseline.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"baseline", "update", "--accept-all", "--no-config", "--baseline", baselinePath,
+		"--threshold", "1", "--min-tokens", "1", "--same-language-only", ".",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("baseline exit = %d, stderr = %q", code, stderr.String())
+	}
+	write(".mori.json", `{
+  "threshold": 1,
+  "min_tokens": 1,
+  "same_language_only": true,
+  "baseline": "mori-baseline.json"
+}`)
+	cliTestGit(t, root, "add", ".mori.json", "mori-baseline.json")
+	cliTestGit(t, root, "commit", "-m", "baseline")
+
+	write("left.go", "package sample\n// staged comment\nfunc Left(v int) int { return v + 1 }\n")
+	cliTestGit(t, root, "add", "left.go")
+	write("mori-baseline.json", "{")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"scan", "--staged", "--format", "json", "--include-focused", "--fail-on-focused-match", ".",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("staged exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode staged report: %v", err)
+	}
+	if result.TotalMatchGroups != 0 || result.SuppressedMatchGroups != 1 ||
+		result.Configuration.BaselineStatus != "compatible" || result.Configuration.Input == nil ||
+		result.Configuration.Input.IndexDigest == "" {
+		t.Fatalf("staged baseline report = %#v", result)
+	}
+}
+
+func TestRunScanStagedRejectsBaselineOutsideIndex(t *testing.T) {
+	root := t.TempDir()
+	cliTestGit(t, root, "init", "--initial-branch=main")
+	cliTestGit(t, root, "config", "user.name", "Mori Test")
+	cliTestGit(t, root, "config", "user.email", "mori@example.invalid")
+	if err := os.WriteFile(filepath.Join(root, "sample.go"), []byte("package sample\nfunc Sample() {}\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile sample: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".mori.json"), []byte(`{"baseline":"missing.json"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile config: %v", err)
+	}
+	cliTestGit(t, root, "add", "sample.go", ".mori.json")
+	cliTestGit(t, root, "commit", "-m", "base")
+	if err := os.WriteFile(filepath.Join(root, "missing.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatalf("WriteFile baseline: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "sample.go"), []byte("package sample\nfunc Sample() { println(1) }\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile sample: %v", err)
+	}
+	cliTestGit(t, root, "add", "sample.go")
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{"scan", "--staged", "."}, &stdout, &stderr)
+	if code != exitError || !strings.Contains(stderr.String(), "not present in the Git index") {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+}
+
+func TestRunScanStagedRejectsExternalBaseline(t *testing.T) {
+	root := t.TempDir()
+	cliTestGit(t, root, "init", "--initial-branch=main")
+	cliTestGit(t, root, "config", "user.name", "Mori Test")
+	cliTestGit(t, root, "config", "user.email", "mori@example.invalid")
+	sourcePath := filepath.Join(root, "sample.go")
+	if err := os.WriteFile(sourcePath, []byte("package sample\nfunc Sample() {}\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile sample: %v", err)
+	}
+	cliTestGit(t, root, "add", "sample.go")
+	cliTestGit(t, root, "commit", "-m", "base")
+	if err := os.WriteFile(sourcePath, []byte("package sample\nfunc Sample() { println(1) }\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile sample: %v", err)
+	}
+	cliTestGit(t, root, "add", "sample.go")
+	external := filepath.Join(t.TempDir(), "baseline.json")
+	if err := os.WriteFile(external, []byte("{}"), 0o600); err != nil {
+		t.Fatalf("WriteFile baseline: %v", err)
+	}
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--staged", "--no-config", "--baseline", external, ".",
+	}, &stdout, &stderr)
+	if code != exitError || !strings.Contains(stderr.String(), "outside the Git worktree") {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+}
+
 func cliTestGit(t *testing.T, root string, args ...string) string {
 	t.Helper()
 	command := exec.Command("git", append([]string{"-C", root}, args...)...)

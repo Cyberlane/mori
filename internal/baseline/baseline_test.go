@@ -36,6 +36,15 @@ func TestLoadRejectsMalformedAndMismatchedFiles(t *testing.T) {
 	}
 }
 
+func TestDecodeRejectsOversizedDocument(t *testing.T) {
+	t.Parallel()
+
+	content := make([]byte, MaxDocumentBytes+1)
+	if _, err := Decode(content); err == nil || !strings.Contains(err.Error(), "document exceeds") {
+		t.Fatalf("oversized Decode error = %v", err)
+	}
+}
+
 func TestLoadSchemaOneAsContentScopeAndToleratesUnknownFields(t *testing.T) {
 	t.Parallel()
 

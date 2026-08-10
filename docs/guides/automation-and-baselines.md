@@ -36,9 +36,12 @@ mori scan --staged --format json \
 ```
 
 The report records an index digest and explicitly excludes unstaged and
-untracked bytes. `--include-focused` bypasses ordinary ignore rules for staged
-paths, while explicit excludes, generated policy, language support, and
-resource limits remain visible coverage boundaries.
+untracked bytes. A configured or explicit baseline is read from that same
+index snapshot and must be a tracked regular file inside the worktree; an
+unstaged baseline edit cannot change suppression. `--include-focused` bypasses
+ordinary ignore rules for staged paths, while explicit excludes, generated
+policy, language support, and resource limits remain visible coverage
+boundaries.
 
 Keep the whole repository as the comparison universe while requiring review of
 groups involving changed source:
