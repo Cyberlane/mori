@@ -65,6 +65,8 @@ func RunWithInput(
 	switch args[0] {
 	case "scan":
 		return runScan(ctx, args[1:], stdin, stdout, stderr)
+	case "explain":
+		return runExplain(ctx, args[1:], stdout, stderr)
 	case "setup":
 		return runProjectSetup(ctx, "setup", args[1:], stdin, stdout, stderr)
 	case "configure":
@@ -75,6 +77,8 @@ func RunWithInput(
 		return runInspect(ctx, args[1:], stdout, stderr)
 	case "doctor":
 		return runDoctor(ctx, args[1:], stdout, stderr)
+	case "lsp":
+		return runLSP(ctx, args[1:], stdin, stdout, stderr)
 	case "init":
 		return runInit(args[1:], stdout, stderr)
 	case "baseline":
@@ -124,6 +128,7 @@ type scanOptions struct {
 	maxFileBytes       int64
 	workers            int
 	format             string
+	color              string
 	sameLanguageOnly   bool
 	crossLanguageOnly  bool
 	failOnMatch        bool
@@ -164,6 +169,7 @@ func defaultScanOptions() scanOptions {
 		maxFileBytes:     2 * 1024 * 1024,
 		workers:          runtime.GOMAXPROCS(0),
 		format:           "text",
+		color:            "auto",
 		sqlDialect:       language.SQLDialectGeneric,
 		blockStatements:  3,
 		maxBlocksPerFunc: 64,
@@ -184,7 +190,8 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 	flags.IntVar(&options.maxPairs, "max-pairs", options.maxPairs, "comparison safety limit; 0 is unlimited")
 	flags.Int64Var(&options.maxFileBytes, "max-file-bytes", options.maxFileBytes, "maximum source file size; 0 is unlimited")
 	flags.IntVar(&options.workers, "workers", options.workers, "parallel parser workers")
-	flags.StringVar(&options.format, "format", options.format, "output format: text, json, or sarif")
+	flags.StringVar(&options.format, "format", options.format, "output format: text, json, sarif, or html")
+	flags.StringVar(&options.color, "color", options.color, "terminal color: auto, always, or never")
 	if baselineAction == "" {
 		flags.StringVar(
 			&options.stdinPath,
@@ -700,8 +707,14 @@ func validateScanOptions(options scanOptions) error {
 	if options.workers < 1 {
 		return errors.New("--workers must be at least 1")
 	}
-	if options.format != "text" && options.format != "json" && options.format != "sarif" {
-		return errors.New("--format must be text, json, or sarif")
+	if options.format != "text" && options.format != "json" && options.format != "sarif" && options.format != "html" {
+		return errors.New("--format must be text, json, sarif, or html")
+	}
+	if options.color != "auto" && options.color != "always" && options.color != "never" {
+		return errors.New("--color must be auto, always, or never")
+	}
+	if options.format != "text" && options.color != "auto" {
+		return errors.New("--color is only available with --format text")
 	}
 	if options.stdinPath != "" && options.baselinePath != "" {
 		return errors.New("--stdin-path cannot be used with --baseline")
@@ -815,13 +828,7 @@ func runScan(
 	result.Configuration.BaselineStatus = baselineStatus
 	result.Configuration.BaselineDigest = baselineDigest
 
-	if options.format == "json" {
-		err = report.JSON(stdout, result)
-	} else if options.format == "sarif" {
-		err = report.SARIF(stdout, result)
-	} else {
-		err = report.Text(stdout, result)
-	}
+	err = renderScanReport(stdout, result, options)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: write report: %v\n", err)
 		return exitError
@@ -836,6 +843,74 @@ func runScan(
 		return exitFindings
 	}
 	return exitSuccess
+}
+
+func renderScanReport(stdout io.Writer, result model.Report, options scanOptions) error {
+	switch options.format {
+	case "json":
+		return report.JSON(stdout, result)
+	case "sarif":
+		return report.SARIF(stdout, result)
+	case "html":
+		return report.HTML(stdout, result)
+	default:
+		if shouldUseColor(stdout, options.color) {
+			return report.ColorText(stdout, result)
+		}
+		return report.Text(stdout, result)
+	}
+}
+
+func shouldUseColor(writer io.Writer, mode string) bool {
+	if mode == "never" || os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	if mode == "always" {
+		return true
+	}
+	file, ok := writer.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := file.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
+
+func runExplain(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+		return usageError(stderr, "explain requires a content-pair identity before scan options")
+	}
+	identity := args[0]
+	options, paths, code, ok := parseScanOptions("explain", args[1:], stderr, "")
+	if !ok {
+		return code
+	}
+	options.maxGroups = 0
+	result, err := executeScan(ctx, paths, options, nil, nil)
+	if err != nil {
+		fmt.Fprintf(stderr, "mori: explain: %v\n", err)
+		return exitError
+	}
+	for _, group := range result.Groups {
+		if group.ID != identity {
+			continue
+		}
+		result.Groups = []model.MatchGroup{group}
+		result.TotalMatchGroups = 1
+		result.TotalLocationPairs = group.LocationPairs
+		result.TotalFocusedMatchGroups = 0
+		if group.Focused {
+			result.TotalFocusedMatchGroups = 1
+		}
+		result.Truncated = false
+		if err := renderScanReport(stdout, result, options); err != nil {
+			fmt.Fprintf(stderr, "mori: explain: write report: %v\n", err)
+			return exitError
+		}
+		return exitSuccess
+	}
+	fmt.Fprintf(stderr, "mori: explain: content-pair identity %q was not found with the active scan options\n", identity)
+	return exitFindings
 }
 
 func readStdinOverlay(ctx context.Context, reader io.Reader, maxFileBytes int64) ([]byte, error) {
@@ -2188,11 +2263,13 @@ func writeRootUsage(writer io.Writer) error {
 		"森 (mori) — cross-language structural similarity for source code\n",
 		"\nUsage:\n",
 		"  mori scan [options] [path ...]\n",
+		"  mori explain <content-pair-id> [scan options] [path ...]\n",
 		"  mori setup [--agent [--format json]] [--answers <path|-> [--apply]] [directory]\n",
 		"  mori configure [--agent [--format json]] [--answers <path|-> [--apply]] [directory]\n",
 		"  mori config <show|validate> [options] [directory]\n",
 		"  mori inspect [--format text|json] [directory]\n",
 		"  mori doctor [--format text|json] [directory]\n",
+		"  mori lsp\n",
 		"  mori init [--profile review|explore|sql] [--stdout | [--force] [directory]]\n",
 		"  mori baseline add --baseline <path> --identity <id> [options] [path ...]\n",
 		"  mori baseline remove --baseline <path> --identity <id>\n",

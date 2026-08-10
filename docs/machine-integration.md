@@ -11,6 +11,11 @@ Mori exposes two deterministic machine formats for different consumers:
 Neither format turns a structural score into proof of semantic or behavioral
 equivalence. A client should present every match as a source-review lead.
 
+`--format html` produces a self-contained, source-free visual report for local
+human review. It is deliberately not a machine contract and has no schema
+version. Paths and report text are HTML-escaped, source bodies are not embedded,
+and no external scripts, fonts, images, or network requests are used.
+
 ## Versioned JSON contract
 
 Schema 17 is described by the Draft 2020-12 artifact at
@@ -100,7 +105,20 @@ the disk file. It should cancel or supersede an older process when a newer edit
 arrives, debounce rapid edits, use process spawning without a shell, and show
 only results that contain a location for the active document.
 
-## Reference VS Code client
+## Language Server Protocol
+
+`mori lsp` runs a local, editor-neutral LSP server over standard input/output.
+It supports full-document synchronization, open/change/save/close lifecycle,
+350 ms change debouncing, cancellation of stale scans, related locations, and
+the same `MORI001` advisory and `MORI002` incomplete-analysis diagnostics as
+SARIF. Messages and unsaved overlays are bounded to 16 MiB.
+
+The server searches the workspace root for `.mori.json`; without one it uses
+the conservative `review` profile. It does not download Mori, upload source,
+create temporary source files, or enable telemetry. Editors should launch the
+binary directly with the argument `lsp` and use full text-document changes.
+
+## VS Code client
 
 [`editors/vscode`](../editors/vscode/README.md) contains a small dependency-free
 reference extension. It demonstrates debouncing, stale-process cancellation,
@@ -108,3 +126,7 @@ SARIF parsing, active-document filtering, related locations, and severity
 mapping. It runs the configured local Mori binary and performs no downloads or
 telemetry. The extension is reference source rather than a Marketplace release;
 projects may package it directly or use the contract from another IDE.
+
+The repository also packages this client as a release asset. Marketplace and
+Open VSX publication remain separate maintainer actions because they require
+store credentials and acceptance of each registry's current terms.

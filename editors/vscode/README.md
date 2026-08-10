@@ -9,6 +9,18 @@ The extension does not download Mori, upload source, create temporary source
 files, or send telemetry. Install an official Mori release separately and make
 `mori` available on `PATH`, or set `mori.executable` to an explicit local path.
 
+## Install a release package
+
+Download `mori-vscode_<version>.vsix` from the matching Mori release, then run:
+
+```sh
+code --install-extension mori-vscode_<version>.vsix
+```
+
+Marketplace and Open VSX publication are separate maintainer actions. The VSIX
+is checksummed alongside every other release asset and does not bundle or
+download the Mori executable.
+
 ## Run from source
 
 1. Open this directory in VS Code.

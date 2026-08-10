@@ -80,11 +80,16 @@ effects, types, external calls, permissions, transactions, or error behavior.
 | Review SQL queries | `mori scan --profile sql path/to/sql` |
 | Produce CI or agent evidence | `mori scan --profile review --format json .` |
 | Produce editor diagnostics | `mori scan --profile review --format sarif .` |
+| Save a local visual report | `mori scan --profile review --format html . > mori.html` |
 | Inspect language coverage | `mori inspect .` |
 | Check project setup | `mori doctor .` |
 
 Lower the token floor toward 12 only for deliberate broad exploration; small
 callbacks and wrappers commonly dominate at that size.
+
+Use `mori explain <content-pair-id> [scan options] .` to reproduce and isolate
+one reported identity. Text output uses restrained color on terminals; set
+`--color never` or `NO_COLOR` to disable it.
 
 ## Supported source
 

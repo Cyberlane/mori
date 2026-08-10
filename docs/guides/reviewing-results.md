@@ -3,6 +3,17 @@
 Mori produces a shortlist for source review. A high score means two normalized
 feature multisets overlap strongly; it does not establish equivalent behavior.
 
+To isolate one retained match after a broad scan, copy its content-pair ID and
+rerun with the same scan settings:
+
+```sh
+mori explain aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb --profile review .
+```
+
+`explain` repeats the scan without the presentation limit, then renders only
+the selected identity and its structural evidence. It does not infer behavior
+or retrieve a result from a remote service.
+
 ## Narrow the source policy
 
 Mori honors nested `.gitignore` and `.moriignore` files. Add explicit exclusions

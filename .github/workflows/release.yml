@@ -160,10 +160,20 @@ jobs:
       - name: Stage versioned JSON Schema
         run: cp schemas/mori-report-v17.schema.json dist/
 
+      - name: Package VS Code extension
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          cd editors/vscode
+          npx --yes @vscode/vsce@3.9.1 package \
+            --no-dependencies \
+            --out "../../dist/mori-vscode_${version}.vsix"
+
       - name: Create checksums
         run: |
           cd dist
-          sha256sum ./*.json ./*.tar.gz ./*.zip > checksums.txt
+          sha256sum ./*.json ./*.tar.gz ./*.vsix ./*.zip > checksums.txt
 
       - name: Create or update draft release
         env:
@@ -218,6 +228,7 @@ jobs:
           gh release download "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --pattern "$archive" \
+            --pattern "mori-vscode_*.vsix" \
             --pattern mori-report-v17.schema.json \
             --pattern checksums.txt \
             --dir dist
@@ -250,6 +261,18 @@ jobs:
             exit 1
           fi
           cmp ../schemas/mori-report-v17.schema.json "$schema"
+
+          extension="mori-vscode_${version}.vsix"
+          expected="$(awk -v name="./$extension" '$2 == name { print $1 }' checksums.txt)"
+          if [[ -z "$expected" ]]; then
+            echo "No checksum found for $extension." >&2
+            exit 1
+          fi
+          actual="$(sha256sum "$extension" | awk '{ print $1 }')"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "Checksum mismatch for $extension." >&2
+            exit 1
+          fi
 
   verify-downloads:
     name: Verify download ${{ matrix.name }}

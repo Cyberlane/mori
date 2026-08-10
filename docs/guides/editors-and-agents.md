@@ -14,6 +14,19 @@ The extension does not download Mori, upload source, write temporary source
 files, or send telemetry. Install an official binary separately and place it
 on `PATH`, or configure an explicit executable path.
 
+## Other editors
+
+Editors with Language Server Protocol support can launch:
+
+```sh
+mori lsp
+```
+
+The server accepts full-document synchronization and publishes informational
+structural-review leads with related source locations. It debounces edits,
+cancels stale work, and emits incomplete-analysis warnings instead of silently
+turning parser or coverage gaps into an empty result.
+
 ## Unsaved buffers
 
 Editors can overlay one already-discovered source path through standard input:

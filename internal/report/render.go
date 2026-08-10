@@ -2,6 +2,7 @@
 package report
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -418,6 +419,51 @@ func Text(writer io.Writer, report model.Report) error {
 		"\nScores identify review candidates; they do not prove behavioral equivalence.",
 	)
 	return err
+}
+
+// ColorText writes the text report with restrained ANSI emphasis. Machine
+// formats never contain terminal control sequences.
+func ColorText(writer io.Writer, value model.Report) error {
+	var buffer bytes.Buffer
+	if err := Text(&buffer, value); err != nil {
+		return err
+	}
+	for _, line := range strings.SplitAfter(buffer.String(), "\n") {
+		colored := line
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "森 (mori):"):
+			colored = "\x1b[1;32m" + strings.TrimSuffix(line, "\n") + "\x1b[0m" + lineEnding(line)
+		case strings.HasPrefix(trimmed, "Warning") || strings.HasPrefix(line, "Warnings"):
+			colored = "\x1b[33m" + strings.TrimSuffix(line, "\n") + "\x1b[0m" + lineEnding(line)
+		case isGroupHeading(trimmed):
+			colored = "\x1b[1;36m" + strings.TrimSuffix(line, "\n") + "\x1b[0m" + lineEnding(line)
+		}
+		if _, err := io.WriteString(writer, colored); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func lineEnding(value string) string {
+	if strings.HasSuffix(value, "\n") {
+		return "\n"
+	}
+	return ""
+}
+
+func isGroupHeading(value string) bool {
+	index := strings.Index(value, ". ")
+	if index < 1 {
+		return false
+	}
+	for _, character := range value[:index] {
+		if character < '0' || character > '9' {
+			return false
+		}
+	}
+	return strings.Contains(value[index+2:], "%")
 }
 
 func groupHasNestedBoundaries(group model.MatchGroup) bool {

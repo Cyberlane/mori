@@ -5,6 +5,11 @@
   "version": "0.1.0",
   "publisher": "Cyberlane",
   "license": "MIT",
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#0f3d38",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Cyberlane/mori.git",
@@ -81,6 +86,7 @@
     }
   },
   "scripts": {
-    "check": "node --check extension.js"
+    "check": "node --check extension.js",
+    "package": "npx --yes @vscode/vsce@3.9.1 package --no-dependencies"
   }
 }
