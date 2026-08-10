@@ -4,7 +4,7 @@ GO ?= go
 ACTIONLINT_VERSION := v1.7.12
 GOVULNCHECK_VERSION := v1.6.0
 
-.PHONY: actionlint build check dogfood fmt fmt-check policy-test scan-example test tidy-check vet vuln
+.PHONY: actionlint build check corpus dogfood fmt fmt-check policy-test scan-example test tidy-check vet vuln
 
 build:
 	mkdir -p bin
@@ -13,11 +13,14 @@ build:
 dogfood: build
 	./bin/mori scan --config configs/self-review.mori.json .
 
+corpus:
+	$(GO) run ./internal/cmd/corpuseval >/dev/null
+
 fmt:
-	gofmt -w cmd internal examples
+	gofmt -w cmd internal examples corpus/code
 
 fmt-check:
-	@files="$$(gofmt -l cmd internal examples)"; \
+	@files="$$(gofmt -l cmd internal examples corpus/code)"; \
 	if [ -n "$$files" ]; then \
 		echo "$$files"; \
 		exit 1; \
@@ -44,4 +47,4 @@ policy-test:
 scan-example:
 	$(GO) run ./cmd/mori scan --threshold 0.70 --cross-language-only examples/email-validation
 
-check: fmt-check tidy-check vet test build policy-test actionlint vuln
+check: fmt-check tidy-check vet test corpus build policy-test actionlint vuln

@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "license": "MIT",
+  "reference": {
+    "mori_version": "0.22.0",
+    "normalization_version": 8
+  },
+  "cases": [
+    {
+      "id": "ordered-rename",
+      "classification": "accepted-positive",
+      "reviewer": "mori-maintainers",
+      "language_pair": ["go", "go"],
+      "threshold": 0.85,
+      "expected": {"min_score": 0.99, "max_score": 1.0, "rank": 2, "reference_score": 1.0, "reference_rank": 2},
+      "left": {"path": "code/ordered.go", "name": "Original"},
+      "right": {"path": "code/ordered.go", "name": "Renamed"}
+    },
+    {
+      "id": "shell-validation",
+      "classification": "accepted-positive",
+      "reviewer": "mori-maintainers",
+      "language_pair": ["bash", "zsh"],
+      "threshold": 0.85,
+      "expected": {"min_score": 0.99, "max_score": 1.0, "rank": 4, "reference_score": 1.0, "reference_rank": 5},
+      "left": {"path": "shell/validate.sh", "start_line": 1},
+      "right": {"path": "shell/check.zsh", "start_line": 1}
+    },
+    {
+      "id": "swift-go-clamp",
+      "classification": "accepted-positive",
+      "reviewer": "mori-maintainers",
+      "language_pair": ["go", "swift"],
+      "threshold": 0.80,
+      "expected": {"min_score": 0.84, "max_score": 0.87, "rank": 6, "reference_score": 0.8484848484848485, "reference_rank": 6},
+      "left": {"path": "code/clamp.go", "name": "ClampNumber"},
+      "right": {"path": "code/clamp.swift", "name": "clampValue"}
+    },
+    {
+      "id": "email-go-javascript",
+      "classification": "accepted-positive",
+      "reviewer": "mori-maintainers",
+      "language_pair": ["go", "javascript"],
+      "threshold": 0.70,
+      "expected": {"min_score": 0.79, "max_score": 0.82, "rank": 7, "reference_score": 0.7952755905511811, "reference_rank": 7},
+      "left": {"path": "code/email.go", "name": "LooksLikeEmail"},
+      "right": {"path": "code/email.js", "name": "looksLikeEmail"}
+    },
+    {
+      "id": "email-rust-javascript",
+      "classification": "accepted-positive",
+      "reviewer": "mori-maintainers",
+      "language_pair": ["rust", "javascript"],
+      "threshold": 0.70,
+      "expected": {"min_score": 0.70, "max_score": 0.72, "rank": 8, "reference_score": 0.7054263565891473, "reference_rank": 8},
+      "left": {"path": "code/email.rs", "name": "looks_like_email"},
+      "right": {"path": "code/email.js", "name": "looksLikeEmail"}
+    },
+    {
+      "id": "generic-sql-shape",
+      "classification": "intentional-similarity",
+      "reviewer": "mori-maintainers",
+      "language_pair": ["sql", "sql"],
+      "threshold": 0.70,
+      "expected": {"min_score": 0.99, "max_score": 1.0, "rank": 1, "reference_score": 1.0, "reference_rank": 1},
+      "left": {"path": "sql/users.sql", "start_line": 1, "sql_dialect": "generic"},
+      "right": {"path": "sql/accounts.sql", "start_line": 1, "sql_dialect": "generic"}
+    },
+    {
+      "id": "postgresql-shape",
+      "classification": "intentional-similarity",
+      "reviewer": "mori-maintainers",
+      "language_pair": ["postgresql", "postgresql"],
+      "threshold": 0.70,
+      "expected": {"min_score": 0.99, "max_score": 1.0, "rank": 3, "reference_score": 1.0, "reference_rank": 4},
+      "left": {"path": "sql/users.sql", "start_line": 1, "sql_dialect": "postgresql"},
+      "right": {"path": "sql/accounts.sql", "start_line": 1, "sql_dialect": "postgresql"}
+    },
+    {
+      "id": "ordered-swap",
+      "classification": "false-positive",
+      "reviewer": "mori-maintainers",
+      "language_pair": ["go", "go"],
+      "threshold": 0.85,
+      "expected": {"min_score": 0.92, "max_score": 0.95, "rank": 5, "reference_score": 1.0, "reference_rank": 3},
+      "left": {"path": "code/ordered.go", "name": "Original"},
+      "right": {"path": "code/ordered.go", "name": "Swapped"}
+    },
+    {
+      "id": "email-versus-sum",
+      "classification": "false-positive",
+      "reviewer": "mori-maintainers",
+      "language_pair": ["go", "go"],
+      "threshold": 0.70,
+      "expected": {"min_score": 0.30, "max_score": 0.34, "rank": 10, "reference_score": 0.31724137931034485, "reference_rank": 10},
+      "left": {"path": "code/email.go", "name": "LooksLikeEmail"},
+      "right": {"path": "code/email.go", "name": "SumValues"}
+    },
+    {
+      "id": "postgresql-select-versus-update",
+      "classification": "false-positive",
+      "reviewer": "mori-maintainers",
+      "language_pair": ["postgresql", "postgresql"],
+      "threshold": 0.70,
+      "expected": {"min_score": 0.34, "max_score": 0.37, "rank": 9, "reference_score": 0.35454545454545455, "reference_rank": 9},
+      "left": {"path": "sql/users.sql", "start_line": 1, "sql_dialect": "postgresql"},
+      "right": {"path": "sql/archive.sql", "start_line": 1, "sql_dialect": "postgresql"}
+    }
+  ]
+}
