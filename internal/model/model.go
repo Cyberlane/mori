@@ -175,6 +175,16 @@ type FocusConfig struct {
 	DeletedPaths         []string              `json:"deleted_paths"`
 	Worktrees            []WorktreeFocusConfig `json:"worktrees,omitempty"`
 	DiscoveredFocusFiles int                   `json:"discovered_focus_files"`
+	RequiredFocusFiles   int                   `json:"required_focus_files"`
+	CoveredFocusFiles    int                   `json:"covered_focus_files"`
+	PathEvidence         []FocusPathEvidence   `json:"path_evidence"`
+}
+
+// FocusPathEvidence explains whether one requested review path was analyzed.
+type FocusPathEvidence struct {
+	Path   string `json:"path"`
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // ParseDiagnostic identifies one bounded Tree-sitter error or missing node.

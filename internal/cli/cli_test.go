@@ -1889,6 +1889,8 @@ func TestRunScanStagedUsesIndexSourcesConfigAndIgnoreRules(t *testing.T) {
 	write("sample.go", "package sample\nfunc StagedA(v int) int { return v + 1 }\nfunc StagedB(x int) int { return x + 1 }\n")
 	cliTestGit(t, root, "add", "sample.go")
 	write("sample.go", "package sample\nfunc Working() int { return 99 }\n")
+	write("ignored.go", "package sample\nfunc IgnoredA(v int) int { return v + 2 }\nfunc IgnoredB(x int) int { return x + 2 }\n")
+	cliTestGit(t, root, "add", "-f", "ignored.go")
 	write(".mori.json", `{"threshold":0.99,"min_tokens":999}`)
 	write(".gitignore", "")
 
@@ -1902,8 +1904,8 @@ func TestRunScanStagedUsesIndexSourcesConfigAndIgnoreRules(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(previous) })
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := Run(context.Background(), []string{"scan", "--staged", "--format", "json"}, &stdout, &stderr)
-	if code != exitSuccess {
+	code := Run(context.Background(), []string{"scan", "--staged", "--format", "json", "--require-focused-coverage"}, &stdout, &stderr)
+	if code != exitCoverage {
 		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
 	}
 	var result model.Report
@@ -1914,8 +1916,24 @@ func TestRunScanStagedUsesIndexSourcesConfigAndIgnoreRules(t *testing.T) {
 		result.Configuration.Input.WorkingTreeIncluded || result.Configuration.Input.UntrackedIncluded ||
 		result.Configuration.Input.IndexDigest == "" || result.Configuration.Focus == nil ||
 		result.Configuration.Focus.Mode != "git-index" || len(result.Groups) != 1 ||
+		result.Configuration.Focus.CoveredFocusFiles != 1 || result.Configuration.Focus.RequiredFocusFiles != 2 ||
 		result.Groups[0].Profiles[0].Occurrences[0].Location.Name == "Working" {
 		t.Fatalf("staged report = %#v", result)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"scan", "--staged", "--format", "json", "--include-focused", "--require-focused-coverage",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("included exit = %d, stderr = %q", code, stderr.String())
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode included report: %v", err)
+	}
+	if result.Configuration.Focus.CoveredFocusFiles != 2 || result.Configuration.Focus.RequiredFocusFiles != 2 {
+		t.Fatalf("included focus = %#v", result.Configuration.Focus)
 	}
 }
 

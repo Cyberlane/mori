@@ -134,6 +134,8 @@ type scanOptions struct {
 	crossLanguageOnly  bool
 	failOnMatch        bool
 	failOnFocusedMatch bool
+	includeFocused     bool
+	requireFocus       bool
 	requireCoverage    bool
 	minFileCoverage    float64
 	maxZeroFiles       int
@@ -293,6 +295,10 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 		options.failOnFocusedMatch,
 		"exit with status 3 when one or more focused match groups are found",
 	)
+	if baselineAction == "" {
+		flags.BoolVar(&options.includeFocused, "include-focused", options.includeFocused, "include focused files that ordinary ignore rules would omit")
+		flags.BoolVar(&options.requireFocus, "require-focused-coverage", options.requireFocus, "exit with status 4 unless every non-deleted focused file is analyzed")
+	}
 	flags.BoolVar(
 		&options.requireCoverage,
 		"require-coverage",
@@ -887,6 +893,10 @@ func validateScanOptions(options scanOptions) error {
 	if options.failOnFocusedMatch && len(options.focusPaths) == 0 && options.changedSince == "" &&
 		len(options.changedWorktrees) == 0 && !options.staged {
 		return errors.New("--fail-on-focused-match requires --focus-path, --changed-since, --changed-worktree, or --staged")
+	}
+	if (options.includeFocused || options.requireFocus) && len(options.focusPaths) == 0 &&
+		options.changedSince == "" && len(options.changedWorktrees) == 0 && !options.staged {
+		return errors.New("focused coverage options require --focus-path, --changed-since, --changed-worktree, or --staged")
 	}
 	if _, err := parseChangedWorktreeSpecs(options.changedWorktrees); err != nil {
 		return err
@@ -1611,6 +1621,19 @@ func enforceCoveragePolicies(
 		}
 		failures = append(failures, message)
 	}
+	if options.requireFocus {
+		focus := result.Configuration.Focus
+		if focus == nil || focus.CoveredFocusFiles < focus.RequiredFocusFiles {
+			covered, required := 0, 0
+			if focus != nil {
+				covered, required = focus.CoveredFocusFiles, focus.RequiredFocusFiles
+			}
+			failures = append(failures, fmt.Sprintf(
+				"focused file coverage %d/%d leaves %d non-deleted path(s) unanalyzed",
+				covered, required, required-covered,
+			))
+		}
+	}
 	if options.minFileCoverage > 0 {
 		actual := 0.0
 		if result.Coverage.AnalyzedFiles > 0 {
@@ -1785,7 +1808,14 @@ func executeScan(
 		if err != nil {
 			return model.Report{}, fmt.Errorf("read staged source: %w", err)
 		}
-		discovered, err = source.DiscoverSnapshot(ctx, options.stagedSnapshot.Root, paths, entries, discoveryOptions)
+		discoveryPaths := append([]string{}, paths...)
+		if options.includeFocused {
+			discoveryPaths = append(discoveryPaths, options.focusPaths...)
+			for _, path := range options.stagedSnapshot.ChangedPaths {
+				discoveryPaths = append(discoveryPaths, filepath.Join(options.stagedSnapshot.Root, filepath.FromSlash(path)))
+			}
+		}
+		discovered, err = source.DiscoverSnapshot(ctx, options.stagedSnapshot.Root, discoveryPaths, entries, discoveryOptions)
 	} else {
 		discovered, err = source.DiscoverContext(ctx, paths, discoveryOptions)
 	}
@@ -1843,6 +1873,21 @@ func executeScan(
 			return model.Report{}, fmt.Errorf("resolve changed files: %w", err)
 		}
 	}
+	if options.includeFocused && options.stagedSnapshot == nil {
+		focusPaths := append([]string{}, options.focusPaths...)
+		for _, change := range changes {
+			for _, path := range change.ChangedPaths {
+				focusPaths = append(focusPaths, filepath.Join(change.Root, filepath.FromSlash(path)))
+			}
+		}
+		if len(focusPaths) > 0 {
+			extra, extraErr := source.DiscoverContext(ctx, focusPaths, discoveryOptions)
+			if extraErr != nil {
+				return model.Report{}, fmt.Errorf("include focused source: %w", extraErr)
+			}
+			discovered = mergeDiscoveryResults(discovered, extra)
+		}
+	}
 	focus, focusSet, focusWarnings, err := resolveFocus(
 		options.focusPaths,
 		changes,
@@ -1860,6 +1905,9 @@ func executeScan(
 		focus.IndexDigest = options.stagedSnapshot.IndexDigest
 		focus.WorkingTreeIncluded = false
 		focus.UntrackedIncluded = false
+	}
+	if focus != nil {
+		annotateFocusCoverage(focus, options, changes, discovered)
 	}
 	discovered.Warnings = append(discovered.Warnings, initialWarnings...)
 	discovered.Warnings = append(discovered.Warnings, focusWarnings...)
@@ -1968,6 +2016,111 @@ func stagedSourceEntries(
 		entries = append(entries, item)
 	}
 	return entries, nil
+}
+
+func mergeDiscoveryResults(primary source.Result, extra source.Result) source.Result {
+	files := make(map[string]source.File, len(primary.Files)+len(extra.Files))
+	for _, file := range append(primary.Files, extra.Files...) {
+		files[canonicalPath(file.Path)] = file
+	}
+	primary.Files = primary.Files[:0]
+	for _, file := range files {
+		primary.Files = append(primary.Files, file)
+	}
+	sort.Slice(primary.Files, func(i, j int) bool { return primary.Files[i].DisplayPath < primary.Files[j].DisplayPath })
+	primary.Warnings = append(primary.Warnings, extra.Warnings...)
+	primary.Excluded = append(primary.Excluded, extra.Excluded...)
+	primary.IgnoreFiles = compactSortedStrings(append(primary.IgnoreFiles, extra.IgnoreFiles...))
+	evidence := make(map[string]model.IgnoreFileEvidence)
+	for _, item := range append(primary.IgnoreEvidence, extra.IgnoreEvidence...) {
+		evidence[item.Path+"\x00"+item.Digest] = item
+	}
+	primary.IgnoreEvidence = primary.IgnoreEvidence[:0]
+	for _, item := range evidence {
+		primary.IgnoreEvidence = append(primary.IgnoreEvidence, item)
+	}
+	sort.Slice(primary.IgnoreEvidence, func(i, j int) bool { return primary.IgnoreEvidence[i].Path < primary.IgnoreEvidence[j].Path })
+	return primary
+}
+
+func compactSortedStrings(values []string) []string {
+	sort.Strings(values)
+	return compactStrings(values)
+}
+
+func annotateFocusCoverage(
+	focus *model.FocusConfig,
+	options scanOptions,
+	changes []vcs.Changes,
+	discovered source.Result,
+) {
+	analyzed := make(map[string]struct{}, len(discovered.Files))
+	for _, file := range discovered.Files {
+		analyzed[canonicalPath(file.Path)] = struct{}{}
+	}
+	excluded := make(map[string]model.FileCoverage, len(discovered.Excluded))
+	for _, coverage := range discovered.Excluded {
+		absolute, err := filepath.Abs(filepath.FromSlash(coverage.Path))
+		if err == nil {
+			excluded[canonicalPath(absolute)] = coverage
+		}
+	}
+	type requestedPath struct {
+		path    string
+		deleted bool
+	}
+	requested := make(map[string]requestedPath)
+	add := func(path string, deleted bool) {
+		clean := canonicalPath(path)
+		current, exists := requested[clean]
+		if !exists || (current.deleted && !deleted) {
+			requested[clean] = requestedPath{path: path, deleted: deleted}
+		}
+	}
+	for _, value := range options.focusPaths {
+		if absolute, err := filepath.Abs(value); err == nil {
+			add(absolute, false)
+		}
+	}
+	for _, change := range changes {
+		for _, path := range change.ChangedPaths {
+			add(filepath.Join(change.Root, filepath.FromSlash(path)), false)
+		}
+		for _, path := range change.DeletedPaths {
+			add(filepath.Join(change.Root, filepath.FromSlash(path)), true)
+		}
+	}
+	keys := make([]string, 0, len(requested))
+	for key := range requested {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	focus.PathEvidence = make([]model.FocusPathEvidence, 0, len(keys))
+	for _, key := range keys {
+		item := requested[key]
+		evidence := model.FocusPathEvidence{Path: displayCLIPath(item.path)}
+		if item.deleted {
+			evidence.Status = "deleted"
+			evidence.Reason = "deleted paths do not require analysis"
+			focus.PathEvidence = append(focus.PathEvidence, evidence)
+			continue
+		}
+		focus.RequiredFocusFiles++
+		if _, ok := analyzed[key]; ok {
+			evidence.Status = "analyzed"
+			focus.CoveredFocusFiles++
+		} else if coverage, ok := excluded[key]; ok {
+			evidence.Status = coverage.Status
+			evidence.Reason = coverage.ZeroReason
+		} else if _, supported := language.DetectWithSQLDialect(item.path, options.sqlDialect); !supported {
+			evidence.Status = "unsupported"
+			evidence.Reason = "unsupported source extension or shebang"
+		} else {
+			evidence.Status = "not_discovered"
+			evidence.Reason = "excluded, ignored, missing, or outside the selected roots"
+		}
+		focus.PathEvidence = append(focus.PathEvidence, evidence)
+	}
 }
 
 const maxPriorityPathRules = 32

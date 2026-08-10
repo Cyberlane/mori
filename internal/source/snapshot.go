@@ -141,10 +141,10 @@ func (state *snapshotDiscoveryState) walk(ctx context.Context, node *snapshotNod
 		}
 		absolutePath := filepath.Join(state.root, filepath.FromSlash(pathRelative))
 		_, explicit := state.explicitFiles[pathRelative]
+		if matchesAny(pathRelative, displayPath(state.cwd, absolutePath), state.options.Excludes) {
+			continue
+		}
 		if !explicit {
-			if matchesAny(pathRelative, displayPath(state.cwd, absolutePath), state.options.Excludes) {
-				continue
-			}
 			if state.options.IgnoreFiles && state.ignores.ignored(absolutePath, false) {
 				continue
 			}
