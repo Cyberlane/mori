@@ -212,7 +212,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 17,
+  "schema_version": 18,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -302,9 +302,10 @@ Consumers should reject or explicitly handle unknown schema versions.
 
 Schema 10 adds `review_priority` and `review_signals` to every group and records
 the effective `configuration.ranking`. `--ranking review` uses these explicit
-location-level signals before the established structural ordering. Identifiers
-are used only for the disclosed same-name signal; they remain absent from
-fingerprints and similarity scores. Focused groups always remain first.
+location-level signals before the established structural ordering. Distinctive
+identifiers are used only for the disclosed same-name signal; generic entry-
+point, constructor, and anonymous names are ignored. Identifiers remain absent
+from fingerprints and similarity scores. Focused groups always remain first.
 
 Review priority is the sum of disclosed, overlapping signals: 4 for a
 same-named pair across directories, 2 for any cross-directory pair, 2 for a
@@ -359,9 +360,16 @@ regeneration.
 
 Schema 17 adds the optional `configuration.stdin_path` field for bounded
 unsaved-buffer overlays. It changes reporting only: normalization remains
-version 9 and baseline schema remains version 3. The complete versioned
-contract is published as
-[`schemas/mori-report-v17.schema.json`](../schemas/mori-report-v17.schema.json).
+version 9 and baseline schema remains version 3. Its complete contract remains
+available in the v0.27.0 and earlier release assets.
+
+Schema 18 adds `configuration.input` for immutable Git-index provenance,
+`configuration.scope` and `scope_roots` for named project surfaces, and exact
+focused-path evidence with required and covered totals. These report and
+candidate-surface changes leave normalization at version 12 and baseline
+schema at version 3. The selected scope and roots participate in the baseline
+scan-profile digest. The complete current contract is published as
+[`schemas/mori-report-v18.schema.json`](../schemas/mori-report-v18.schema.json).
 
 Normalization version 10 adds Java and C# function boundaries and canonical
 syntax mappings, makes redundant parentheses transparent, and adds the

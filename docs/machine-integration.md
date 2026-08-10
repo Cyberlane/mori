@@ -16,6 +16,10 @@ human review. It is deliberately not a machine contract and has no schema
 version. Paths and report text are HTML-escaped, source bodies are not embedded,
 and no external scripts, fonts, images, or network requests are used.
 
+`--format compact` is a bounded human/agent shortlist with one line per group,
+focus coverage, warning totals, and the behavioral-equivalence disclaimer. It
+is not a versioned machine contract; use JSON when fields must be parsed.
+
 For a report that will leave the project boundary, add `--redact-paths`. Mori
 then replaces every exact source, warning, coverage, configuration, ignore,
 stdin, baseline, and focus path with a deterministic placeholder such as
@@ -25,14 +29,15 @@ presentation only, not scores, fingerprints, counts, or schema version.
 
 ## Versioned JSON contract
 
-Schema 17 is described by the Draft 2020-12 artifact at
-[`schemas/mori-report-v17.schema.json`](../schemas/mori-report-v17.schema.json).
+Schema 18 is described by the Draft 2020-12 artifact at
+[`schemas/mori-report-v18.schema.json`](../schemas/mori-report-v18.schema.json).
 Official releases include the same file and its SHA-256 checksum.
 Consumers should select a validator that supports Draft 2020-12, require
-`schema_version` to equal `17`, and reject or explicitly handle unknown report
+`schema_version` to equal `18`, and reject or explicitly handle unknown report
 versions.
 
-Schema 17 originally added only the optional `configuration.stdin_path` field.
+Schema 18 adds immutable Git-index input provenance, named project scopes, and
+per-path focused coverage. Schema 17 added the optional stdin overlay field.
 The current normalization version is 12 and the baseline contract remains
 schema 3.
 
@@ -68,6 +73,10 @@ exit policy. Clients may therefore consume valid output with these exit codes:
 - `0`: scan completed and configured gates passed;
 - `3`: a configured match gate failed; or
 - `4`: at least one configured coverage gate failed.
+
+Project-maintenance clients may also receive exit `5` from
+`mori project upgrade --check` when project-managed Mori assets drift. That
+command emits its own versioned plan rather than a scan report.
 
 Exit `1` is an operational failure and exit `2` is invalid usage. A client
 should reject empty, malformed, or wrong-version output regardless of exit

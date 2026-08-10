@@ -7,6 +7,28 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added immutable `--staged` scans that read tracked source, ignore rules, and
+  configuration from one Git-index snapshot, record its digest, and exclude
+  unstaged and untracked content by construction.
+- Added `--include-focused` and `--require-focused-coverage`, with per-path
+  analyzed, deleted, excluded, unsupported, resource-limited, or undiscovered
+  evidence and coverage exit status `4`.
+- Added named `.mori.json` scopes, compact one-line-per-group output, and
+  `mori project upgrade --check|--dry-run|--apply` for coordinated local
+  version-pin and Agent Skill maintenance with recoverable backups.
+
+### Changed
+
+- Review ranking no longer treats generic entry-point, constructor, or
+  anonymous callable names as distinctive same-name evidence.
+- Source discovery now prunes ignored build trees before loading irrelevant
+  nested ignore files while retaining deterministic negation behavior.
+- Machine-readable reports now use schema version 18 for immutable input
+  provenance, named scope evidence, and exact focused-file coverage. Baseline
+  schema remains version 3 and normalization remains version 12.
+
 ## [0.27.0] - 2026-08-10
 
 ### Added

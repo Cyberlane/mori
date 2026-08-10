@@ -25,6 +25,21 @@ exits `3`; coverage failure takes precedence.
 
 ## Changed-file gates
 
+For a local pre-commit gate, scan exactly the index and require every
+non-deleted staged path to participate:
+
+```sh
+mori scan --staged --format json \
+  --include-focused \
+  --require-focused-coverage \
+  --fail-on-focused-match
+```
+
+The report records an index digest and explicitly excludes unstaged and
+untracked bytes. `--include-focused` bypasses ordinary ignore rules for staged
+paths, while explicit excludes, generated policy, language support, and
+resource limits remain visible coverage boundaries.
+
 Keep the whole repository as the comparison universe while requiring review of
 groups involving changed source:
 
