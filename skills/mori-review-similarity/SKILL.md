@@ -410,8 +410,9 @@ each reviewed kind is repeated with `--allow-warning`.
 
 When the owner explicitly accepts focused findings for exactly one staged
 commit and durable suppression would be misleading, use `mori review
-acknowledge --staged --accept-focused`. The default owner-only receipt lives
-under Git metadata. Pass it to the hook with `--review-receipt`; require a
+acknowledge --staged --accept-focused`. The default local receipt lives under
+private Git metadata and uses owner-only permissions on POSIX filesystems.
+Pass it to the hook with `--review-receipt`; require a
 compatible receipt in schema-19 evidence. It changes only the focused-match
 policy exit status, never hides findings, and any HEAD, index, profile, tool,
 normalization, or focused-identity change invalidates it.

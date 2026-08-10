@@ -485,7 +485,8 @@ mori scan --staged --fail-on-focused-match \
   --review-receipt "$(git rev-parse --git-path mori/staged-review.json)" .
 ```
 
-The receipt is owner-only local state under Git metadata by default. It stores
-no source or timestamp, does not suppress findings, and becomes stale after the
-commit because HEAD changes. A missing, malformed, or stale requested receipt
-fails closed.
+The receipt is local state under private Git metadata by default and uses
+owner-only file permissions on POSIX filesystems. It stores no source or
+timestamp, does not suppress findings, and becomes stale after the commit
+because HEAD changes. A missing, malformed, or stale requested receipt fails
+closed.
