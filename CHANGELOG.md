@@ -7,6 +7,13 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added a redistributable ten-case labeled calibration corpus spanning code,
+  shell, generic SQL, and PostgreSQL, with deterministic precision-at-k,
+  actionability, score-distribution, fragment-size, and ranking-movement
+  reporting against a pinned v0.22.0 reference.
+
 ## [0.23.0] - 2026-08-10
 
 ### Added

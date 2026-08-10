@@ -78,6 +78,12 @@ For each broadening rule, include:
 - a nearby negative fixture that should remain below the chosen threshold; and
 - a note in `docs/scoring.md` if the public scoring contract changes.
 
+Add redistributable reviewed cases to `corpus/manifest.json` when the language
+participates in cross-language calibration. Record the language pair, fragment
+sizes, classification, threshold, expected score range and rank, and a pinned
+reference when measuring ranking movement. Corpus evidence remains scoped to
+its labeled cases and does not establish a universal threshold.
+
 Do not map user-defined APIs to semantic families without a strong,
 language-independent reason. Never preserve raw identifier or literal text just
 to make one fixture pass.

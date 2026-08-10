@@ -497,6 +497,18 @@ Run Mori's explicit production-code self-review profile with:
 make dogfood
 ```
 
+Run the redistributable labeled calibration corpus with:
+
+```sh
+make corpus
+go run ./internal/cmd/corpuseval
+```
+
+The corpus records reviewed positives, intentional structural similarity, and
+false positives across code, shell, generic SQL, and PostgreSQL. Its metrics
+are regression evidence for the included cases, not a universal precision or
+threshold claim. See [corpus/README.md](corpus/README.md).
+
 The config in `configs/self-review.mori.json` is not auto-discovered. It records
 the `review` profile plus explicit release-stable values and repository-specific
 exclusions, so normal development and cross-language example commands keep
