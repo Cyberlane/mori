@@ -201,6 +201,9 @@ func RelativeIndexPath(snapshot IndexSnapshot, path string) (string, error) {
 		return "", err
 	}
 	clean := filepath.Clean(absolute)
+	if canonical, canonicalErr := filepath.EvalSymlinks(clean); canonicalErr == nil {
+		clean = canonical
+	}
 	relative, err := filepath.Rel(snapshot.Root, clean)
 	if err != nil {
 		return "", err

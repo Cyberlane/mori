@@ -216,6 +216,23 @@ func TestRelativeIndexPathAcceptsDescendantsAndRejectsOutside(t *testing.T) {
 	}
 }
 
+func TestRelativeIndexPathCanonicalizesExistingPath(t *testing.T) {
+	root := t.TempDir()
+	linked := filepath.Join(t.TempDir(), "linked")
+	if err := os.Symlink(root, linked); err != nil {
+		t.Skipf("Symlink unavailable: %v", err)
+	}
+	canonicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatalf("EvalSymlinks(root): %v", err)
+	}
+	snapshot := IndexSnapshot{Root: canonicalRoot}
+	relative, err := RelativeIndexPath(snapshot, linked)
+	if err != nil || relative != "." {
+		t.Fatalf("RelativeIndexPath(link) = %q, %v", relative, err)
+	}
+}
+
 func initRepository(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
