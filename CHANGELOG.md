@@ -17,7 +17,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   policies before returning success or modifying a baseline.
 - Added deterministic coverage-summary totals, aggregate unsupported-extension
   counts, pre-token-floor boundary counts, and machine-readable reasons for
-  every zero-fragment supported file.
+  every zero-fragment supported file. Linked-worktree `.git` control files are
+  treated as VCS metadata rather than unsupported source.
 
 ### Changed
 

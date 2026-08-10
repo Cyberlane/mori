@@ -37,6 +37,19 @@ func TestDiscoverSupportedFilesAndDefaultExcludes(t *testing.T) {
 	}
 }
 
+func TestDiscoverSkipsLinkedWorktreeGitControlFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFixture(t, filepath.Join(root, ".git"), "gitdir: /tmp/example\n")
+	writeFixture(t, filepath.Join(root, "README.md"), "# docs\n")
+	result := Discover([]string{root}, Options{})
+	if len(result.Files) != 0 || len(result.Warnings) != 0 ||
+		len(result.Unsupported) != 1 || result.Unsupported[0].Extension != ".md" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
 func TestDiscoverExtensionlessScriptsByShebang(t *testing.T) {
 	t.Parallel()
 

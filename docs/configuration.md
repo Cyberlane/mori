@@ -178,7 +178,8 @@ Directory scans honor `.gitignore` and `.moriignore` files from the working
 directory through nested scan directories. Rules are evaluated in order;
 `.moriignore` is read after `.gitignore` in the same directory, so it can add
 or negate repository rules. Common VCS, dependency, and build directories are
-still excluded by Mori's built-in policy.
+still excluded by Mori's built-in policy. A linked worktree's `.git` control
+file is VCS metadata and is not included in unsupported-extension counts.
 
 Ignore files support the Git-style rules Mori needs for repository discovery:
 comments, negation, directory suffixes, anchoring, and `*`, `?`, and `**`
