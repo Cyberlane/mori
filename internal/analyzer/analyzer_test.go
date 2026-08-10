@@ -227,6 +227,131 @@ end
 	}
 }
 
+func TestAnalyzeKotlinRubyDartAndPowerShellPositiveAndNearbyNegative(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		leftName  string
+		left      string
+		rightName string
+		right     string
+		negative  string
+		pair      LanguagePair
+		threshold float64
+		minimum   float64
+		maximum   float64
+	}{
+		{
+			name: "Kotlin and Java", leftName: "Clamp.kt", rightName: "Clamp.java",
+			left: `fun clamp(value: Int, minimum: Int, maximum: Int): Int {
+    if (value < minimum) return minimum
+    if (value > maximum) return maximum
+    return value
+}
+`,
+			right: `class Clamp { static int apply(int value, int minimum, int maximum) {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+} }
+`, negative: `class Sum { static int apply(int[] values) {
+  int total = 0;
+  for (int value : values) total += value;
+  return total;
+} }
+`, pair: LanguagePair{Left: "kotlin", Right: "java"}, threshold: 0.70, minimum: 0.71, maximum: 0.72,
+		},
+		{
+			name: "Ruby and Python", leftName: "clamp.rb", rightName: "clamp.py",
+			left: `def clamp(value, minimum, maximum)
+  if value < minimum
+    return minimum
+  end
+  if value > maximum
+    return maximum
+  end
+  return value
+end
+`,
+			right: `def clamp(value, minimum, maximum):
+    if value < minimum:
+        return minimum
+    if value > maximum:
+        return maximum
+    return value
+`, negative: `def total(values):
+    result = 0
+    for value in values:
+        result += value
+    return result
+`, pair: LanguagePair{Left: "ruby", Right: "python"}, threshold: 0.45, minimum: 0.47, maximum: 0.49,
+		},
+		{
+			name: "Dart and TypeScript", leftName: "clamp.dart", rightName: "clamp.ts",
+			left: `int clamp(int value, int minimum, int maximum) {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+}
+`,
+			right: `function clamp(value: number, minimum: number, maximum: number): number {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+}
+`, negative: `function total(values: number[]): number {
+  let result = 0;
+  for (const value of values) result += value;
+  return result;
+}
+`, pair: LanguagePair{Left: "dart", Right: "typescript"}, threshold: 0.55, minimum: 0.59, maximum: 0.61,
+		},
+		{
+			name: "PowerShell and C sharp", leftName: "clamp.ps1", rightName: "Clamp.cs",
+			left: `function Get-ClampedValue {
+  param([int]$Value, [int]$Minimum, [int]$Maximum)
+  if ($Value -lt $Minimum) { return $Minimum }
+  if ($Value -gt $Maximum) { return $Maximum }
+  return $Value
+}
+`,
+			right: `class Clamp { static int Apply(int value, int minimum, int maximum) {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+} }
+`, negative: `class Sum { static int Apply(int[] values) {
+  int result = 0;
+  foreach (int value in values) result += value;
+  return result;
+} }
+`, pair: LanguagePair{Left: "powershell", Right: "csharp"}, threshold: 0.50, minimum: 0.53, maximum: 0.55,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			writeAnalyzerFixture(t, root, test.leftName, test.left)
+			writeAnalyzerFixture(t, root, test.rightName, test.right)
+			options := Options{Threshold: test.threshold, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{test.pair}}
+			result := analyzeTwoFileFixture(t, root, options)
+			if len(result.Groups) != 1 || result.Groups[0].Similarity < test.minimum || result.Groups[0].Similarity > test.maximum {
+				t.Fatalf("positive result = %#v", result)
+			}
+
+			negativeRoot := t.TempDir()
+			writeAnalyzerFixture(t, negativeRoot, test.leftName, test.left)
+			writeAnalyzerFixture(t, negativeRoot, test.rightName, test.negative)
+			negative := analyzeTwoFileFixture(t, negativeRoot, options)
+			if negative.TotalMatchGroups != 0 || len(negative.Groups) != 0 {
+				t.Fatalf("nearby-negative result = %#v", negative)
+			}
+		})
+	}
+}
+
 func analyzePHPHackFixture(t *testing.T, root string, threshold float64) model.Report {
 	t.Helper()
 	return analyzeTwoFileFixture(t, root, Options{

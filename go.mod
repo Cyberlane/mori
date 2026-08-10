@@ -23,8 +23,12 @@ require (
 )
 
 require (
+	github.com/UserNobody14/tree-sitter-dart v0.0.0-20260707040301-be07cf7118d3
+	github.com/tree-sitter-grammars/tree-sitter-kotlin v1.1.0
 	github.com/tree-sitter-grammars/tree-sitter-lua v0.5.0
 	github.com/tree-sitter-grammars/tree-sitter-luau v1.2.0
+	github.com/tree-sitter/tree-sitter-ruby v0.23.1
+	github.com/wharflab/tree-sitter-powershell v0.38.1
 )
 
 require github.com/mattn/go-pointer v0.0.1 // indirect

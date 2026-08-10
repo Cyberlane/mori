@@ -9,15 +9,19 @@ binary.
 | C | c-cpp | code | `.c`, `.h` | — |
 | C++ | c-cpp | code | `.cc`, `.cpp`, `.cxx`, `.hh`, `.hpp`, `.hxx` | — |
 | C# | csharp | code | `.cs` | — |
+| Dart | dart | code | `.dart` | — |
 | Go | go | code | `.go` | — |
 | GDScript | gdscript | code | `.gd` | — |
 | Hack | php-hack | code | `.hack`, legacy marked `.php` | — |
 | Java | java | code | `.java` | — |
 | JavaScript / JSX | javascript | code | `.js`, `.jsx`, `.mjs`, `.cjs` | `node`, `nodejs` |
+| Kotlin | kotlin | code | `.kt`, `.kts` | `kotlin` |
 | Lua | lua-luau | code | `.lua` | `lua`, `lua5.1`–`lua5.4`, `luajit` |
 | Luau | lua-luau | code | `.luau` | — |
 | PHP | php-hack | code | `.php`, `.phtml` | — |
+| PowerShell | powershell | code | `.ps1`, `.psd1`, `.psm1` | `powershell`, `pwsh` |
 | Python | python | code | `.py`, `.pyi` | `python`, `python3` |
+| Ruby | ruby | code | `.rb`, `.rake`, `.gemspec` | `ruby` |
 | Rust | rust | code | `.rs` | — |
 | Swift | swift | code | `.swift` | — |
 | TypeScript / TSX | typescript | code | `.ts`, `.mts`, `.cts`, `.tsx` | — |
@@ -53,6 +57,14 @@ kinds or comparison domains.
 - GDScript: function definitions and lambdas. C# files in Godot projects are
   handled by the existing C# grammar; Mori does not parse Godot scenes or
   resources as code.
+- Kotlin: function declarations, anonymous functions, and lambdas.
+- Ruby: instance methods, singleton methods, and lambdas.
+- Dart: named function bodies, local functions, and anonymous function
+  expressions. The grammar exposes a named function's signature beside its
+  body, so the body is scored and named from that adjacent signature; parameter
+  declarations are not part of that fragment's fingerprint.
+- PowerShell: functions and class methods. Script blocks passed as ordinary
+  command arguments are not independent units.
 - C#: implemented methods, constructors, destructors, operators, accessors,
   local functions, anonymous methods, and lambdas.
 - Swift: implemented functions, initializers, deinitializers, and closures.

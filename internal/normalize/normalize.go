@@ -461,6 +461,8 @@ func canonicalNamed(node *tree_sitter.Node, source []byte) string {
 	// source structure that Mori intends to compare.
 	if kind == "statement_list" || kind == "expression_list" || kind == "value_argument" ||
 		kind == "argument" || kind == "parenthesized_expression" ||
+		kind == "script_block_body" || kind == "pipeline" || kind == "pipeline_chain" ||
+		kind == "attribute_list" || kind == "attribute" || kind == "type_literal" || kind == "type_spec" ||
 		kind == "stmt" || kind == "select_no_parens" || kind == "simple_select" ||
 		kind == "a_expr" || kind == "a_expr_prec" || kind == "c_expr" ||
 		kind == "ColId" || kind == "ColLabel" || kind == "attr_name" ||
@@ -477,6 +479,12 @@ func canonicalNamed(node *tree_sitter.Node, source []byte) string {
 	}
 	if kind == "control_transfer_statement" {
 		return swiftControlTransferKind(node.Utf8Text(source))
+	}
+	if kind == "flow_control_statement" {
+		return shellControlTransferKind(node.Utf8Text(source))
+	}
+	if kind == "unary_expression" && node.ChildCount() == 1 {
+		return ""
 	}
 	if kind == "binary_expression" && directAssignmentOperator(node) {
 		return "expression:assignment"
@@ -533,6 +541,10 @@ var canonicalKinds = map[string]string{
 	"lambda_expression":               "function",
 	"lambda":                          "function",
 	"local_function_statement":        "function",
+	"function_statement":              "function",
+	"local_function_declaration":      "function",
+	"method":                          "function",
+	"singleton_method":                "function",
 	"operator_declaration":            "function",
 
 	// SQL query boundaries and structure.
@@ -634,37 +646,41 @@ var canonicalKinds = map[string]string{
 	"kw_null":           "literal:null",
 
 	// Parameters, blocks, and bindings.
-	"block":                        "block",
-	"body":                         "block",
-	"compound_statement":           "block",
-	"constructor_body":             "block",
-	"formal_parameters":            "parameters",
-	"formal_parameter":             "parameter",
-	"simple_parameter":             "parameter",
-	"variadic_parameter":           "parameter",
-	"property_promotion_parameter": "parameter",
-	"parameter":                    "parameter",
-	"parameter_declaration":        "parameter",
-	"parameter_list":               "parameters",
-	"parameters":                   "parameters",
-	"required_parameter":           "parameter",
-	"optional_parameter":           "parameter",
-	"typed_parameter":              "parameter",
-	"default_parameter":            "parameter:default",
-	"assignment_pattern":           "parameter:default",
-	"statement_block":              "block",
-	"function_body":                "block",
-	"let_declaration":              "binding",
-	"lexical_declaration":          "binding",
-	"short_var_declaration":        "binding",
-	"variable_declaration":         "binding",
-	"variable_declarator":          "binding",
-	"local_declaration_statement":  "binding",
-	"local_variable_declaration":   "binding",
-	"property_declaration":         "binding",
-	"property_declarator":          "binding",
-	"function_static_declaration":  "binding",
-	"static_variable_declaration":  "binding",
+	"block":                          "block",
+	"body":                           "block",
+	"compound_statement":             "block",
+	"constructor_body":               "block",
+	"formal_parameters":              "parameters",
+	"formal_parameter":               "parameter",
+	"simple_parameter":               "parameter",
+	"variadic_parameter":             "parameter",
+	"property_promotion_parameter":   "parameter",
+	"parameter":                      "parameter",
+	"parameter_declaration":          "parameter",
+	"parameter_list":                 "parameters",
+	"parameters":                     "parameters",
+	"method_parameters":              "parameters",
+	"function_parameter_declaration": "parameters",
+	"required_parameter":             "parameter",
+	"optional_parameter":             "parameter",
+	"typed_parameter":                "parameter",
+	"default_parameter":              "parameter:default",
+	"assignment_pattern":             "parameter:default",
+	"statement_block":                "block",
+	"body_statement":                 "block",
+	"script_block":                   "block",
+	"function_body":                  "block",
+	"let_declaration":                "binding",
+	"lexical_declaration":            "binding",
+	"short_var_declaration":          "binding",
+	"variable_declaration":           "binding",
+	"variable_declarator":            "binding",
+	"local_declaration_statement":    "binding",
+	"local_variable_declaration":     "binding",
+	"property_declaration":           "binding",
+	"property_declarator":            "binding",
+	"function_static_declaration":    "binding",
+	"static_variable_declaration":    "binding",
 
 	// Shell grammars use different node names for the same variable expansion
 	// and word shapes. These aliases retain the surrounding command structure
@@ -695,11 +711,13 @@ var canonicalKinds = map[string]string{
 	"enhanced_for_statement": "flow:loop",
 	"foreach_statement":      "flow:loop",
 	"if_expression":          "flow:if",
+	"if":                     "flow:if",
 	"if_statement":           "flow:if",
 	"match_arm":              "flow:case",
 	"match_block":            "flow:switch",
 	"match_expression":       "flow:switch",
 	"return_expression":      "flow:return",
+	"return":                 "flow:return",
 	"return_statement":       "flow:return",
 	"switch_case":            "flow:case",
 	"switch_default":         "flow:case",
@@ -745,6 +763,7 @@ var canonicalKinds = map[string]string{
 	"comparison_operator":               "expression:comparison",
 	"additive_expression":               "expression:binary",
 	"comparison_expression":             "expression:binary",
+	"binary":                            "expression:binary",
 	"equality_expression":               "expression:binary",
 	"infix_expression":                  "expression:binary",
 	"multiplicative_expression":         "expression:binary",
@@ -760,6 +779,7 @@ var canonicalKinds = map[string]string{
 	"map":                               "collection",
 	"member_expression":                 "expression:member",
 	"member_access_expression":          "expression:member",
+	"member_access":                     "expression:member",
 	"nullsafe_member_access_expression": "expression:member",
 	"scoped_property_access_expression": "expression:member",
 	"scoped_identifier":                 "expression:member",
@@ -771,6 +791,8 @@ var canonicalKinds = map[string]string{
 	"object":                            "collection",
 	"parenthesized_expression":          "expression:group",
 	"selector_expression":               "expression:member",
+	"relational_expression":             "expression:binary",
+	"relational_operator":               "",
 	"slice_expression":                  "expression:slice",
 	"subscript":                         "expression:index",
 	"subscript_expression":              "expression:index",
@@ -786,8 +808,11 @@ var canonicalKinds = map[string]string{
 
 	// Names are deliberately anonymous.
 	"field_identifier":              "symbol",
+	"function_name":                 "symbol",
 	"identifier":                    "symbol",
 	"simple_identifier":             "symbol",
+	"simple_name":                   "symbol",
+	"script_parameter":              "parameter",
 	"property_identifier":           "symbol",
 	"self":                          "symbol:self",
 	"shorthand_property_identifier": "symbol",
@@ -1070,6 +1095,25 @@ func swiftControlTransferKind(value string) string {
 		return "flow:continue"
 	case "fallthrough":
 		return "flow:fallthrough"
+	case "return":
+		return "flow:return"
+	case "throw":
+		return "flow:throw"
+	default:
+		return "statement:control-transfer"
+	}
+}
+
+func shellControlTransferKind(value string) string {
+	fields := strings.Fields(strings.ToLower(value))
+	if len(fields) == 0 {
+		return "statement:control-transfer"
+	}
+	switch fields[0] {
+	case "break":
+		return "flow:break"
+	case "continue":
+		return "flow:continue"
 	case "return":
 		return "flow:return"
 	case "throw":

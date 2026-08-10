@@ -96,8 +96,8 @@ one reported identity. Text output uses restrained color on terminals; set
 Mori currently supports:
 
 - Bash/POSIX shell and Zsh;
-- C, C++, C#, GDScript, Go, Hack, Java, JavaScript/JSX, Lua, Luau, PHP, Python, Rust, Swift,
-  TypeScript/TSX;
+- C, C++, C#, Dart, GDScript, Go, Hack, Java, JavaScript/JSX, Kotlin, Lua,
+  Luau, PHP, PowerShell, Python, Ruby, Rust, Swift, TypeScript/TSX;
 - generic SQL queries and explicitly selected PostgreSQL queries.
 
 Run `mori languages` for the exact extensions, families, fragment kinds, and

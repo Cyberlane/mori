@@ -446,6 +446,26 @@ func fragmentName(node *tree_sitter.Node, content []byte, fragmentKind string) s
 	if node.Kind() == "deinit_declaration" {
 		return "deinit"
 	}
+	if node.Kind() == "function_body" {
+		previous := node.PrevNamedSibling()
+		if previous != nil && previous.Kind() == "function_signature" {
+			if name := previous.ChildByFieldName("name"); name != nil {
+				if value := cleanName(name.Utf8Text(content)); value != "" {
+					return value
+				}
+			}
+		}
+	}
+	if node.Kind() == "function_statement" {
+		for index := uint(0); index < node.NamedChildCount(); index++ {
+			child := node.NamedChild(index)
+			if child != nil && child.Kind() == "function_name" {
+				if value := cleanName(child.Utf8Text(content)); value != "" {
+					return value
+				}
+			}
+		}
+	}
 	if name := node.ChildByFieldName("name"); name != nil {
 		if value := cleanName(name.Utf8Text(content)); value != "" {
 			return value

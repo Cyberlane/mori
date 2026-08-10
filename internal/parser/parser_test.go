@@ -193,6 +193,55 @@ var transform = func(item: int) -> int:
 	}
 }
 
+func TestKotlinRubyDartAndPowerShellExtractFunctionBoundaries(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		content string
+		names   []string
+	}{
+		"sample.kt": {content: `fun validate(value: String): Boolean {
+    return value.isNotEmpty()
+}
+`, names: []string{"validate"}},
+		"sample.rb": {content: `def validate(value)
+  !value.empty?
+end
+`, names: []string{"validate"}},
+		"sample.dart": {content: `bool validate(String value) {
+  return value.isNotEmpty;
+}
+`, names: []string{"validate"}},
+		"sample.ps1": {content: `function Test-Value {
+  param([string]$Value)
+  return $Value.Length -gt 0
+}
+`, names: []string{"Test-Value"}},
+	}
+	for name, test := range tests {
+		name, test := name, test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), name)
+			if err := os.WriteFile(path, []byte(test.content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			spec, ok := language.Detect(path)
+			if !ok {
+				t.Fatalf("%s was not detected", name)
+			}
+			fragments, warnings := File(context.Background(), source.File{Path: path, DisplayPath: name, Language: spec}, 1)
+			if len(warnings) != 0 || len(fragments) != len(test.names) {
+				t.Fatalf("fragments/warnings = %#v/%#v", fragments, warnings)
+			}
+			for index, expected := range test.names {
+				if fragments[index].Location.Name != expected {
+					t.Errorf("name[%d] = %q, want %q", index, fragments[index].Location.Name, expected)
+				}
+			}
+		})
+	}
+}
+
 func TestShellTopLevelBodyIsIndependentFromFunctions(t *testing.T) {
 	t.Parallel()
 
