@@ -1792,7 +1792,7 @@ func Second(flag bool) { logEvent(); if flag { storeRecord() } }
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("decode report: %v", err)
 	}
-	if result.SchemaVersion != 17 || result.Configuration.StdinPath == "" ||
+	if result.SchemaVersion != model.SchemaVersion || result.Configuration.StdinPath == "" ||
 		result.Configuration.Focus == nil || result.Configuration.Focus.DiscoveredFocusFiles != 1 ||
 		len(result.Groups) != 1 || !result.Groups[0].Focused {
 		t.Fatalf("overlay report = %#v", result)
@@ -1861,4 +1861,128 @@ func TestRunScanRejectsMissingOrBaselinedStdinPath(t *testing.T) {
 			t.Fatalf("RunWithInput(%v) exit = %d, stderr = %q", test.args, code, stderr.String())
 		}
 	}
+}
+
+func TestRunScanUsesNamedProjectScopeRootsAndOverrides(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for _, directory := range []string{"backend", "frontend"} {
+		if err := os.MkdirAll(filepath.Join(root, directory), 0o700); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		content := fmt.Sprintf("package sample\nfunc %sA(v int) int { return v + 1 }\nfunc %sB(x int) int { return x + 1 }\n", directory, directory)
+		if err := os.WriteFile(filepath.Join(root, directory, "sample.go"), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+	configPath := filepath.Join(root, ".mori.json")
+	if err := os.WriteFile(configPath, []byte(`{
+  "threshold": 0.7,
+  "scopes": {"backend": {"roots": ["backend"], "threshold": 1, "min_tokens": 1, "same_language_only": true}}
+}`), 0o600); err != nil {
+		t.Fatalf("WriteFile config: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--config", configPath, "--scope", "backend", "--format", "json",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	if result.Configuration.Scope != "backend" || !reflect.DeepEqual(result.Configuration.ScopeRoots, []string{"backend"}) ||
+		result.Files != 1 || len(result.Groups) != 1 || result.Threshold != 1 {
+		t.Fatalf("scope report = %#v", result)
+	}
+}
+
+func TestRunScanStagedUsesIndexSourcesConfigAndIgnoreRules(t *testing.T) {
+	root := t.TempDir()
+	cliTestGit(t, root, "init", "--initial-branch=main")
+	cliTestGit(t, root, "config", "user.name", "Mori Test")
+	cliTestGit(t, root, "config", "user.email", "mori@example.invalid")
+	write := func(name, content string) {
+		t.Helper()
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+	write(".mori.json", `{"threshold":1,"min_tokens":1,"same_language_only":true}`)
+	write(".gitignore", "ignored.go\n")
+	write("README.md", "base\n")
+	write("sample.go", "package sample\nfunc Base() int { return 0 }\n")
+	write("ignored.go", "package sample\nfunc IgnoredA() int { return 1 }; func IgnoredB() int { return 1 }\n")
+	cliTestGit(t, root, "add", ".mori.json", ".gitignore", "README.md", "sample.go")
+	cliTestGit(t, root, "add", "-f", "ignored.go")
+	cliTestGit(t, root, "commit", "-m", "base")
+
+	write("sample.go", "package sample\nfunc StagedA(v int) int { return v + 1 }\nfunc StagedB(x int) int { return x + 1 }\n")
+	cliTestGit(t, root, "add", "sample.go")
+	write("sample.go", "package sample\nfunc Working() int { return 99 }\n")
+	write("README.md", "staged documentation\n")
+	cliTestGit(t, root, "add", "README.md")
+	write("ignored.go", "package sample\nfunc IgnoredA(v int) int { return v + 2 }\nfunc IgnoredB(x int) int { return x + 2 }\n")
+	cliTestGit(t, root, "add", "-f", "ignored.go")
+	write(".mori.json", `{"threshold":0.99,"min_tokens":999}`)
+	write(".gitignore", "")
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{"scan", "--staged", "--format", "json", "--require-focused-coverage"}, &stdout, &stderr)
+	if code != exitCoverage {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	if result.Configuration.Input == nil || result.Configuration.Input.Mode != "git-index" ||
+		result.Configuration.Input.WorkingTreeIncluded || result.Configuration.Input.UntrackedIncluded ||
+		result.Configuration.Input.IndexDigest == "" || result.Configuration.Focus == nil ||
+		result.Configuration.Focus.Mode != "git-index" || len(result.Groups) != 1 ||
+		result.Configuration.Focus.CoveredFocusFiles != 1 || result.Configuration.Focus.RequiredFocusFiles != 2 ||
+		result.Groups[0].Profiles[0].Occurrences[0].Location.Name == "Working" {
+		t.Fatalf("staged report = %#v", result)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"scan", "--staged", "--format", "json", "--include-focused", "--require-focused-coverage",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("included exit = %d, stderr = %q", code, stderr.String())
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode included report: %v", err)
+	}
+	if result.Configuration.Focus.CoveredFocusFiles != 2 || result.Configuration.Focus.RequiredFocusFiles != 2 {
+		t.Fatalf("included focus = %#v", result.Configuration.Focus)
+	}
+}
+
+func cliTestGit(t *testing.T, root string, args ...string) string {
+	t.Helper()
+	command := exec.Command("git", append([]string{"-C", root}, args...)...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, output)
+	}
+	return string(output)
 }

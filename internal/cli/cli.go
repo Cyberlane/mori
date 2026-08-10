@@ -36,6 +36,7 @@ const (
 	exitUsage            = 2
 	exitFindings         = 3
 	exitCoverage         = 4
+	exitUpgrade          = 5
 	maxChangedWorktrees  = 64
 	maxFocusedGitPaths   = 100_000
 	maxStdinOverlayBytes = 16 * 1024 * 1024
@@ -77,6 +78,11 @@ func RunWithInput(
 		return runInspect(ctx, args[1:], stdout, stderr)
 	case "doctor":
 		return runDoctor(ctx, args[1:], stdout, stderr)
+	case "project":
+		if len(args) >= 2 && args[1] == "upgrade" {
+			return runProjectUpgrade(ctx, args[2:], stdout, stderr)
+		}
+		return usageError(stderr, "project requires the upgrade subcommand")
 	case "lsp":
 		return runLSP(ctx, args[1:], stdin, stdout, stderr)
 	case "init":
@@ -107,6 +113,9 @@ func RunWithInput(
 
 type scanOptions struct {
 	profile            string
+	scope              string
+	scopeRoots         []string
+	scopeRootLabels    []string
 	excludes           stringList
 	languagePairs      stringList
 	comparisonDomain   string
@@ -134,6 +143,8 @@ type scanOptions struct {
 	crossLanguageOnly  bool
 	failOnMatch        bool
 	failOnFocusedMatch bool
+	includeFocused     bool
+	requireFocus       bool
 	requireCoverage    bool
 	minFileCoverage    float64
 	maxZeroFiles       int
@@ -158,6 +169,8 @@ type scanOptions struct {
 	allowedWarnings    stringList
 	stdinPath          string
 	stdinContent       []byte
+	staged             bool
+	stagedSnapshot     *vcs.IndexSnapshot
 }
 
 func defaultScanOptions() scanOptions {
@@ -183,6 +196,7 @@ func defaultScanOptions() scanOptions {
 
 func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string) {
 	flags.StringVar(&options.profile, "profile", options.profile, "scan profile: review, explore, or sql")
+	flags.StringVar(&options.scope, "scope", options.scope, "named project scope from .mori.json")
 	flags.Float64Var(&options.threshold, "threshold", options.threshold, "minimum weighted Jaccard score, from 0 to 1")
 	flags.IntVar(&options.minTokens, "min-tokens", options.minTokens, "minimum normalized AST tokens per fragment")
 	flags.IntVar(&options.maxGroups, "max-groups", options.maxGroups, "maximum reported content-pair groups; 0 is unlimited")
@@ -191,7 +205,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 	flags.IntVar(&options.maxPairs, "max-pairs", options.maxPairs, "comparison safety limit; 0 is unlimited")
 	flags.Int64Var(&options.maxFileBytes, "max-file-bytes", options.maxFileBytes, "maximum source file size; 0 is unlimited")
 	flags.IntVar(&options.workers, "workers", options.workers, "parallel parser workers")
-	flags.StringVar(&options.format, "format", options.format, "output format: text, json, sarif, or html")
+	flags.StringVar(&options.format, "format", options.format, "output format: text, compact, json, sarif, or html")
 	flags.StringVar(&options.color, "color", options.color, "terminal color: auto, always, or never")
 	flags.BoolVar(&options.redactPaths, "redact-paths", options.redactPaths, "replace source and configuration paths with stable placeholders in output")
 	if baselineAction == "" {
@@ -201,6 +215,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 			options.stdinPath,
 			"analyze bounded stdin as the unsaved content of one discovered source path",
 		)
+		flags.BoolVar(&options.staged, "staged", options.staged, "analyze the immutable Git index instead of working-tree files")
 	}
 	flags.StringVar(
 		&options.comparisonDomain,
@@ -290,6 +305,10 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 		options.failOnFocusedMatch,
 		"exit with status 3 when one or more focused match groups are found",
 	)
+	if baselineAction == "" {
+		flags.BoolVar(&options.includeFocused, "include-focused", options.includeFocused, "include focused files that ordinary ignore rules would omit")
+		flags.BoolVar(&options.requireFocus, "require-focused-coverage", options.requireFocus, "exit with status 4 unless every supported non-deleted focused file is analyzed")
+	}
 	flags.BoolVar(
 		&options.requireCoverage,
 		"require-coverage",
@@ -399,6 +418,9 @@ func parseScanOptions(
 	})
 	options.noteSet = visited["note"]
 	options.classificationSet = visited["classification"]
+	if !options.staged {
+		options.stagedSnapshot = nil
+	}
 	reconcileCLISelection(&options, visited)
 	options.respectIgnore = !options.noIgnore
 	if err := validateScanOptions(options); err != nil {
@@ -413,13 +435,33 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 		return scanOptions{}, err
 	}
 	options := defaultScanOptions()
+	staged, err := findStagedRequest(args)
+	if err != nil {
+		return scanOptions{}, err
+	}
+	if staged {
+		snapshot, err := vcs.ResolveIndex(context.Background(), ".")
+		if err != nil {
+			return scanOptions{}, fmt.Errorf("resolve --staged input: %w", err)
+		}
+		options.staged = true
+		options.stagedSnapshot = &snapshot
+	}
 	options.noConfig = request.disabled
 	options.requestedConfig = request.path
 	requestedProfile, err := findProfileRequest(args)
 	if err != nil {
 		return scanOptions{}, err
 	}
+	requestedScope, err := findScopeRequest(args)
+	if err != nil {
+		return scanOptions{}, err
+	}
+	options.scope = requestedScope
 	if request.disabled {
+		if requestedScope != "" {
+			return scanOptions{}, errors.New("--scope requires project configuration")
+		}
 		if requestedProfile != "" {
 			if err := applyScanProfile(&options, requestedProfile); err != nil {
 				return scanOptions{}, err
@@ -429,6 +471,47 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 	}
 
 	path := request.path
+	if options.stagedSnapshot != nil {
+		settings, stagedPath, found, err := loadStagedConfig(context.Background(), *options.stagedSnapshot, path)
+		if err != nil {
+			return scanOptions{}, err
+		}
+		if !found {
+			if requestedScope != "" {
+				return scanOptions{}, fmt.Errorf("scope %q requires project configuration", requestedScope)
+			}
+			if requestedProfile != "" {
+				if err := applyScanProfile(&options, requestedProfile); err != nil {
+					return scanOptions{}, err
+				}
+			}
+			return options, nil
+		}
+		selectedProfile := settings.Profile
+		selectedScope, err := selectConfigScope(settings, requestedScope)
+		if err != nil {
+			return scanOptions{}, err
+		}
+		if selectedScope != nil && selectedScope.Profile != "" {
+			selectedProfile = selectedScope.Profile
+		}
+		if requestedProfile != "" {
+			selectedProfile = requestedProfile
+		}
+		if selectedProfile != "" {
+			if err := applyScanProfile(&options, selectedProfile); err != nil {
+				return scanOptions{}, err
+			}
+		}
+		applyConfig(&options, settings, filepath.Dir(stagedPath))
+		if selectedScope != nil {
+			if err := applyConfigScope(&options, *selectedScope, filepath.Dir(stagedPath)); err != nil {
+				return scanOptions{}, err
+			}
+		}
+		options.configPath = displayCLIPath(stagedPath)
+		return options, nil
+	}
 	if path == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -439,6 +522,9 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 			return scanOptions{}, err
 		}
 		if !found {
+			if requestedScope != "" {
+				return scanOptions{}, fmt.Errorf("scope %q requires project configuration", requestedScope)
+			}
 			if requestedProfile != "" {
 				if err := applyScanProfile(&options, requestedProfile); err != nil {
 					return scanOptions{}, err
@@ -453,6 +539,13 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 		return scanOptions{}, err
 	}
 	selectedProfile := settings.Profile
+	selectedScope, err := selectConfigScope(settings, requestedScope)
+	if err != nil {
+		return scanOptions{}, err
+	}
+	if selectedScope != nil && selectedScope.Profile != "" {
+		selectedProfile = selectedScope.Profile
+	}
 	if requestedProfile != "" {
 		selectedProfile = requestedProfile
 	}
@@ -462,8 +555,90 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 		}
 	}
 	applyConfig(&options, settings, filepath.Dir(path))
+	if selectedScope != nil {
+		if err := applyConfigScope(&options, *selectedScope, filepath.Dir(path)); err != nil {
+			return scanOptions{}, err
+		}
+	}
 	options.configPath = displayCLIPath(path)
 	return options, nil
+}
+
+func findStagedRequest(args []string) (bool, error) {
+	staged := false
+	for _, argument := range args {
+		if argument == "--" {
+			break
+		}
+		switch {
+		case argument == "--staged":
+			staged = true
+		case strings.HasPrefix(argument, "--staged="):
+			value, err := strconv.ParseBool(strings.TrimPrefix(argument, "--staged="))
+			if err != nil {
+				return false, fmt.Errorf("invalid value for --staged: %w", err)
+			}
+			staged = value
+		}
+	}
+	return staged, nil
+}
+
+func loadStagedConfig(
+	ctx context.Context,
+	snapshot vcs.IndexSnapshot,
+	requested string,
+) (config.Settings, string, bool, error) {
+	var candidates []string
+	if requested != "" {
+		relative, err := vcs.RelativeIndexPath(snapshot, requested)
+		if err != nil {
+			return config.Settings{}, "", false, err
+		}
+		candidates = []string{relative}
+	} else {
+		current := filepath.FromSlash(snapshot.Prefix)
+		if current == "" {
+			current = "."
+		}
+		for {
+			candidate := config.FileName
+			if current != "." {
+				candidate = filepath.ToSlash(filepath.Join(current, config.FileName))
+			}
+			candidates = append(candidates, candidate)
+			if current == "." {
+				break
+			}
+			parent := filepath.Dir(current)
+			if parent == current || parent == "" {
+				parent = "."
+			}
+			current = parent
+		}
+	}
+	for _, candidate := range candidates {
+		entry, found := vcs.IndexEntryForPath(snapshot, candidate)
+		if !found {
+			continue
+		}
+		if entry.Mode != "100644" && entry.Mode != "100755" {
+			return config.Settings{}, "", false, errors.New("staged config is not a regular file")
+		}
+		content, _, err := vcs.ReadIndexBlob(ctx, snapshot, entry, 1024*1024)
+		if err != nil {
+			return config.Settings{}, "", false, err
+		}
+		settings, err := config.Decode(content)
+		if err != nil {
+			return config.Settings{}, "", false, err
+		}
+		return settings, filepath.Join(snapshot.Root, filepath.FromSlash(candidate)), true, nil
+	}
+	if requested != "" {
+		return config.Settings{}, "", false, fmt.Errorf("staged config %q is not present in the Git index", requested)
+	}
+	return config.Settings{}, "", false, nil
 }
 
 func findProfileRequest(args []string) (string, error) {
@@ -489,6 +664,65 @@ func findProfileRequest(args []string) (string, error) {
 		return "", err
 	}
 	return resolved.name, nil
+}
+
+func findScopeRequest(args []string) (string, error) {
+	var scope string
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		switch {
+		case argument == "--scope":
+			if index+1 >= len(args) {
+				return "", errors.New("--scope requires a value")
+			}
+			index++
+			scope = args[index]
+		case strings.HasPrefix(argument, "--scope="):
+			scope = strings.TrimPrefix(argument, "--scope=")
+		}
+	}
+	if strings.TrimSpace(scope) == "" && scope != "" {
+		return "", errors.New("--scope cannot be empty")
+	}
+	return scope, nil
+}
+
+func selectConfigScope(settings config.Settings, name string) (*config.ScopeSettings, error) {
+	if name == "" {
+		return nil, nil
+	}
+	scope, ok := settings.Scopes[name]
+	if !ok {
+		names := make([]string, 0, len(settings.Scopes))
+		for candidate := range settings.Scopes {
+			names = append(names, candidate)
+		}
+		sort.Strings(names)
+		return nil, fmt.Errorf("unknown scope %q; configured scopes: %s", name, strings.Join(names, ", "))
+	}
+	return &scope, nil
+}
+
+func applyConfigScope(options *scanOptions, scope config.ScopeSettings, base string) error {
+	if len(scope.Roots) == 0 {
+		return fmt.Errorf("scope %q must define at least one root", options.scope)
+	}
+	options.scopeRoots = make([]string, 0, len(scope.Roots))
+	options.scopeRootLabels = make([]string, 0, len(scope.Roots))
+	for _, root := range scope.Roots {
+		if root == "" || filepath.IsAbs(root) {
+			return fmt.Errorf("scope %q root %q must be a relative project path", options.scope, root)
+		}
+		clean := filepath.Clean(filepath.FromSlash(root))
+		if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("scope %q root %q escapes the project", options.scope, root)
+		}
+		options.scopeRoots = append(options.scopeRoots, filepath.Join(base, clean))
+		options.scopeRootLabels = append(options.scopeRootLabels, filepath.ToSlash(clean))
+	}
+	options.scopeRootLabels = compactSortedStrings(options.scopeRootLabels)
+	applyConfig(options, scope.Settings(), base)
+	return nil
 }
 
 type configRequest struct {
@@ -709,8 +943,8 @@ func validateScanOptions(options scanOptions) error {
 	if options.workers < 1 {
 		return errors.New("--workers must be at least 1")
 	}
-	if options.format != "text" && options.format != "json" && options.format != "sarif" && options.format != "html" {
-		return errors.New("--format must be text, json, sarif, or html")
+	if options.format != "text" && options.format != "compact" && options.format != "json" && options.format != "sarif" && options.format != "html" {
+		return errors.New("--format must be text, compact, json, sarif, or html")
 	}
 	if options.color != "auto" && options.color != "always" && options.color != "never" {
 		return errors.New("--color must be auto, always, or never")
@@ -720,6 +954,9 @@ func validateScanOptions(options scanOptions) error {
 	}
 	if options.stdinPath != "" && options.baselinePath != "" {
 		return errors.New("--stdin-path cannot be used with --baseline")
+	}
+	if options.staged && (options.stdinPath != "" || options.changedSince != "" || len(options.changedWorktrees) > 0) {
+		return errors.New("--staged cannot be combined with --stdin-path, --changed-since, or --changed-worktree")
 	}
 	if _, err := resolveSQLDialect(options.sqlDialect); err != nil {
 		return err
@@ -756,8 +993,12 @@ func validateScanOptions(options scanOptions) error {
 		return errors.New("--fail-on-match and --fail-on-focused-match cannot be used together")
 	}
 	if options.failOnFocusedMatch && len(options.focusPaths) == 0 && options.changedSince == "" &&
-		len(options.changedWorktrees) == 0 {
-		return errors.New("--fail-on-focused-match requires --focus-path, --changed-since, or --changed-worktree")
+		len(options.changedWorktrees) == 0 && !options.staged {
+		return errors.New("--fail-on-focused-match requires --focus-path, --changed-since, --changed-worktree, or --staged")
+	}
+	if (options.includeFocused || options.requireFocus) && len(options.focusPaths) == 0 &&
+		options.changedSince == "" && len(options.changedWorktrees) == 0 && !options.staged {
+		return errors.New("focused coverage options require --focus-path, --changed-since, --changed-worktree, or --staged")
 	}
 	if _, err := parseChangedWorktreeSpecs(options.changedWorktrees); err != nil {
 		return err
@@ -852,6 +1093,8 @@ func renderScanReport(stdout io.Writer, result model.Report, options scanOptions
 		redactReportPaths(&result)
 	}
 	switch options.format {
+	case "compact":
+		return report.Compact(stdout, result)
 	case "json":
 		return report.JSON(stdout, result)
 	case "sarif":
@@ -1482,6 +1725,19 @@ func enforceCoveragePolicies(
 		}
 		failures = append(failures, message)
 	}
+	if options.requireFocus {
+		focus := result.Configuration.Focus
+		if focus == nil || focus.CoveredFocusFiles < focus.RequiredFocusFiles {
+			covered, required := 0, 0
+			if focus != nil {
+				covered, required = focus.CoveredFocusFiles, focus.RequiredFocusFiles
+			}
+			failures = append(failures, fmt.Sprintf(
+				"focused file coverage %d/%d leaves %d supported non-deleted path(s) unanalyzed",
+				covered, required, required-covered,
+			))
+		}
+	}
 	if options.minFileCoverage > 0 {
 		actual := 0.0
 		if result.Coverage.AnalyzedFiles > 0 {
@@ -1567,6 +1823,8 @@ func baselineScanProfile(
 		})
 	}
 	return baseline.ScanProfile{
+		Scope:             options.scope,
+		ScopeRoots:        append([]string{}, options.scopeRootLabels...),
 		Threshold:         options.threshold,
 		MinTokens:         options.minTokens,
 		MaxPairs:          options.maxPairs,
@@ -1625,6 +1883,9 @@ func executeScan(
 	suppress func(string, model.Location, model.Location) bool,
 	initialWarnings []model.Warning,
 ) (model.Report, error) {
+	if len(paths) == 0 && len(options.scopeRoots) > 0 {
+		paths = append([]string{}, options.scopeRoots...)
+	}
 	domain, domainSet, err := resolveComparisonDomain(options.comparisonDomain)
 	if err != nil {
 		return model.Report{}, err
@@ -1641,7 +1902,7 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, err
 	}
-	discovered, err := source.DiscoverContext(ctx, paths, source.Options{
+	discoveryOptions := source.Options{
 		Excludes:          options.excludes,
 		MaxFileBytes:      options.maxFileBytes,
 		IgnoreFiles:       options.respectIgnore,
@@ -1649,7 +1910,25 @@ func executeScan(
 		SQLDialect:        sqlDialect,
 		EmbeddedSQL:       options.embeddedSQL,
 		ExcludeGenerated:  options.excludeGenerated,
-	})
+	}
+	var discovered source.Result
+	if options.stagedSnapshot != nil {
+		entries, err := stagedSourceEntries(ctx, *options.stagedSnapshot, options.maxFileBytes, sqlDialect)
+		if err != nil {
+			return model.Report{}, fmt.Errorf("read staged source: %w", err)
+		}
+		discoveryPaths := append([]string{}, paths...)
+		if options.includeFocused {
+			discoveryPaths = append(discoveryPaths, options.focusPaths...)
+			for _, path := range options.stagedSnapshot.ChangedPaths {
+				discoveryPaths = append(discoveryPaths, filepath.Join(options.stagedSnapshot.Root, filepath.FromSlash(path)))
+			}
+		}
+		base := filepath.Join(options.stagedSnapshot.Root, filepath.FromSlash(options.stagedSnapshot.Prefix))
+		discovered, err = source.DiscoverSnapshotAt(ctx, options.stagedSnapshot.Root, base, discoveryPaths, entries, discoveryOptions)
+	} else {
+		discovered, err = source.DiscoverContext(ctx, paths, discoveryOptions)
+	}
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
 	}
@@ -1688,14 +1967,36 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, err
 	}
-	changes, worktreeMode, err := resolveChangedWorktrees(
-		ctx,
-		discovered.Files,
-		options.changedSince,
-		options.changedWorktrees,
-	)
-	if err != nil {
-		return model.Report{}, fmt.Errorf("resolve changed files: %w", err)
+	var changes []vcs.Changes
+	worktreeMode := false
+	if options.stagedSnapshot != nil {
+		changes = []vcs.Changes{{
+			Root: options.stagedSnapshot.Root, HeadCommit: options.stagedSnapshot.HeadCommit,
+			ChangedPaths: append([]string{}, options.stagedSnapshot.ChangedPaths...),
+			DeletedPaths: append([]string{}, options.stagedSnapshot.DeletedPaths...),
+		}}
+	} else {
+		changes, worktreeMode, err = resolveChangedWorktrees(
+			ctx, discovered.Files, options.changedSince, options.changedWorktrees,
+		)
+		if err != nil {
+			return model.Report{}, fmt.Errorf("resolve changed files: %w", err)
+		}
+	}
+	if options.includeFocused && options.stagedSnapshot == nil {
+		focusPaths := append([]string{}, options.focusPaths...)
+		for _, change := range changes {
+			for _, path := range change.ChangedPaths {
+				focusPaths = append(focusPaths, filepath.Join(change.Root, filepath.FromSlash(path)))
+			}
+		}
+		if len(focusPaths) > 0 {
+			extra, extraErr := source.DiscoverContext(ctx, focusPaths, discoveryOptions)
+			if extraErr != nil {
+				return model.Report{}, fmt.Errorf("include focused source: %w", extraErr)
+			}
+			discovered = mergeDiscoveryResults(discovered, extra)
+		}
 	}
 	focus, focusSet, focusWarnings, err := resolveFocus(
 		options.focusPaths,
@@ -1705,6 +2006,24 @@ func executeScan(
 	)
 	if err != nil {
 		return model.Report{}, fmt.Errorf("resolve focus: %w", err)
+	}
+	if focus != nil && options.stagedSnapshot != nil {
+		focus.Mode = "git-index"
+		if len(options.focusPaths) > 0 {
+			focus.Mode = "git-index-and-explicit"
+		}
+		focus.IndexDigest = options.stagedSnapshot.IndexDigest
+		focus.WorkingTreeIncluded = false
+		focus.UntrackedIncluded = false
+	}
+	if focus != nil {
+		annotateFocusCoverage(focus, options, changes, discovered)
+		focusWarnings = nil
+		if missing := focus.RequiredFocusFiles - focus.CoveredFocusFiles; missing > 0 {
+			focusWarnings = append(focusWarnings, model.Warning{
+				Kind: "focus", Message: fmt.Sprintf("%d supported focused path(s) were excluded or not discovered", missing),
+			})
+		}
 	}
 	discovered.Warnings = append(discovered.Warnings, initialWarnings...)
 	discovered.Warnings = append(discovered.Warnings, focusWarnings...)
@@ -1740,6 +2059,8 @@ func executeScan(
 	}
 	result.Configuration = model.EffectiveConfig{
 		Profile:           options.profile,
+		Scope:             options.scope,
+		ScopeRoots:        append([]string{}, options.scopeRootLabels...),
 		ConfigPath:        options.configPath,
 		IgnoreFiles:       discovered.IgnoreFiles,
 		IgnoreEvidence:    append([]model.IgnoreFileEvidence{}, discovered.IgnoreEvidence...),
@@ -1772,11 +2093,154 @@ func executeScan(
 		StdinPath:         displayOptionalPath(options.stdinPath),
 		Focus:             focus,
 	}
+	if options.stagedSnapshot != nil {
+		result.Configuration.Input = &model.InputSnapshot{
+			Mode: "git-index", GitRoot: displayCLIPath(options.stagedSnapshot.Root),
+			HeadCommit: options.stagedSnapshot.HeadCommit, IndexDigest: options.stagedSnapshot.IndexDigest,
+			WorkingTreeIncluded: false, UntrackedIncluded: false,
+		}
+	}
 	result.Tool = buildinfo.Current()
 	result.Tool.NormalizationVersion = normalize.Version
 	sort.Strings(result.Configuration.Excludes)
 	sort.Strings(result.Configuration.LanguagePairs)
 	return result, nil
+}
+
+func stagedSourceEntries(
+	ctx context.Context,
+	snapshot vcs.IndexSnapshot,
+	maxFileBytes int64,
+	sqlDialect string,
+) ([]source.SnapshotEntry, error) {
+	entries := make([]source.SnapshotEntry, 0, len(snapshot.Entries))
+	for _, entry := range snapshot.Entries {
+		item := source.SnapshotEntry{Path: entry.Path, Mode: entry.Mode}
+		base := filepath.Base(filepath.FromSlash(entry.Path))
+		_, supported := language.DetectWithSQLDialect(entry.Path, sqlDialect)
+		needsContent := supported || filepath.Ext(entry.Path) == "" || base == ".gitignore" || base == ".moriignore"
+		if needsContent && entry.Mode != "120000" && entry.Mode != "160000" {
+			limit := maxFileBytes
+			if base == ".gitignore" || base == ".moriignore" {
+				limit = 1024 * 1024
+			}
+			content, size, err := vcs.ReadIndexBlob(ctx, snapshot, entry, limit)
+			if err != nil {
+				return nil, err
+			}
+			item.Content = content
+			item.Size = size
+		}
+		entries = append(entries, item)
+	}
+	return entries, nil
+}
+
+func mergeDiscoveryResults(primary source.Result, extra source.Result) source.Result {
+	files := make(map[string]source.File, len(primary.Files)+len(extra.Files))
+	for _, file := range append(primary.Files, extra.Files...) {
+		files[canonicalPath(file.Path)] = file
+	}
+	primary.Files = primary.Files[:0]
+	for _, file := range files {
+		primary.Files = append(primary.Files, file)
+	}
+	sort.Slice(primary.Files, func(i, j int) bool { return primary.Files[i].DisplayPath < primary.Files[j].DisplayPath })
+	primary.Warnings = append(primary.Warnings, extra.Warnings...)
+	primary.Excluded = append(primary.Excluded, extra.Excluded...)
+	primary.IgnoreFiles = compactSortedStrings(append(primary.IgnoreFiles, extra.IgnoreFiles...))
+	evidence := make(map[string]model.IgnoreFileEvidence)
+	for _, item := range append(primary.IgnoreEvidence, extra.IgnoreEvidence...) {
+		evidence[item.Path+"\x00"+item.Digest] = item
+	}
+	primary.IgnoreEvidence = primary.IgnoreEvidence[:0]
+	for _, item := range evidence {
+		primary.IgnoreEvidence = append(primary.IgnoreEvidence, item)
+	}
+	sort.Slice(primary.IgnoreEvidence, func(i, j int) bool { return primary.IgnoreEvidence[i].Path < primary.IgnoreEvidence[j].Path })
+	return primary
+}
+
+func compactSortedStrings(values []string) []string {
+	sort.Strings(values)
+	return compactStrings(values)
+}
+
+func annotateFocusCoverage(
+	focus *model.FocusConfig,
+	options scanOptions,
+	changes []vcs.Changes,
+	discovered source.Result,
+) {
+	analyzed := make(map[string]struct{}, len(discovered.Files))
+	for _, file := range discovered.Files {
+		analyzed[canonicalPath(file.Path)] = struct{}{}
+	}
+	excluded := make(map[string]model.FileCoverage, len(discovered.Excluded))
+	for _, coverage := range discovered.Excluded {
+		absolute, err := filepath.Abs(filepath.FromSlash(coverage.Path))
+		if err == nil {
+			excluded[canonicalPath(absolute)] = coverage
+		}
+	}
+	type requestedPath struct {
+		path    string
+		deleted bool
+	}
+	requested := make(map[string]requestedPath)
+	add := func(path string, deleted bool) {
+		clean := canonicalPath(path)
+		current, exists := requested[clean]
+		if !exists || (current.deleted && !deleted) {
+			requested[clean] = requestedPath{path: path, deleted: deleted}
+		}
+	}
+	for _, value := range options.focusPaths {
+		if absolute, err := filepath.Abs(value); err == nil {
+			add(absolute, false)
+		}
+	}
+	for _, change := range changes {
+		for _, path := range change.ChangedPaths {
+			add(filepath.Join(change.Root, filepath.FromSlash(path)), false)
+		}
+		for _, path := range change.DeletedPaths {
+			add(filepath.Join(change.Root, filepath.FromSlash(path)), true)
+		}
+	}
+	keys := make([]string, 0, len(requested))
+	for key := range requested {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	focus.PathEvidence = make([]model.FocusPathEvidence, 0, len(keys))
+	for _, key := range keys {
+		item := requested[key]
+		evidence := model.FocusPathEvidence{Path: displayCLIPath(item.path)}
+		if item.deleted {
+			evidence.Status = "deleted"
+			evidence.Reason = "deleted paths do not require analysis"
+			focus.PathEvidence = append(focus.PathEvidence, evidence)
+			continue
+		}
+		if _, ok := analyzed[key]; ok {
+			focus.RequiredFocusFiles++
+			evidence.Status = "analyzed"
+			focus.CoveredFocusFiles++
+		} else if coverage, ok := excluded[key]; ok {
+			focus.RequiredFocusFiles++
+			evidence.Status = coverage.Status
+			evidence.Reason = coverage.ZeroReason
+		} else if _, supported := language.DetectWithSQLDialect(item.path, options.sqlDialect); !supported {
+			evidence.Status = "unsupported"
+			evidence.Reason = "not a supported source path; excluded from the focused coverage denominator"
+		} else {
+			focus.RequiredFocusFiles++
+			evidence.Status = "not_discovered"
+			evidence.Reason = "excluded, ignored, missing, or outside the selected roots"
+		}
+		focus.PathEvidence = append(focus.PathEvidence, evidence)
+	}
 }
 
 const maxPriorityPathRules = 32
@@ -2274,6 +2738,7 @@ func writeRootUsage(writer io.Writer) error {
 		"  mori config <show|validate> [options] [directory]\n",
 		"  mori inspect [--format text|json] [directory]\n",
 		"  mori doctor [--format text|json] [directory]\n",
+		"  mori project upgrade [--check|--dry-run|--apply] [directory]\n",
 		"  mori lsp\n",
 		"  mori init [--profile review|explore|sql] [--stdout | [--force] [directory]]\n",
 		"  mori baseline add --baseline <path> --identity <id> [options] [path ...]\n",

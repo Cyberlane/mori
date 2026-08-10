@@ -75,7 +75,7 @@ status `4` means at least one configured coverage policy failed. The report is
 still written; classify the scan as not applicable or insufficiently covered,
 never as a clean result.
 
-Schema-17 reports include `coverage` and `file_coverage`. Verify the exact
+Schema-18 reports include `coverage` and `file_coverage`. Verify the exact
 fragment-file numerator and analyzed-file denominator, then inspect every
 supported file with zero fragments, its zero-fragment reason, boundary counts,
 skipped-fragment count, and parse-diagnostic count. Generated exclusions remain
@@ -120,6 +120,23 @@ with a changed occurrence. It never fetches the revision. Use repeatable
 `--focus-path` for exact paths when Git-derived focus is unavailable or when a
 review includes additional files. The two focus inputs are additive.
 
+For a pre-commit review, prefer the immutable index snapshot:
+
+```sh
+mori scan \
+  --staged \
+  --format json \
+  --include-focused \
+  --require-focused-coverage
+```
+
+Confirm `configuration.input.mode` is `git-index`, retain its HEAD and index
+digest, and require both working-tree inclusion flags to be false. Staged mode
+reads tracked source, ignore rules, and `.mori.json` from that same snapshot;
+it must never be described as including unstaged or untracked content.
+`--include-focused` bypasses ordinary ignore rules for focused files but not
+explicit excludes, generated policy, unsupported syntax, or resource limits.
+
 One revision does not safely describe multiple worktree histories. When the
 full scan includes a nested worktree or submodule, give it its own locally
 available revision with repeatable `--changed-worktree PATH=REVISION` values:
@@ -146,6 +163,12 @@ by default. Inspect `configuration` in the JSON report to verify the effective
 config, ignore files, exclusions, comparison domain, and family or pair
 filters. Use `--no-ignore` or `--no-config` only when the review scope requires
 it.
+
+When `.mori.json` defines named review surfaces, prefer `--scope NAME` over
+reconstructing roots and exclusions. Verify `configuration.scope` and
+`scope_roots`; explicit positional paths replace only the scope's default
+roots. Use `--format compact` for a bounded shortlist only. Retain JSON for
+machine validation and durable evidence.
 
 For intentional cross-language discovery, choose exactly one filtering mode.
 Use this broad family selection:
@@ -263,7 +286,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `17`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `18`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while
@@ -295,6 +318,13 @@ revision or date from the version string. Inspect:
   and how many focused files were actually discovered. In multi-worktree mode,
   verify every `worktrees` entry and its independent requested base and full
   commits; do not infer nested-repository coverage from the parent entry;
+- `configuration.focus.path_evidence`: require every supported non-deleted focused path
+  to be `analyzed` in strict review, and report generated, resource,
+  unsupported, or undiscovered statuses instead of collapsing them;
+- `configuration.input`: for staged scans, verify the Git-index digest, HEAD,
+  and false working-tree and untracked inclusion flags;
+- `configuration.scope` and `scope_roots`: verify the selected named project
+  surface and remember that these fields participate in baseline compatibility;
 - `configuration.profile`: record the selected named defaults and verify the
   neighboring effective fields rather than assuming the profile was unmodified;
 - `configuration.scan_profile_digest`, `baseline_profile_digest`, and
@@ -327,7 +357,8 @@ revision or date from the version string. Inspect:
   highly without treating the summary as behavioral evidence.
 - `review_priority` and `review_signals`: when review ranking is selected,
   explain the source-location reasons for ordering and never present the
-  priority as semantic confidence.
+  priority as semantic confidence. Generic entry-point, constructor, and
+  anonymous names deliberately do not receive same-name priority.
 
 Treat an operational error or an unexpected schema as a failed scan. Exit
 status `3` means policy findings were found with `--fail-on-match` or
@@ -336,6 +367,13 @@ after the repository has adopted a reviewed threshold, scope, and exclusions.
 Exit status `4` means one or more strict coverage policies were not met and
 must be reported as not applicable or incomplete rather than as a successful
 clean scan. Coverage failure takes precedence over finding status `3`.
+
+When the project has a `.mori-version` or project-installed Mori skill, check
+their coordination after a CLI update with `mori project upgrade --check .`.
+Exit status `5` means managed assets drift. Preview with `--dry-run` before an
+authorized `--apply`; apply updates the pin and embedded skill with backups but
+does not install the CLI, rewrite project-specific automation, commit, push, or
+release.
 
 When reviewing a change, rely on native focus ordering when available. Review
 at most 25 distinct identities deeply, not the first 25 raw location pairs.

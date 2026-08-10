@@ -150,6 +150,104 @@ func TestParseNameStatusRejectsUnsafeAndUnboundedPaths(t *testing.T) {
 	}
 }
 
+func TestResolveIndexReadsOnlyStageZeroSnapshot(t *testing.T) {
+	root := initRepository(t)
+	writeFile(t, root, "sample.go", "package sample\nfunc First() int { return 1 }\n")
+	runGit(t, root, "add", ".")
+	runGit(t, root, "commit", "-m", "base")
+	writeFile(t, root, "sample.go", "package sample\nfunc Staged() int { return 2 }\n")
+	runGit(t, root, "add", "sample.go")
+	writeFile(t, root, "sample.go", "package sample\nfunc Working() int { return 3 }\n")
+
+	snapshot, err := ResolveIndex(context.Background(), root)
+	if err != nil {
+		t.Fatalf("ResolveIndex: %v", err)
+	}
+	if !reflect.DeepEqual(snapshot.ChangedPaths, []string{"sample.go"}) || snapshot.IndexDigest == "" {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+	entry, ok := IndexEntryForPath(snapshot, "sample.go")
+	if !ok {
+		t.Fatal("sample.go missing from index")
+	}
+	content, size, err := ReadIndexBlob(context.Background(), snapshot, entry, 1024)
+	if err != nil {
+		t.Fatalf("ReadIndexBlob: %v", err)
+	}
+	if !strings.Contains(string(content), "Staged") || strings.Contains(string(content), "Working") || int64(len(content)) != size {
+		t.Fatalf("content = %q, size = %d", content, size)
+	}
+}
+
+func TestResolveIndexRecordsRepositoryRelativePrefix(t *testing.T) {
+	root := initRepository(t)
+	nested := filepath.Join(root, "nested", "deeper")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	snapshot, err := ResolveIndex(context.Background(), nested)
+	if err != nil {
+		t.Fatalf("ResolveIndex: %v", err)
+	}
+	if snapshot.Prefix != "nested/deeper" {
+		t.Fatalf("prefix = %q, want nested/deeper", snapshot.Prefix)
+	}
+}
+
+func TestResolveIndexSupportsUnbornRepository(t *testing.T) {
+	root := initRepository(t)
+	writeFile(t, root, "first.go", "package sample\n")
+	runGit(t, root, "add", "first.go")
+	snapshot, err := ResolveIndex(context.Background(), root)
+	if err != nil {
+		t.Fatalf("ResolveIndex: %v", err)
+	}
+	if snapshot.HeadCommit != "" || !reflect.DeepEqual(snapshot.ChangedPaths, []string{"first.go"}) {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestParseIndexEntriesRejectsUnsafeAndUnmergedEntries(t *testing.T) {
+	oid := strings.Repeat("a", 40)
+	if _, err := parseIndexEntries([]byte("100644 "+oid+" 0\t../outside.go\x00"), 10); err == nil {
+		t.Fatal("unsafe index path returned nil")
+	}
+	if _, err := parseIndexEntries([]byte("100644 "+oid+" 2\tconflict.go\x00"), 10); err == nil || !strings.Contains(err.Error(), "unmerged") {
+		t.Fatalf("unmerged index error = %v", err)
+	}
+}
+
+func TestRelativeIndexPathAcceptsDescendantsAndRejectsOutside(t *testing.T) {
+	root := t.TempDir()
+	snapshot := IndexSnapshot{Root: root}
+	path := filepath.Join(root, "nested", "config.json")
+	relative, err := RelativeIndexPath(snapshot, path)
+	if err != nil || relative != "nested/config.json" {
+		t.Fatalf("RelativeIndexPath(descendant) = %q, %v", relative, err)
+	}
+	if _, err := RelativeIndexPath(snapshot, filepath.Join(filepath.Dir(root), "outside.json")); err == nil ||
+		!strings.Contains(err.Error(), "outside the Git worktree") {
+		t.Fatalf("RelativeIndexPath(outside) error = %v", err)
+	}
+}
+
+func TestRelativeIndexPathCanonicalizesExistingPath(t *testing.T) {
+	root := t.TempDir()
+	linked := filepath.Join(t.TempDir(), "linked")
+	if err := os.Symlink(root, linked); err != nil {
+		t.Skipf("Symlink unavailable: %v", err)
+	}
+	canonicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatalf("EvalSymlinks(root): %v", err)
+	}
+	snapshot := IndexSnapshot{Root: canonicalRoot}
+	relative, err := RelativeIndexPath(snapshot, linked)
+	if err != nil || relative != "." {
+		t.Fatalf("RelativeIndexPath(link) = %q, %v", relative, err)
+	}
+}
+
 func initRepository(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

@@ -37,6 +37,24 @@ func TestDiscoverSupportedFilesAndDefaultExcludes(t *testing.T) {
 	}
 }
 
+func TestDiscoverSnapshotAtUsesResolvedBase(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	base := filepath.Join(root, "nested")
+	entries := []SnapshotEntry{
+		{Path: "root.go", Mode: "100644", Content: []byte("package root\n")},
+		{Path: "nested/main.go", Mode: "100644", Content: []byte("package nested\n")},
+	}
+	result, err := DiscoverSnapshotAt(context.Background(), root, base, nil, entries, Options{MaxFileBytes: 1024})
+	if err != nil {
+		t.Fatalf("DiscoverSnapshotAt: %v", err)
+	}
+	if len(result.Files) != 1 || result.Files[0].DisplayPath != "main.go" {
+		t.Fatalf("files = %#v, want nested/main.go relative to base", result.Files)
+	}
+}
+
 func TestDiscoverSkipsLinkedWorktreeGitControlFile(t *testing.T) {
 	t.Parallel()
 
@@ -394,6 +412,52 @@ func TestDiscoverHonorsNestedGitAndMoriIgnoreRules(t *testing.T) {
 	for index, evidence := range result.IgnoreEvidence {
 		if evidence.Path != result.IgnoreFiles[index] || len(evidence.Digest) != 64 {
 			t.Fatalf("ignore evidence %d = %#v", index, evidence)
+		}
+	}
+}
+
+func TestDiscoverPrunesDefaultBuildDirectoryBeforeLoadingNestedIgnores(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFixture(t, filepath.Join(root, ".gitignore"), "/.build/\n!.env.example\n")
+	writeFixture(t, filepath.Join(root, "main.go"), "package main\nfunc main() {}\n")
+	writeFixture(t, filepath.Join(root, ".build", "checkouts", "dependency", ".gitignore"), "generated.go\n")
+	writeFixture(t, filepath.Join(root, ".build", "checkouts", "dependency", "source.go"), "package dependency\nfunc generated() {}\n")
+
+	result, err := DiscoverContext(context.Background(), []string{root}, Options{IgnoreFiles: true})
+	if err != nil {
+		t.Fatalf("DiscoverContext: %v", err)
+	}
+	if len(result.Files) != 1 || !strings.HasSuffix(result.Files[0].DisplayPath, "main.go") {
+		t.Fatalf("files = %#v, want only main.go", result.Files)
+	}
+	if len(result.IgnoreFiles) != 1 || !strings.HasSuffix(result.IgnoreFiles[0], ".gitignore") ||
+		strings.Contains(result.IgnoreFiles[0], ".build") {
+		t.Fatalf("ignore files = %#v, want only root .gitignore", result.IgnoreFiles)
+	}
+}
+
+func TestDiscoverNegationTraversalIsLimitedToApplicableDirectory(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFixture(t, filepath.Join(root, ".gitignore"), "generated/\ncache/\n!generated/keep.go\n")
+	writeFixture(t, filepath.Join(root, "generated", "drop.go"), "package generated\nfunc drop() {}\n")
+	writeFixture(t, filepath.Join(root, "generated", "keep.go"), "package generated\nfunc keep() {}\n")
+	writeFixture(t, filepath.Join(root, "cache", ".gitignore"), "*.tmp\n")
+	writeFixture(t, filepath.Join(root, "cache", "ignored.go"), "package cache\nfunc ignored() {}\n")
+
+	result, err := DiscoverContext(context.Background(), []string{root}, Options{IgnoreFiles: true})
+	if err != nil {
+		t.Fatalf("DiscoverContext: %v", err)
+	}
+	if len(result.Files) != 1 || !strings.HasSuffix(result.Files[0].DisplayPath, "generated/keep.go") {
+		t.Fatalf("files = %#v, want only generated/keep.go", result.Files)
+	}
+	for _, path := range result.IgnoreFiles {
+		if strings.Contains(path, "cache/") {
+			t.Fatalf("irrelevant nested ignore was loaded: %#v", result.IgnoreFiles)
 		}
 	}
 }

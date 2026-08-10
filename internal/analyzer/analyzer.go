@@ -8,6 +8,7 @@ import (
 	"math"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/Cyberlane/mori/internal/fingerprint"
@@ -738,7 +739,7 @@ func reviewPriority(candidate *groupCandidate, priorityPaths []model.PriorityPat
 			continue
 		}
 		crossFile = true
-		sameName := pair.Left.Name != "" && pair.Left.Name == pair.Right.Name
+		sameName := distinctiveReviewName(pair.Left.Name) && pair.Left.Name == pair.Right.Name
 		if sameName {
 			sameNameCrossFile = true
 		}
@@ -788,6 +789,19 @@ func reviewPriority(candidate *groupCandidate, priorityPaths []model.PriorityPat
 		}
 	}
 	return priority, signals
+}
+
+func distinctiveReviewName(name string) bool {
+	value := strings.ToLower(strings.TrimSpace(name))
+	if value == "" || strings.HasPrefix(value, "anonymous@") {
+		return false
+	}
+	switch value {
+	case "main", "init", "deinit", "new", "constructor", "lambda", "closure":
+		return false
+	default:
+		return true
+	}
 }
 
 func (group *groupCandidate) addFocusedOccurrence(location model.Location, paths map[string]struct{}) {

@@ -68,6 +68,25 @@ Agent installation, project configuration, refactoring, baselining, CI,
 committing, pushing, and releasing are separate permissions. Installing the
 skill alone does not authorize any of the others.
 
+## Coordinated project upgrades
+
+An updated CLI can inspect every project-managed Mori surface in one local,
+versioned plan:
+
+```sh
+mori project upgrade --check --format json .
+mori project upgrade --dry-run .
+mori project upgrade --apply .
+```
+
+Check mode exits `5` when the `.mori-version` pin or project Agent Skill is
+outdated, or configuration/baseline validation needs attention. Apply mode
+atomically updates the pin, replaces a differing skill with a recoverable
+backup, and then rechecks the project. It inventories conventional hooks,
+scripts, and CI files but does not rewrite them because their policy is
+project-specific. It also never installs a CLI, creates a baseline, commits,
+pushes, or releases.
+
 ## Agent-guided project setup
 
 Ask Mori for a deterministic, read-only project inventory and question plan:

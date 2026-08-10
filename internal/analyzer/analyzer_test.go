@@ -601,6 +601,24 @@ func TestReviewPriorityUsesOnlyExplainableLocationSignals(t *testing.T) {
 	}
 }
 
+func TestReviewPriorityDoesNotInflateGenericCallableNames(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"main", "init", "deinit", "anonymous@42"} {
+		candidate := &groupCandidate{
+			locationPairs: 1,
+			pathPairs: map[string]model.LocationPair{"pair": {
+				Left:  model.Location{Path: "Sources/App/Left.swift", Name: name},
+				Right: model.Location{Path: "Sources/Feature/Right.swift", Name: name},
+			}},
+		}
+		priority, signals := reviewPriority(candidate, nil)
+		if priority != 3 || !reflect.DeepEqual(signals, []string{"cross-directory", "cross-file"}) {
+			t.Fatalf("%s priority = %d, signals = %#v", name, priority, signals)
+		}
+	}
+}
+
 func TestReviewPriorityAddsConfiguredPathRulesOnce(t *testing.T) {
 	t.Parallel()
 

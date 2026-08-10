@@ -263,9 +263,9 @@ count and feature name. Explanation fields do not alter scoring.
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-17 reports expose deterministic binary provenance, the selected scan
-profile, comparison selection, comparison domains, fragment kinds, optional
-exact focus metadata, grouped
+Schema-18 reports expose deterministic binary provenance, the selected scan
+profile and named scope, comparison selection, comparison domains, fragment
+kinds, immutable Git-index provenance, exact per-path focus metadata, grouped
 content-pair identities, fragment fingerprints, occurrence samples and exact
 counts, nesting metadata, structured parser
 diagnostics, effective configuration, ignore-source content evidence, and
@@ -279,6 +279,12 @@ Multi-worktree focus adds a deterministic `configuration.focus.worktrees`
 array with a display root and full Git resolution for every worktree. The
 legacy scalar Git focus fields remain unchanged for a single
 `--changed-since` worktree.
+
+Staged discovery builds a bounded virtual tree from stage-zero index entries,
+reads source and ignore blobs by object ID, and hashes the ordered mode/OID/path
+inventory. It never writes Git objects and never falls back to working-tree or
+untracked bytes. Named scope roots are resolved inside the configuration
+project and become part of baseline compatibility.
 
 When focus is active, focused groups form the first bucket. Within each bucket,
 and for every scan without focus, group ordering is:

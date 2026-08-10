@@ -51,7 +51,10 @@ func TestLoadStrictConfig(t *testing.T) {
 	"fail_on_parse_diagnostic": true,
 	"exclude_generated": true,
   "exclude": ["**/*_test.go"],
-  "respect_ignore": true
+  "respect_ignore": true,
+  "scopes": {
+    "backend": {"roots": ["cmd", "internal"], "profile": "review", "exclude": ["**/generated/**"]}
+  }
 }`)
 	settings, err := Load(path)
 	if err != nil {
@@ -74,7 +77,8 @@ func TestLoadStrictConfig(t *testing.T) {
 		settings.FailOnWarning == nil || !*settings.FailOnWarning ||
 		settings.FailOnDiagnostic == nil || !*settings.FailOnDiagnostic ||
 		settings.ExcludeGenerated == nil || !*settings.ExcludeGenerated ||
-		settings.RespectIgnore == nil || !*settings.RespectIgnore {
+		settings.RespectIgnore == nil || !*settings.RespectIgnore ||
+		len(settings.Scopes["backend"].Roots) != 2 || settings.Scopes["backend"].Profile != "review" {
 		t.Fatalf("settings = %#v", settings)
 	}
 }

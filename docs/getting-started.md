@@ -71,6 +71,24 @@ Explicit `.mori.json` values override profile defaults. Explicit CLI values
 override both. Profiles deliberately do not guess project-specific test,
 migration, generated-router, vendor, or framework exclusions.
 
+For a monorepository, define named `scopes` with relative roots in
+`.mori.json`, then run `mori scan --scope backend`. The scope name and roots
+are recorded and participate in baseline compatibility.
+
+## Review exactly what is staged
+
+```sh
+mori scan --staged --format compact \
+  --include-focused \
+  --require-focused-coverage
+```
+
+Staged mode reads tracked source, ignore rules, and configuration from one Git
+index snapshot. It records a digest and does not include unstaged or untracked
+content. Focused coverage reports every staged path and exits `4` if a
+supported non-deleted path was not analyzed; unsupported paths remain evidence
+but do not enter the denominator.
+
 ## Explore across languages
 
 ```sh
@@ -125,4 +143,11 @@ mori inspect --format json .
 mori config validate .
 mori config show --effective --provenance .
 mori doctor .
+mori project upgrade --check .
 ```
+
+After installing a newer Mori binary, preview coordinated project maintenance
+with `mori project upgrade --dry-run .`, then use `--apply` to update the
+version pin and embedded Agent Skill with backups. Configuration, baselines,
+and conventional automation are inspected; ambiguous project policy is never
+rewritten automatically.

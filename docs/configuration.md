@@ -37,7 +37,7 @@ Profiles deliberately do not guess project-specific test, migration, generated
 router, or framework exclusions. Add those only after auditing the repository's
 source categories and the first report.
 
-The selected profile is recorded in schema-17 reports. Omitting `profile`
+The selected profile is recorded in schema-18 reports. Omitting `profile`
 retains the legacy defaults. A CLI `--profile` replaces a configured profile;
 explicit fields from the config are then applied, followed by explicit CLI
 flags. An explicit language-selection mode replaces the profile's mode, so
@@ -82,6 +82,35 @@ flags. An explicit language-selection mode replaces the profile's mode, so
 }
 ```
 
+## Named scopes
+
+Monorepositories can keep reviewed scan surfaces in `scopes` and select one
+with `--scope NAME`:
+
+```json
+{
+  "profile": "review",
+  "scopes": {
+    "backend": {
+      "roots": ["cmd", "internal"],
+      "exclude": ["**/*_test.go"],
+      "priority_paths": ["**/auth/**=25"]
+    },
+    "ios": {
+      "roots": ["Sources", "Packages"],
+      "same_language_only": true
+    }
+  }
+}
+```
+
+Scope roots must be relative paths inside the configuration project. Top-level
+settings apply first, the selected scope overrides or adds its settings, and
+explicit CLI flags remain last. Positional scan paths override the scope's
+default roots without discarding its other policy. The selected name and roots
+participate in baseline scan-profile digests and appear as
+`configuration.scope` and `configuration.scope_roots`.
+
 `comparison_domain` accepts one case-insensitive domain ID printed by
 `mori languages`. The selected domain is applied before parsing, so other
 domains do not affect file counts, warnings, focus, or pair limits. An empty or
@@ -110,8 +139,8 @@ statement blocks are mutually exclusive scan modes.
 Structural ordering sorts by similarity score, shared evidence mass,
 represented location-pair count, and stable identity. Review ordering first
 uses explicit location signals, then the existing structural order. It favors
-same-named candidates across directories, other cross-directory and cross-file
-candidates, and identities representing repeated location pairs. It does not
+distinctively named candidates across directories, other cross-directory and
+cross-file candidates, and identities representing repeated location pairs. It does not
 change scores, fingerprints, candidate membership, focus priority, or baseline
 suppression. The equivalent command-line form is `--ranking review`.
 
@@ -194,7 +223,7 @@ Ignore files affect directory traversal only. A file passed explicitly remains
 visible. Repeated `--exclude` globs remain additive and continue to exclude an
 explicitly requested file. Use `--no-ignore` to disable both ignore-file types.
 
-Schema-17 JSON reports record the effective profile, strict coverage policies,
+Schema-18 JSON reports record the effective profile, named scope, strict coverage policies,
 options, and every loaded ignore file with its SHA-256 content evidence under
 `configuration` so a scan can be
 reproduced. Review focus remains
@@ -202,6 +231,14 @@ CLI-only: `--focus-path` is repeatable, `--changed-since` always requires an
 explicit locally available Git revision, and repeatable
 `--changed-worktree PATH=REVISION` values give every additional Git worktree
 its own revision. Dynamic Git revisions are intentionally not project config.
+
+`--staged` is also CLI-only. It reads tracked sources, ignore files, and
+`.mori.json` from one immutable Git-index snapshot and records the HEAD and
+index digest under `configuration.input`. Combine it with `--include-focused`
+to bypass ordinary ignore rules for changed files while retaining explicit
+excludes, generated-source policy, and resource bounds. Add
+`--require-focused-coverage` when every supported non-deleted focused path must be
+analyzed; failures still write the report and exit with status `4`.
 
 See [Scan selection controls](scan-selection.md) for the complete validation,
 execution, compatibility, and reporting contract.

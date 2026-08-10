@@ -54,6 +54,11 @@ The revision must already exist locally. Mori compares changed and unchanged
 source together, then moves groups touching changed files forward. It includes
 staged, unstaged, and untracked non-ignored files and never fetches a remote.
 
+Use `--staged` when that broader working-tree behavior is undesirable. Staged
+mode reads the repository index only; combine `--include-focused` with
+`--require-focused-coverage` and inspect every `path_evidence` status before
+calling the pre-commit review complete.
+
 Use repeated `--focus-path` for explicit paths. For nested worktrees, give each
 root its own locally available revision with repeated
 `--changed-worktree PATH=REVISION`; one parent revision cannot describe several

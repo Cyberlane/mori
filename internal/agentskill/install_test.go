@@ -38,6 +38,33 @@ func TestInstallNewAndCurrent(t *testing.T) {
 	}
 }
 
+func TestInspectIsReadOnlyAndReportsDrift(t *testing.T) {
+	t.Parallel()
+	parent := filepath.Join(t.TempDir(), "missing", "skills")
+	result, err := Inspect(parent)
+	if err != nil || result.Status != StatusMissing {
+		t.Fatalf("Inspect(missing) = %#v, %v", result, err)
+	}
+	if _, err := os.Lstat(parent); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Inspect created parent: %v", err)
+	}
+	installed, err := Install(parent, false)
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	result, err = Inspect(parent)
+	if err != nil || result.Status != StatusCurrent {
+		t.Fatalf("Inspect(current) = %#v, %v", result, err)
+	}
+	if err := os.WriteFile(filepath.Join(installed.Path, "SKILL.md"), []byte("changed\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	result, err = Inspect(parent)
+	if err != nil || result.Status != StatusDifferent {
+		t.Fatalf("Inspect(different) = %#v, %v", result, err)
+	}
+}
+
 func TestInstallRejectsDifferentContentAndPreservesBackup(t *testing.T) {
 	t.Parallel()
 

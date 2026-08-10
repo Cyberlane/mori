@@ -83,10 +83,13 @@ effects, types, external calls, permissions, transactions, or error behavior.
 | Review one language pair | `mori scan --language-pair go,typescript .` |
 | Review SQL queries | `mori scan --profile sql path/to/sql` |
 | Produce CI or agent evidence | `mori scan --profile review --format json .` |
+| Review exactly what is staged | `mori scan --staged --include-focused --require-focused-coverage` |
+| Produce a concise terminal shortlist | `mori scan --profile review --format compact .` |
 | Produce editor diagnostics | `mori scan --profile review --format sarif .` |
 | Save a local visual report | `mori scan --profile review --format html . > mori.html` |
 | Inspect language coverage | `mori inspect .` |
 | Check project setup | `mori doctor .` |
+| Check project-managed Mori assets | `mori project upgrade --check .` |
 
 Lower the token floor toward 12 only for deliberate broad exploration; small
 callbacks and wrappers commonly dominate at that size.
@@ -124,6 +127,18 @@ mori skill install --project .
 
 The skill teaches agents to treat matches as review leads, verify coverage,
 inspect both source locations, and avoid score-only refactors.
+
+After installing a newer Mori binary, coordinate the project pin, embedded
+skill, configuration and baseline validation, and automation inventory with:
+
+```sh
+mori project upgrade --dry-run .
+mori project upgrade --apply .
+```
+
+Apply mode updates `.mori-version` and the project Agent Skill with backups.
+It does not install the CLI, invent configuration policy, rewrite hooks or CI,
+commit, push, or release anything.
 
 To let a project agent configure Mori without granting hidden write access:
 
