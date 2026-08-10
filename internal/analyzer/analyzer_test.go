@@ -96,6 +96,7 @@ function validate_email(string $value): bool {
   if ($clean === '') return false;
   return str_contains($clean, '@') && str_contains($clean, '.');
 }
+
 `)
 	writeAnalyzerFixture(t, positive, "check.hack", `function check_address(string $candidate): bool {
   $normalized = Str\trim($candidate);
@@ -126,6 +127,45 @@ function validate_email(string $value): bool {
 	if negativeResult.CandidatePairs != 0 || negativeResult.TotalMatchGroups != 0 ||
 		len(negativeResult.Groups) != 0 {
 		t.Fatalf("PHP/Hack nearby-negative result = %#v", negativeResult)
+	}
+}
+
+func TestAnalyzeCCPPPositiveAndNearbyNegative(t *testing.T) {
+	t.Parallel()
+	positive := t.TempDir()
+	writeAnalyzerFixture(t, positive, "clamp.c", `int clamp_number(int value, int minimum, int maximum) {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+}
+`)
+	writeAnalyzerFixture(t, positive, "clamp.cpp", `int clampValue(int input, int lower, int upper) {
+  if (input < lower) return lower;
+  if (input > upper) return upper;
+  return input;
+}
+`)
+	positiveResult := analyzeTwoFileFixture(t, positive, Options{Threshold: 0.70, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{{Left: "c", Right: "cpp"}}})
+	if positiveResult.CandidatePairs != 1 || positiveResult.TotalMatchGroups != 1 || len(positiveResult.Groups) != 1 || positiveResult.Groups[0].Similarity < 0.87 || positiveResult.Groups[0].Similarity > 0.89 {
+		t.Fatalf("C/C++ positive result = %#v", positiveResult)
+	}
+
+	negative := t.TempDir()
+	writeAnalyzerFixture(t, negative, "clamp.c", `int clamp_number(int value, int minimum, int maximum) {
+  if (value < minimum) return minimum;
+  if (value > maximum) return maximum;
+  return value;
+}
+`)
+	writeAnalyzerFixture(t, negative, "sum.cpp", `int sumValues(const int *values, int count) {
+  int total = 0;
+  for (int index = 0; index < count; index++) total += values[index];
+  return total;
+}
+`)
+	negativeResult := analyzeTwoFileFixture(t, negative, Options{Threshold: 0.70, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10, MaxPairs: 10, Workers: 2, LanguagePairs: []LanguagePair{{Left: "c", Right: "cpp"}}})
+	if negativeResult.CandidatePairs != 1 || negativeResult.TotalMatchGroups != 0 {
+		t.Fatalf("C/C++ nearby-negative result = %#v", negativeResult)
 	}
 }
 

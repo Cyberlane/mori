@@ -451,9 +451,15 @@ func fragmentName(node *tree_sitter.Node, content []byte, fragmentKind string) s
 			return value
 		}
 	}
+	if value := declaratorName(node.ChildByFieldName("declarator"), content); value != "" {
+		return value
+	}
 
 	parent := node.Parent()
 	if parent != nil {
+		if value := declaratorName(parent.ChildByFieldName("declarator"), content); value != "" {
+			return value
+		}
 		for _, field := range []string{"name", "left", "key"} {
 			candidate := parent.ChildByFieldName(field)
 			if candidate == nil {
@@ -466,6 +472,21 @@ func fragmentName(node *tree_sitter.Node, content []byte, fragmentKind string) s
 	}
 
 	return fmt.Sprintf("anonymous@%d", node.StartPosition().Row+1)
+}
+
+func declaratorName(node *tree_sitter.Node, content []byte) string {
+	for node != nil {
+		switch node.Kind() {
+		case "identifier", "field_identifier", "operator_name", "destructor_name":
+			return cleanName(node.Utf8Text(content))
+		}
+		next := node.ChildByFieldName("declarator")
+		if next == nil {
+			next = node.ChildByFieldName("name")
+		}
+		node = next
+	}
+	return ""
 }
 
 func sqlcQueryName(node *tree_sitter.Node, content []byte) string {

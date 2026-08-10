@@ -10,6 +10,8 @@
 | `github.com/tree-sitter/go-tree-sitter` | 0.25.0 | Copyright (c) 2024 Amaan Qureshi | MIT |
 | Tree-sitter core | bundled by the Go binding | Copyright (c) 2018 Max Brunsfeld | MIT |
 | Tree-sitter Bash grammar | 0.25.1 | Copyright (c) 2017 Max Brunsfeld | MIT |
+| Tree-sitter C grammar | 0.24.2 | Copyright (c) 2014 Max Brunsfeld | MIT |
+| Tree-sitter C++ grammar | 0.23.4 | Copyright (c) 2014 Max Brunsfeld | MIT |
 | Tree-sitter C# grammar | 0.23.5 | Copyright (c) 2014-2023 Max Brunsfeld, Damien Guard, Amaan Qureshi, and contributors | MIT |
 | Tree-sitter Go grammar | 0.25.0 | Copyright (c) 2014 Max Brunsfeld | MIT |
 | Tree-sitter Java grammar | 0.23.5 | Copyright (c) 2017 Ayman Nadeem | MIT |

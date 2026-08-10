@@ -96,7 +96,7 @@ one reported identity. Text output uses restrained color on terminals; set
 Mori currently supports:
 
 - Bash/POSIX shell and Zsh;
-- C#, Go, Hack, Java, JavaScript/JSX, PHP, Python, Rust, Swift,
+- C, C++, C#, Go, Hack, Java, JavaScript/JSX, PHP, Python, Rust, Swift,
   TypeScript/TSX;
 - generic SQL queries and explicitly selected PostgreSQL queries.
 

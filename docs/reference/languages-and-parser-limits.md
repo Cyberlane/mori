@@ -6,6 +6,8 @@ binary.
 | Parser language | Review family | Domain | File types | Shebangs |
 | --- | --- | --- | --- | --- |
 | Bash / POSIX shell | shell | code | `.sh`, `.bash` | `sh`, `dash`, `bash` |
+| C | c-cpp | code | `.c`, `.h` | — |
+| C++ | c-cpp | code | `.cc`, `.cpp`, `.cxx`, `.hh`, `.hpp`, `.hxx` | — |
 | C# | csharp | code | `.cs` | — |
 | Go | go | code | `.go` | — |
 | Hack | php-hack | code | `.hack`, legacy marked `.php` | — |
@@ -40,6 +42,9 @@ kinds or comparison domains.
 ## Language-specific boundaries
 
 - Java: implemented methods, constructors, compact constructors, and lambdas.
+- C: function definitions. `.h` defaults to C; use a C++-specific header suffix
+  when C++ parsing is required.
+- C++: function definitions and lambdas.
 - C#: implemented methods, constructors, destructors, operators, accessors,
   local functions, anonymous methods, and lambdas.
 - Swift: implemented functions, initializers, deinitializers, and closures.

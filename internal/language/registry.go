@@ -13,6 +13,8 @@ import (
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tree_sitter_bash "github.com/tree-sitter/tree-sitter-bash/bindings/go"
 	tree_sitter_c_sharp "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
+	tree_sitter_c "github.com/tree-sitter/tree-sitter-c/bindings/go"
+	tree_sitter_cpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
 	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
 	tree_sitter_java "github.com/tree-sitter/tree-sitter-java/bindings/go"
 	tree_sitter_javascript "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
@@ -122,6 +124,32 @@ var specs = []Spec{
 		fragmentKinds:           kinds("function_definition"),
 		topLevelKinds:           kinds("program"),
 		topLevelFragmentKind:    "script",
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "c",
+		Family:           "c-cpp",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "C",
+		Extensions:       []string{".c", ".h"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_c.Language())
+		},
+		fragmentKinds:           kinds("function_definition"),
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "cpp",
+		Family:           "c-cpp",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "C++",
+		Extensions:       []string{".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_cpp.Language())
+		},
+		fragmentKinds:           kinds("function_definition", "lambda_expression"),
 		excludeNestedBoundaries: true,
 	},
 	{
