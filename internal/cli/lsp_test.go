@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -51,16 +52,18 @@ func TestReadLSPFrameRejectsOversize(t *testing.T) {
 
 func TestLSPDiagnosticsKeepSimilarityAdvisory(t *testing.T) {
 	t.Parallel()
+	root := t.TempDir()
+	documentPath := filepath.Join(root, "a.go")
 	report := model.Report{Groups: []model.MatchGroup{{
 		ID: "aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb", Similarity: 0.91,
 		Profiles: []model.FragmentProfile{{
 			Occurrences: []model.FragmentSummary{
-				{Location: model.Location{Path: "/tmp/project/a.go", Language: "go", StartLine: 2, EndLine: 4}},
-				{Location: model.Location{Path: "/tmp/project/b.go", Language: "go", StartLine: 6, EndLine: 8}},
+				{Location: model.Location{Path: documentPath, Language: "go", StartLine: 2, EndLine: 4}},
+				{Location: model.Location{Path: filepath.Join(root, "b.go"), Language: "go", StartLine: 6, EndLine: 8}},
 			},
 		}},
 	}}}
-	diagnostics := diagnosticsForLSPDocument(report, "/tmp/project/a.go", "/tmp/project")
+	diagnostics := diagnosticsForLSPDocument(report, documentPath, root)
 	if len(diagnostics) != 1 || diagnostics[0].Code != "MORI001" || diagnostics[0].Severity != 3 || len(diagnostics[0].Related) != 1 || !strings.Contains(diagnostics[0].Message, "review both locations") {
 		t.Fatalf("diagnostics = %+v", diagnostics)
 	}

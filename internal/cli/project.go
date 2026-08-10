@@ -503,18 +503,6 @@ func writeAtomicConfig(path string, content []byte, replace bool) error {
 	return syncConfigDirectory(directory)
 }
 
-func syncConfigDirectory(directory string) error {
-	directoryHandle, err := os.Open(directory)
-	if err != nil {
-		return fmt.Errorf("open config directory: %w", err)
-	}
-	defer directoryHandle.Close()
-	if err := directoryHandle.Sync(); err != nil {
-		return fmt.Errorf("sync config directory: %w", err)
-	}
-	return nil
-}
-
 func runConfigCommand(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		return usageError(stderr, "config requires show or validate")
