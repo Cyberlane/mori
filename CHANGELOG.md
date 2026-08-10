@@ -13,6 +13,21 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   shell, generic SQL, and PostgreSQL, with deterministic precision-at-k,
   actionability, score-distribution, fragment-size, and ranking-movement
   reporting against a pinned v0.22.0 reference.
+- Added deterministic SARIF 2.1.0 output with stable similarity and incomplete-
+  analysis rules, source locations, fingerprints, and exact suppression,
+  warning, and truncation metadata.
+- Added bounded `--stdin-path` overlays so editor clients can analyze unsaved
+  source through standard input while retaining repository-wide comparisons
+  and automatically focusing the overlaid file.
+- Added a dependency-free reference VS Code extension and a published Draft
+  2020-12 JSON Schema for the machine-readable report contract.
+
+### Changed
+
+- Machine-readable reports now use schema version 17 and record the optional
+  stdin overlay path. Normalization remains version 9 and baseline schema
+  remains version 3 because scores, fingerprints, and accepted identities are
+  unchanged.
 
 ## [0.23.0] - 2026-08-10
 

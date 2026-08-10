@@ -1,0 +1,82 @@
+{
+  "name": "mori-vscode",
+  "displayName": "Mori Structural Review",
+  "description": "Review Mori structural-similarity leads while editing.",
+  "version": "0.1.0",
+  "publisher": "Cyberlane",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Cyberlane/mori.git",
+    "directory": "editors/vscode"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters"
+  ],
+  "keywords": [
+    "duplicate",
+    "sarif",
+    "similarity",
+    "structural"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onCommand:mori.refreshDiagnostics",
+    "onLanguage:go",
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:python",
+    "onLanguage:rust",
+    "onLanguage:shellscript",
+    "onLanguage:sql",
+    "onLanguage:swift",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "mori.refreshDiagnostics",
+        "title": "Mori: Refresh Structural Diagnostics"
+      }
+    ],
+    "configuration": {
+      "title": "Mori",
+      "properties": {
+        "mori.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Analyze supported file documents as they change."
+        },
+        "mori.executable": {
+          "type": "string",
+          "default": "mori",
+          "description": "Path or command name for the local Mori executable."
+        },
+        "mori.profile": {
+          "type": "string",
+          "enum": [
+            "review",
+            "explore",
+            "sql"
+          ],
+          "default": "review",
+          "description": "Mori scan profile used for editor diagnostics."
+        },
+        "mori.debounceMilliseconds": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 10000,
+          "default": 750,
+          "description": "Delay after an edit before Mori starts a scan."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "node --check extension.js"
+  }
+}

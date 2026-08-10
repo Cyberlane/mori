@@ -255,6 +255,26 @@ Write results as JSON for a script or CI system:
 mori scan --format json .
 ```
 
+Write SARIF 2.1.0 for IDEs and code-scanning consumers:
+
+```sh
+mori scan --profile review --format sarif .
+```
+
+Editors can analyze an unsaved buffer without writing it to disk. The path must
+already be one discovered supported source file; Mori reads at most 16 MiB from
+standard input, applies the configured file-size limit when it is smaller, and
+automatically focuses results that touch the overlaid file:
+
+```sh
+mori scan --profile review --format sarif --stdin-path src/example.go . \
+  < src/example.go
+```
+
+The repository includes a dependency-free reference [VS Code extension](editors/vscode/README.md)
+that uses this editor-neutral contract. See [Machine and editor integration](docs/machine-integration.md)
+for stable rule IDs, suppression behavior, limits, and the versioned JSON Schema.
+
 For a human review shortlist, opt into explainable source-location ranking:
 
 ```sh
@@ -310,7 +330,7 @@ files. Generated exclusions do not enter that denominator.
 fatal independently. Every scan-backed baseline mutation evaluates the same
 policies before modifying a baseline.
 
-Schema-16 reports embed deterministic `tool` build provenance, the selected
+Schema-17 reports embed deterministic `tool` build provenance, the selected
 profile, comparison selection, domain and fragment-kind metadata, exact focus
 metadata, loaded ignore-file paths and SHA-256 content evidence, a coverage
 summary, per-file zero-fragment reasons, and aggregate unsupported-extension
@@ -362,7 +382,7 @@ mori scan \
 `--changed-worktree PATH=REVISION` values describe the other worktrees. Mori
 requires every discovered file to belong to a resolved root, never inherits a
 parent revision for a nested repository, and records each root's requested
-base, full resolved commits, changed paths, and deleted paths in schema-16 JSON.
+base, full resolved commits, changed paths, and deleted paths in schema-17 JSON.
 Use only repeated `--changed-worktree` values when every scanned root should be
 explicit. Excluding and scanning a nested worktree separately remains valid;
 never interpret an excluded repository as unchanged. Mori bounds one scan to
@@ -481,6 +501,7 @@ mori skill install --global
 - [How Mori scores fragments](docs/scoring.md)
 - [Scan selection controls](docs/scan-selection.md)
 - [Project configuration](docs/configuration.md)
+- [Machine and editor integration](docs/machine-integration.md)
 - [Architecture](docs/architecture.md)
 - [Add a language](docs/adding-a-language.md)
 - [Contributing](CONTRIBUTING.md)

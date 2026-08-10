@@ -37,7 +37,7 @@ Profiles deliberately do not guess project-specific test, migration, generated
 router, or framework exclusions. Add those only after auditing the repository's
 source categories and the first report.
 
-The selected profile is recorded in schema-16 reports. Omitting `profile`
+The selected profile is recorded in schema-17 reports. Omitting `profile`
 retains the legacy defaults. A CLI `--profile` replaces a configured profile;
 explicit fields from the config are then applied, followed by explicit CLI
 flags. An explicit language-selection mode replaces the profile's mode, so
@@ -191,7 +191,7 @@ Ignore files affect directory traversal only. A file passed explicitly remains
 visible. Repeated `--exclude` globs remain additive and continue to exclude an
 explicitly requested file. Use `--no-ignore` to disable both ignore-file types.
 
-Schema-16 JSON reports record the effective profile, strict coverage policies,
+Schema-17 JSON reports record the effective profile, strict coverage policies,
 options, and every loaded ignore file with its SHA-256 content evidence under
 `configuration` so a scan can be
 reproduced. Review focus remains
