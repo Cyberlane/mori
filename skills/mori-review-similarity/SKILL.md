@@ -305,6 +305,9 @@ revision or date from the version string. Inspect:
 - `structural_evidence`: verify exact weighted intersection/union totals,
   complete A-only/B-only totals, fingerprint alignment, and bounded feature
   lists; describe 100% only as normalized feature identity; and
+- `ordered:` evidence: treat statement positions and anonymous callee slots as
+  low-weight structural differences only; slots are fragment-local, do not
+  disclose source names, and do not identify equivalent operations;
 - `shape_summary` and `shared_features`: use them to explain why a group ranked
   highly without treating the summary as behavioral evidence.
 - `review_priority` and `review_signals`: when review ranking is selected,

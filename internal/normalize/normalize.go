@@ -4,6 +4,8 @@ package normalize
 import (
 	"context"
 	"crypto/sha256"
+	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -15,7 +17,12 @@ import (
 // Version identifies the normalization contract used to build feature bags.
 // Bump it whenever the selected comparison-unit contract, feature vocabulary,
 // weights, canonical mappings, or semantic-hint list changes.
-const Version = 8
+const Version = 9
+
+const (
+	maxOrderedCallFeatures = 8
+	maxOrderedCalleeSlots  = 8
+)
 
 // Profile is a normalized, language-neutral view of one syntax fragment.
 // It is not the stable content identity exposed in reports.
@@ -37,6 +44,16 @@ func Build(
 	profile := Profile{Features: make(model.FeatureBag)}
 	if root == nil {
 		return profile, nil
+	}
+	if err := addOrderedFeatures(
+		ctx,
+		root,
+		source,
+		isBoundary,
+		excludeNestedBoundaries,
+		profile.Features,
+	); err != nil {
+		return Profile{}, err
 	}
 
 	type frame struct {
@@ -129,6 +146,7 @@ func BuildCollection(
 		addFeature(profile.Features, "node:"+canonicalRoot, 1)
 		profile.TokenCount = 1
 	}
+	addStatementOrderFeatures(profile.Features, roots, source, isBoundary)
 	for _, root := range roots {
 		part, err := Build(ctx, root, source, isBoundary, excludeNestedBoundaries)
 		if err != nil {
@@ -141,6 +159,206 @@ func BuildCollection(
 		profile.LiteralDigests = append(profile.LiteralDigests, part.LiteralDigests...)
 	}
 	return profile, nil
+}
+
+type orderedCall struct {
+	callee  string
+	context string
+}
+
+// addOrderedFeatures adds bounded, low-weight evidence that a plain multiset
+// cannot represent. Statement features use only canonical shapes. Call-role
+// features use fragment-local anonymous slots and never expose callee names or
+// name digests in fingerprints or reports.
+func addOrderedFeatures(
+	ctx context.Context,
+	root *tree_sitter.Node,
+	source []byte,
+	isBoundary func(string) bool,
+	excludeNestedBoundaries bool,
+	features model.FeatureBag,
+) error {
+	type frame struct {
+		node    *tree_sitter.Node
+		context string
+	}
+
+	rootID := root.Id()
+	stack := []frame{{node: root, context: "linear"}}
+	calls := make([]orderedCall, 0)
+	callees := make(map[string]struct{})
+
+	for len(stack) > 0 {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		node := current.node
+		if node == nil || node.IsError() || node.IsMissing() || node.IsExtra() {
+			continue
+		}
+		kind := node.Kind()
+		if excludeNestedBoundaries && node.Id() != rootID && isBoundary != nil && isBoundary(kind) {
+			continue
+		}
+		if shouldSkipSubtree(kind) {
+			continue
+		}
+
+		if canonicalNamed(node, source) == "block" {
+			addStatementOrderFeatures(features, directOrderedStatements(node), source, isBoundary)
+		}
+		if canonicalNamed(node, source) == "expression:call" {
+			if callee := callCallee(node, source); callee != "" {
+				calls = append(calls, orderedCall{callee: callee, context: current.context})
+				callees[callee] = struct{}{}
+			}
+		}
+
+		for index := int(node.ChildCount()) - 1; index >= 0; index-- {
+			child := node.Child(uint(index))
+			if child == nil {
+				continue
+			}
+			field := node.FieldNameForChild(uint32(index))
+			stack = append(stack, frame{
+				node:    child,
+				context: orderedControlContext(node, field, current.context, source),
+			})
+		}
+	}
+
+	// Anonymous slots are useful only when a fragment has multiple callees.
+	// Skip larger call vocabularies rather than letting project-specific names
+	// have unbounded influence over a structural score.
+	if len(callees) < 2 || len(callees) > maxOrderedCalleeSlots {
+		return nil
+	}
+	orderedCallees := make([]string, 0, len(callees))
+	for callee := range callees {
+		orderedCallees = append(orderedCallees, callee)
+	}
+	sort.Strings(orderedCallees)
+	slots := make(map[string]int, len(orderedCallees))
+	for index, callee := range orderedCallees {
+		slots[callee] = index
+	}
+	for index, call := range calls {
+		if index >= maxOrderedCallFeatures {
+			break
+		}
+		addFeature(
+			features,
+			"ordered:call:"+call.context+":callee-slot-"+strconv.Itoa(slots[call.callee]),
+			1,
+		)
+	}
+	return nil
+}
+
+func addStatementOrderFeatures(
+	features model.FeatureBag,
+	statements []*tree_sitter.Node,
+	source []byte,
+	isBoundary func(string) bool,
+) {
+	for index, statement := range statements {
+		if statement == nil || statement.IsError() || statement.IsMissing() || statement.IsExtra() {
+			continue
+		}
+		if isBoundary != nil && isBoundary(statement.Kind()) {
+			continue
+		}
+		shape := canonicalNamed(statement, source)
+		if shape == "" {
+			continue
+		}
+		addFeature(
+			features,
+			"ordered:statement:"+statementPosition(index, len(statements))+":"+shape,
+			1,
+		)
+	}
+}
+
+func directOrderedStatements(block *tree_sitter.Node) []*tree_sitter.Node {
+	statements := namedChildren(block)
+	if len(statements) == 1 && isTransparentStatementContainer(statements[0].Kind()) {
+		return namedChildren(statements[0])
+	}
+	return statements
+}
+
+func namedChildren(node *tree_sitter.Node) []*tree_sitter.Node {
+	children := make([]*tree_sitter.Node, 0, node.NamedChildCount())
+	for index := uint(0); index < node.NamedChildCount(); index++ {
+		if child := node.NamedChild(index); child != nil {
+			children = append(children, child)
+		}
+	}
+	return children
+}
+
+func isTransparentStatementContainer(kind string) bool {
+	return kind == "statement_list" || kind == "statements"
+}
+
+func statementPosition(index, count int) string {
+	if count == 1 {
+		return "only"
+	}
+	if index == 0 {
+		return "first"
+	}
+	if index == count-1 {
+		return "last"
+	}
+	return "middle"
+}
+
+func orderedControlContext(
+	parent *tree_sitter.Node,
+	field string,
+	inherited string,
+	source []byte,
+) string {
+	switch canonicalNamed(parent, source) {
+	case "flow:if":
+		switch field {
+		case "condition":
+			return "condition"
+		case "alternative":
+			return "alternative"
+		default:
+			return "branch"
+		}
+	case "flow:loop":
+		if field == "condition" {
+			return "loop-condition"
+		}
+		return "loop-body"
+	case "flow:switch", "flow:case":
+		return "selection"
+	case "flow:defer":
+		return "deferred"
+	default:
+		return inherited
+	}
+}
+
+func callCallee(node *tree_sitter.Node, source []byte) string {
+	callee := node.ChildByFieldName("function")
+	if callee == nil {
+		callee = node.ChildByFieldName("callee")
+	}
+	if callee == nil && node.Kind() == "invocation" && node.NamedChildCount() > 0 {
+		callee = node.NamedChild(0)
+	}
+	if callee == nil {
+		return ""
+	}
+	return strings.ToLower(rightmostWord(callee.Utf8Text(source)))
 }
 
 func enterNode(
