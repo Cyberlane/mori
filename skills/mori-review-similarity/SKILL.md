@@ -75,7 +75,7 @@ status `4` means at least one configured coverage policy failed. The report is
 still written; classify the scan as not applicable or insufficiently covered,
 never as a clean result.
 
-Schema-16 reports include `coverage` and `file_coverage`. Verify the exact
+Schema-17 reports include `coverage` and `file_coverage`. Verify the exact
 fragment-file numerator and analyzed-file denominator, then inspect every
 supported file with zero fragments, its zero-fragment reason, boundary counts,
 skipped-fragment count, and parse-diagnostic count. Generated exclusions remain
@@ -248,7 +248,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `16`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `17`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while

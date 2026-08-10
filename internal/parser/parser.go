@@ -64,7 +64,7 @@ func FileWithCoverage(
 	file source.File,
 	options Options,
 ) ([]model.Fragment, []model.Warning, Coverage) {
-	content, err := readSource(ctx, file.Path, file.MaxBytes, file.Info)
+	content, err := readSource(ctx, file)
 	if err != nil {
 		return nil, []model.Warning{{
 			Path:    file.DisplayPath,
@@ -523,11 +523,18 @@ func cleanName(value string) string {
 
 func readSource(
 	ctx context.Context,
-	path string,
-	maxBytes int64,
-	expectedInfo os.FileInfo,
+	sourceFile source.File,
 ) (returnBytes []byte, returnErr error) {
-	file, err := os.Open(path)
+	if sourceFile.Content != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if sourceFile.MaxBytes > 0 && int64(len(sourceFile.Content)) > sourceFile.MaxBytes {
+			return nil, fmt.Errorf("file exceeded %d-byte limit while reading", sourceFile.MaxBytes)
+		}
+		return append([]byte(nil), sourceFile.Content...), nil
+	}
+	file, err := os.Open(sourceFile.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -544,24 +551,24 @@ func readSource(
 	if !openedInfo.Mode().IsRegular() {
 		return nil, errors.New("source is no longer a regular file")
 	}
-	if expectedInfo != nil && !os.SameFile(expectedInfo, openedInfo) {
+	if sourceFile.Info != nil && !os.SameFile(sourceFile.Info, openedInfo) {
 		return nil, errors.New("source changed identity after discovery")
 	}
 
-	if maxBytes <= 0 {
+	if sourceFile.MaxBytes <= 0 {
 		return readAllContext(ctx, file)
 	}
 
-	readLimit := maxBytes
-	if maxBytes < math.MaxInt64 {
+	readLimit := sourceFile.MaxBytes
+	if sourceFile.MaxBytes < math.MaxInt64 {
 		readLimit++
 	}
 	content, err := readAllContext(ctx, io.LimitReader(file, readLimit))
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(content)) > maxBytes {
-		return nil, fmt.Errorf("file exceeded %d-byte limit while reading", maxBytes)
+	if int64(len(content)) > sourceFile.MaxBytes {
+		return nil, fmt.Errorf("file exceeded %d-byte limit while reading", sourceFile.MaxBytes)
 	}
 	return content, nil
 }

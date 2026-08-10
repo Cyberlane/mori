@@ -54,6 +54,11 @@ jobs:
           CGO_ENABLED: "1"
         run: make check
 
+      - name: Check reference VS Code extension
+        run: |
+          node --check editors/vscode/extension.js
+          node -e 'JSON.parse(require("fs").readFileSync("editors/vscode/package.json", "utf8"))'
+
       - name: Verify example scan
         env:
           CGO_ENABLED: "1"

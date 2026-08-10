@@ -25,6 +25,7 @@ type File struct {
 	DisplayPath    string
 	Language       language.Spec
 	AnalysisDomain string
+	Content        []byte
 	Generated      bool
 	Marker         string
 	MaxBytes       int64

@@ -196,7 +196,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 16,
+  "schema_version": 17,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -340,6 +340,12 @@ callee/control-position evidence without changing the schema-16 JSON shape or
 baseline schema 3. Scores, fingerprints, and accepted identities can change,
 so older-normalization baselines fail closed and require deliberate review and
 regeneration.
+
+Schema 17 adds the optional `configuration.stdin_path` field for bounded
+unsaved-buffer overlays. It changes reporting only: normalization remains
+version 9 and baseline schema remains version 3. The complete versioned
+contract is published as
+[`schemas/mori-report-v17.schema.json`](../schemas/mori-report-v17.schema.json).
 
 Schema 9 added a deterministic `file_coverage` array with one entry per analyzed
 or generated-excluded supported file. Each entry records its language, review

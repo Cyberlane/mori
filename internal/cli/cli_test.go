@@ -1763,3 +1763,65 @@ func TestReadOnlyCommandsReportWriteFailures(t *testing.T) {
 		t.Errorf("Run(skill install --help) exit = %d, want %d", code, exitError)
 	}
 }
+
+func TestRunScanUsesBoundedStdinOverlayAndImplicitFocus(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "sample.go")
+	disk := `package sample
+func First(ok bool) { alpha(); if ok { beta() } }
+func Second(values []int) int { total := 0; for _, value := range values { total += value }; return total }
+`
+	if err := os.WriteFile(path, []byte(disk), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	overlay := `package sample
+func First(ok bool) { alpha(); if ok { beta() } }
+func Second(flag bool) { logEvent(); if flag { storeRecord() } }
+`
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := RunWithInput(context.Background(), []string{
+		"scan", "--no-config", "--format", "json", "--same-language-only",
+		"--threshold", "1", "--min-tokens", "1", "--stdin-path", path, root,
+	}, strings.NewReader(overlay), &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	if result.SchemaVersion != 17 || result.Configuration.StdinPath == "" ||
+		result.Configuration.Focus == nil || result.Configuration.Focus.DiscoveredFocusFiles != 1 ||
+		len(result.Groups) != 1 || !result.Groups[0].Focused {
+		t.Fatalf("overlay report = %#v", result)
+	}
+	if result.Groups[0].Profiles[0].Occurrences[0].Location.Name != "First" &&
+		result.Groups[0].Profiles[1].Occurrences[0].Location.Name != "First" {
+		t.Fatalf("overlay group = %#v", result.Groups[0])
+	}
+
+	if _, err := readStdinOverlay(context.Background(), strings.NewReader("12345"), 4); err == nil {
+		t.Fatal("oversized stdin overlay succeeded")
+	}
+}
+
+func TestRunScanRejectsMissingOrBaselinedStdinPath(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		args []string
+		code int
+	}{
+		{args: []string{"scan", "--no-config", "--stdin-path", "missing.go", "."}, code: exitError},
+		{args: []string{"scan", "--no-config", "--stdin-path", "file.go", "--baseline", "baseline.json", "."}, code: exitUsage},
+	} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		if code := RunWithInput(
+			context.Background(), test.args, strings.NewReader("package sample\n"), &stdout, &stderr,
+		); code != test.code {
+			t.Fatalf("RunWithInput(%v) exit = %d, stderr = %q", test.args, code, stderr.String())
+		}
+	}
+}

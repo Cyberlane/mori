@@ -31,17 +31,30 @@ import (
 )
 
 const (
-	exitSuccess         = 0
-	exitError           = 1
-	exitUsage           = 2
-	exitFindings        = 3
-	exitCoverage        = 4
-	maxChangedWorktrees = 64
-	maxFocusedGitPaths  = 100_000
+	exitSuccess          = 0
+	exitError            = 1
+	exitUsage            = 2
+	exitFindings         = 3
+	exitCoverage         = 4
+	maxChangedWorktrees  = 64
+	maxFocusedGitPaths   = 100_000
+	maxStdinOverlayBytes = 16 * 1024 * 1024
 )
 
 // Run executes one CLI invocation and returns its process exit code.
 func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
+	return RunWithInput(ctx, args, os.Stdin, stdout, stderr)
+}
+
+// RunWithInput executes one CLI invocation with an explicit standard input.
+// Editors use it to provide a bounded unsaved source overlay.
+func RunWithInput(
+	ctx context.Context,
+	args []string,
+	stdin io.Reader,
+	stdout io.Writer,
+	stderr io.Writer,
+) int {
 	if len(args) == 0 {
 		if err := writeRootUsage(stderr); err != nil {
 			return exitError
@@ -51,7 +64,7 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 
 	switch args[0] {
 	case "scan":
-		return runScan(ctx, args[1:], stdout, stderr)
+		return runScan(ctx, args[1:], stdin, stdout, stderr)
 	case "init":
 		return runInit(args[1:], stdout, stderr)
 	case "baseline":
@@ -127,6 +140,8 @@ type scanOptions struct {
 	classification     string
 	classificationSet  bool
 	allowedWarnings    stringList
+	stdinPath          string
+	stdinContent       []byte
 }
 
 func defaultScanOptions() scanOptions {
@@ -159,7 +174,15 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 	flags.IntVar(&options.maxPairs, "max-pairs", options.maxPairs, "comparison safety limit; 0 is unlimited")
 	flags.Int64Var(&options.maxFileBytes, "max-file-bytes", options.maxFileBytes, "maximum source file size; 0 is unlimited")
 	flags.IntVar(&options.workers, "workers", options.workers, "parallel parser workers")
-	flags.StringVar(&options.format, "format", options.format, "output format: text or json")
+	flags.StringVar(&options.format, "format", options.format, "output format: text, json, or sarif")
+	if baselineAction == "" {
+		flags.StringVar(
+			&options.stdinPath,
+			"stdin-path",
+			options.stdinPath,
+			"analyze bounded stdin as the unsaved content of one discovered source path",
+		)
+	}
 	flags.StringVar(
 		&options.comparisonDomain,
 		"comparison-domain",
@@ -667,8 +690,11 @@ func validateScanOptions(options scanOptions) error {
 	if options.workers < 1 {
 		return errors.New("--workers must be at least 1")
 	}
-	if options.format != "text" && options.format != "json" {
-		return errors.New("--format must be text or json")
+	if options.format != "text" && options.format != "json" && options.format != "sarif" {
+		return errors.New("--format must be text, json, or sarif")
+	}
+	if options.stdinPath != "" && options.baselinePath != "" {
+		return errors.New("--stdin-path cannot be used with --baseline")
 	}
 	if _, err := resolveSQLDialect(options.sqlDialect); err != nil {
 		return err
@@ -734,10 +760,25 @@ func validateScanOptions(options scanOptions) error {
 	return source.ValidatePatterns(options.excludes)
 }
 
-func runScan(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
+func runScan(
+	ctx context.Context,
+	args []string,
+	stdin io.Reader,
+	stdout io.Writer,
+	stderr io.Writer,
+) int {
 	options, paths, code, ok := parseScanOptions("scan", args, stderr, "")
 	if !ok {
 		return code
+	}
+	if options.stdinPath != "" {
+		content, err := readStdinOverlay(ctx, stdin, options.maxFileBytes)
+		if err != nil {
+			fmt.Fprintf(stderr, "mori: read --stdin-path overlay: %v\n", err)
+			return exitError
+		}
+		options.stdinContent = content
+		options.focusPaths = append(options.focusPaths, options.stdinPath)
 	}
 	suppress, baselineWarnings, baselineStatus, baselineDigest, err := loadSuppression(options.baselinePath)
 	if err != nil {
@@ -766,6 +807,8 @@ func runScan(ctx context.Context, args []string, stdout io.Writer, stderr io.Wri
 
 	if options.format == "json" {
 		err = report.JSON(stdout, result)
+	} else if options.format == "sarif" {
+		err = report.SARIF(stdout, result)
 	} else {
 		err = report.Text(stdout, result)
 	}
@@ -783,6 +826,29 @@ func runScan(ctx context.Context, args []string, stdout io.Writer, stderr io.Wri
 		return exitFindings
 	}
 	return exitSuccess
+}
+
+func readStdinOverlay(ctx context.Context, reader io.Reader, maxFileBytes int64) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	limit := int64(maxStdinOverlayBytes)
+	if maxFileBytes > 0 && maxFileBytes < limit {
+		limit = maxFileBytes
+	}
+	content, err := io.ReadAll(io.LimitReader(reader, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(content)) > limit {
+		return nil, fmt.Errorf("stdin content exceeds the %d-byte overlay limit", limit)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	cloned := make([]byte, len(content))
+	copy(cloned, content)
+	return cloned, nil
 }
 
 func runBaseline(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
@@ -1497,6 +1563,29 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, fmt.Errorf("discover source: %w", err)
 	}
+	if options.stdinPath != "" {
+		overlayPath, err := filepath.Abs(options.stdinPath)
+		if err != nil {
+			return model.Report{}, fmt.Errorf("resolve --stdin-path: %w", err)
+		}
+		overlayCanonical := canonicalPath(overlayPath)
+		matched := false
+		for index := range discovered.Files {
+			if canonicalPath(discovered.Files[index].Path) != overlayCanonical {
+				continue
+			}
+			discovered.Files[index].Content = make([]byte, len(options.stdinContent))
+			copy(discovered.Files[index].Content, options.stdinContent)
+			matched = true
+			break
+		}
+		if !matched {
+			return model.Report{}, fmt.Errorf(
+				"--stdin-path %q is not one discovered supported source file",
+				displayCLIPath(overlayPath),
+			)
+		}
+	}
 	profile, err := baselineScanProfile(options, discovered.IgnoreEvidence)
 	if err != nil {
 		return model.Report{}, err
@@ -1582,6 +1671,7 @@ func executeScan(
 		FailOnDiagnostic:  options.failOnDiagnostic,
 		BaselinePath:      displayOptionalPath(options.baselinePath),
 		ScanProfileDigest: baseline.Digest(profile),
+		StdinPath:         displayOptionalPath(options.stdinPath),
 		Focus:             focus,
 	}
 	result.Tool = buildinfo.Current()

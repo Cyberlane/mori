@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Cyberlane/mori/v0.24.0/schemas/mori-report-v17.schema.json",
+  "title": "Mori structural similarity report schema 17",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "tool", "threshold", "files", "fragments",
+    "candidate_pairs", "total_location_pairs", "total_match_groups",
+    "total_focused_match_groups", "suppressed_location_pairs",
+    "suppressed_match_groups", "truncated", "groups", "warnings",
+    "file_coverage", "coverage", "configuration"
+  ],
+  "properties": {
+    "schema_version": {"const": 17},
+    "tool": {"$ref": "#/$defs/tool"},
+    "threshold": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+    "files": {"$ref": "#/$defs/nonNegativeInteger"},
+    "fragments": {"$ref": "#/$defs/nonNegativeInteger"},
+    "candidate_pairs": {"$ref": "#/$defs/nonNegativeInteger"},
+    "total_location_pairs": {"$ref": "#/$defs/nonNegativeInteger"},
+    "total_match_groups": {"$ref": "#/$defs/nonNegativeInteger"},
+    "total_focused_match_groups": {"$ref": "#/$defs/nonNegativeInteger"},
+    "suppressed_location_pairs": {"$ref": "#/$defs/nonNegativeInteger"},
+    "suppressed_match_groups": {"$ref": "#/$defs/nonNegativeInteger"},
+    "truncated": {"type": "boolean"},
+    "groups": {"type": "array", "items": {"$ref": "#/$defs/group"}},
+    "warnings": {"type": "array", "items": {"$ref": "#/$defs/warning"}},
+    "file_coverage": {"type": "array", "items": {"$ref": "#/$defs/fileCoverage"}},
+    "coverage": {"$ref": "#/$defs/coverage"},
+    "configuration": {"$ref": "#/$defs/configuration"}
+  },
+  "$defs": {
+    "nonNegativeInteger": {"type": "integer", "minimum": 0},
+    "stringArray": {"type": "array", "items": {"type": "string"}},
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "revision", "source_date", "modified", "go_version", "goos", "goarch", "normalization_version"],
+      "properties": {
+        "name": {"const": "mori"},
+        "version": {"type": "string"},
+        "revision": {"type": "string"},
+        "source_date": {"type": "string"},
+        "modified": {"type": "boolean"},
+        "go_version": {"type": "string"},
+        "goos": {"type": "string"},
+        "goarch": {"type": "string"},
+        "normalization_version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "language", "language_family", "comparison_domain", "fragment_kind", "name", "start_line", "end_line"],
+      "properties": {
+        "path": {"type": "string"},
+        "language": {"type": "string"},
+        "language_family": {"type": "string"},
+        "comparison_domain": {"enum": ["code", "sql-query"]},
+        "fragment_kind": {"enum": ["function", "script", "block", "query"]},
+        "name": {"type": "string"},
+        "start_line": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1}
+      }
+    },
+    "fragment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "token_count", "feature_count", "fingerprint", "nesting_depth", "nested_function_count"],
+      "properties": {
+        "location": {"$ref": "#/$defs/location"},
+        "token_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "feature_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+        "nesting_depth": {"$ref": "#/$defs/nonNegativeInteger"},
+        "parent": {"$ref": "#/$defs/location"},
+        "parent_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+        "nested_function_count": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fingerprint", "token_count", "feature_count", "occurrence_count", "occurrences"],
+      "properties": {
+        "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+        "token_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "feature_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "occurrence_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "occurrences": {"type": "array", "items": {"$ref": "#/$defs/fragment"}}
+      }
+    },
+    "feature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature", "count"],
+      "properties": {
+        "feature": {"type": "string"},
+        "count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "profileDifference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fingerprint", "weighted_only_total", "features"],
+      "properties": {
+        "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+        "weighted_only_total": {"$ref": "#/$defs/nonNegativeInteger"},
+        "features": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/feature"}}
+      }
+    },
+    "structuralEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["weighted_intersection", "weighted_union", "left_only", "right_only"],
+      "properties": {
+        "weighted_intersection": {"$ref": "#/$defs/nonNegativeInteger"},
+        "weighted_union": {"$ref": "#/$defs/nonNegativeInteger"},
+        "left_only": {"$ref": "#/$defs/profileDifference"},
+        "right_only": {"$ref": "#/$defs/profileDifference"}
+      }
+    },
+    "literalEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compared_location_pairs", "pairs_with_differences", "max_differing_positions", "literal_count_mismatch_pairs"],
+      "properties": {
+        "compared_location_pairs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "pairs_with_differences": {"$ref": "#/$defs/nonNegativeInteger"},
+        "max_differing_positions": {"$ref": "#/$defs/nonNegativeInteger"},
+        "literal_count_mismatch_pairs": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_pair_id", "similarity", "location_pairs", "focused", "focused_occurrences", "profiles", "shape_summary", "shared_features", "structural_evidence", "review_priority", "review_signals"],
+      "properties": {
+        "content_pair_id": {"type": "string", "pattern": "^[0-9a-f]{16}:[0-9a-f]{16}$"},
+        "similarity": {"type": "number", "minimum": 0, "maximum": 1},
+        "location_pairs": {"type": "integer", "minimum": 1},
+        "focused": {"type": "boolean"},
+        "focused_occurrences": {"$ref": "#/$defs/nonNegativeInteger"},
+        "profiles": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"$ref": "#/$defs/profile"}},
+        "shape_summary": {"$ref": "#/$defs/stringArray"},
+        "shared_features": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/feature"}},
+        "structural_evidence": {"$ref": "#/$defs/structuralEvidence"},
+        "review_priority": {"$ref": "#/$defs/nonNegativeInteger"},
+        "review_signals": {"$ref": "#/$defs/stringArray"},
+        "literal_evidence": {"$ref": "#/$defs/literalEvidence"}
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_kind", "start_line", "start_column", "end_line", "end_column"],
+      "properties": {
+        "node_kind": {"type": "string"},
+        "start_line": {"type": "integer", "minimum": 1},
+        "start_column": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1},
+        "end_column": {"type": "integer", "minimum": 1}
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "kind": {"enum": ["baseline", "coverage", "focus", "other", "parse"]},
+        "path": {"type": "string"},
+        "language": {"type": "string"},
+        "message": {"type": "string"},
+        "total_diagnostics": {"$ref": "#/$defs/nonNegativeInteger"},
+        "skipped_fragments": {"$ref": "#/$defs/nonNegativeInteger"},
+        "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/diagnostic"}}
+      }
+    },
+    "fileCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "language", "language_family", "comparison_domain", "status", "generated", "fragment_count", "candidate_fragment_count", "below_token_floor_count", "skipped_fragments", "parse_diagnostics"],
+      "properties": {
+        "path": {"type": "string"},
+        "language": {"type": "string"},
+        "language_family": {"type": "string"},
+        "comparison_domain": {"enum": ["code", "sql-query"]},
+        "status": {"enum": ["analyzed", "excluded_generated", "skipped_resource"]},
+        "generated": {"type": "boolean"},
+        "generated_marker": {"type": "string"},
+        "fragment_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "candidate_fragment_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "below_token_floor_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "zero_fragment_reason": {"enum": ["no_boundaries", "below_token_floor", "invalid_fragments", "resource_limit", "generated_excluded"]},
+        "skipped_fragments": {"$ref": "#/$defs/nonNegativeInteger"},
+        "parse_diagnostics": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "unsupported": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["extension", "file_count"],
+      "properties": {
+        "extension": {"type": "string"},
+        "file_count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supported_files", "analyzed_files", "fragment_files", "zero_fragment_files", "generated_excluded_files", "warning_files", "warning_count", "parse_diagnostic_files", "parse_diagnostic_count", "unsupported_extensions"],
+      "properties": {
+        "supported_files": {"$ref": "#/$defs/nonNegativeInteger"},
+        "analyzed_files": {"$ref": "#/$defs/nonNegativeInteger"},
+        "fragment_files": {"$ref": "#/$defs/nonNegativeInteger"},
+        "zero_fragment_files": {"$ref": "#/$defs/nonNegativeInteger"},
+        "generated_excluded_files": {"$ref": "#/$defs/nonNegativeInteger"},
+        "warning_files": {"$ref": "#/$defs/nonNegativeInteger"},
+        "warning_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "parse_diagnostic_files": {"$ref": "#/$defs/nonNegativeInteger"},
+        "parse_diagnostic_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "unsupported_extensions": {"type": "array", "items": {"$ref": "#/$defs/unsupported"}}
+      }
+    },
+    "ignoreEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {"type": "string"},
+        "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "priorityPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern", "priority"],
+      "properties": {
+        "pattern": {"type": "string"},
+        "priority": {"type": "integer", "minimum": 1, "maximum": 100}
+      }
+    },
+    "worktreeFocus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "requested_base", "base_commit", "merge_base", "head_commit", "working_tree_included", "untracked_included", "changed_paths", "deleted_paths"],
+      "properties": {
+        "root": {"type": "string"},
+        "requested_base": {"type": "string"},
+        "base_commit": {"type": "string"},
+        "merge_base": {"type": "string"},
+        "head_commit": {"type": "string"},
+        "working_tree_included": {"type": "boolean"},
+        "untracked_included": {"type": "boolean"},
+        "changed_paths": {"$ref": "#/$defs/stringArray"},
+        "deleted_paths": {"$ref": "#/$defs/stringArray"}
+      }
+    },
+    "focus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "explicit_paths", "working_tree_included", "untracked_included", "changed_paths", "deleted_paths", "discovered_focus_files"],
+      "properties": {
+        "mode": {"enum": ["explicit", "git", "git-and-explicit", "git-worktrees", "git-worktrees-and-explicit"]},
+        "explicit_paths": {"$ref": "#/$defs/stringArray"},
+        "requested_base": {"type": "string"},
+        "base_commit": {"type": "string"},
+        "merge_base": {"type": "string"},
+        "head_commit": {"type": "string"},
+        "working_tree_included": {"type": "boolean"},
+        "untracked_included": {"type": "boolean"},
+        "changed_paths": {"$ref": "#/$defs/stringArray"},
+        "deleted_paths": {"$ref": "#/$defs/stringArray"},
+        "worktrees": {"type": "array", "items": {"$ref": "#/$defs/worktreeFocus"}},
+        "discovered_focus_files": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ignore_files", "ignore_file_evidence", "respect_ignore", "exclude_generated", "excludes", "min_tokens", "max_groups", "max_occurrences", "max_pairs", "max_file_bytes", "comparison_domain", "sql_dialect", "embedded_sql", "statement_blocks", "block_statements", "max_blocks_per_function", "ranking", "priority_paths", "same_language_only", "cross_language_only", "language_pairs", "require_coverage", "min_file_coverage", "max_zero_fragment_files", "fail_on_warning", "fail_on_parse_diagnostic", "scan_profile_digest"],
+      "properties": {
+        "profile": {"enum": ["review", "explore", "sql"]},
+        "config_path": {"type": "string"},
+        "ignore_files": {"$ref": "#/$defs/stringArray"},
+        "ignore_file_evidence": {"type": "array", "items": {"$ref": "#/$defs/ignoreEvidence"}},
+        "respect_ignore": {"type": "boolean"},
+        "exclude_generated": {"type": "boolean"},
+        "excludes": {"$ref": "#/$defs/stringArray"},
+        "min_tokens": {"type": "integer", "minimum": 1},
+        "max_groups": {"$ref": "#/$defs/nonNegativeInteger"},
+        "max_occurrences": {"$ref": "#/$defs/nonNegativeInteger"},
+        "max_pairs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "max_file_bytes": {"$ref": "#/$defs/nonNegativeInteger"},
+        "comparison_domain": {"type": "string"},
+        "sql_dialect": {"enum": ["generic", "postgresql"]},
+        "embedded_sql": {"type": "boolean"},
+        "statement_blocks": {"type": "boolean"},
+        "block_statements": {"type": "integer", "minimum": 2, "maximum": 10},
+        "max_blocks_per_function": {"type": "integer", "minimum": 1, "maximum": 256},
+        "ranking": {"enum": ["structural", "review"]},
+        "priority_paths": {"type": "array", "items": {"$ref": "#/$defs/priorityPath"}},
+        "same_language_only": {"type": "boolean"},
+        "cross_language_only": {"type": "boolean"},
+        "language_pairs": {"$ref": "#/$defs/stringArray"},
+        "require_coverage": {"type": "boolean"},
+        "min_file_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+        "max_zero_fragment_files": {"type": "integer", "minimum": -1},
+        "fail_on_warning": {"type": "boolean"},
+        "fail_on_parse_diagnostic": {"type": "boolean"},
+        "baseline_path": {"type": "string"},
+        "scan_profile_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "baseline_profile_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "baseline_profile_status": {"enum": ["compatible", "legacy"]},
+        "stdin_path": {"type": "string"},
+        "focus": {"$ref": "#/$defs/focus"}
+      }
+    }
+  }
+}
