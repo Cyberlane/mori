@@ -199,7 +199,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 	flags.IntVar(&options.maxPairs, "max-pairs", options.maxPairs, "comparison safety limit; 0 is unlimited")
 	flags.Int64Var(&options.maxFileBytes, "max-file-bytes", options.maxFileBytes, "maximum source file size; 0 is unlimited")
 	flags.IntVar(&options.workers, "workers", options.workers, "parallel parser workers")
-	flags.StringVar(&options.format, "format", options.format, "output format: text, json, sarif, or html")
+	flags.StringVar(&options.format, "format", options.format, "output format: text, compact, json, sarif, or html")
 	flags.StringVar(&options.color, "color", options.color, "terminal color: auto, always, or never")
 	flags.BoolVar(&options.redactPaths, "redact-paths", options.redactPaths, "replace source and configuration paths with stable placeholders in output")
 	if baselineAction == "" {
@@ -942,8 +942,8 @@ func validateScanOptions(options scanOptions) error {
 	if options.workers < 1 {
 		return errors.New("--workers must be at least 1")
 	}
-	if options.format != "text" && options.format != "json" && options.format != "sarif" && options.format != "html" {
-		return errors.New("--format must be text, json, sarif, or html")
+	if options.format != "text" && options.format != "compact" && options.format != "json" && options.format != "sarif" && options.format != "html" {
+		return errors.New("--format must be text, compact, json, sarif, or html")
 	}
 	if options.color != "auto" && options.color != "always" && options.color != "never" {
 		return errors.New("--color must be auto, always, or never")
@@ -1092,6 +1092,8 @@ func renderScanReport(stdout io.Writer, result model.Report, options scanOptions
 		redactReportPaths(&result)
 	}
 	switch options.format {
+	case "compact":
+		return report.Compact(stdout, result)
 	case "json":
 		return report.JSON(stdout, result)
 	case "sarif":

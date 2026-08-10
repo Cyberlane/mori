@@ -68,6 +68,38 @@ func TestTextEscapesTerminalControlCharacters(t *testing.T) {
 	}
 }
 
+func TestCompactUsesOneLinePerGroupAndKeepsSafetyDisclosure(t *testing.T) {
+	t.Parallel()
+	var output bytes.Buffer
+	err := Compact(&output, model.Report{
+		Threshold: 0.8, Files: 2, Fragments: 2, TotalMatchGroups: 1, TotalLocationPairs: 1,
+		Configuration: model.EffectiveConfig{
+			Input: &model.InputSnapshot{Mode: "git-index", IndexDigest: strings.Repeat("a", 64)},
+			Focus: &model.FocusConfig{CoveredFocusFiles: 1, RequiredFocusFiles: 2},
+		},
+		TotalFocusedMatchGroups: 1,
+		Groups: []model.MatchGroup{{
+			ID: "pair", Similarity: 0.9, Focused: true, LocationPairs: 1,
+			Profiles: []model.FragmentProfile{
+				{Occurrences: []model.FragmentSummary{{Location: model.Location{Path: "a.go", StartLine: 4, Name: "First"}}}},
+				{Occurrences: []model.FragmentSummary{{Location: model.Location{Path: "b.go", StartLine: 8, Name: "Second"}}}},
+			},
+		}},
+		Warnings: []model.Warning{{Message: "warning"}},
+	})
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	for _, expected := range []string{
+		"input: git-index aaaaaaaaaaaa", "focus: 1/2", "90.0% pair focused pairs=1 a.go:4:First <-> b.go:8:Second",
+		"warnings: 1", "do not prove behavioral equivalence",
+	} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("compact output missing %q:\n%s", expected, output.String())
+		}
+	}
+}
+
 func TestTextDisclosesSuppressedGroups(t *testing.T) {
 	t.Parallel()
 
