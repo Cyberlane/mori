@@ -27,11 +27,12 @@ Settings:
 - `mori.profile`: `review`, `explore`, or `sql`; and
 - `mori.debounceMilliseconds`: 100 through 10,000 milliseconds.
 
-The reference client supports VS Code language IDs for Go, JavaScript,
-TypeScript, JSX, TSX, Python, Rust, shell, Swift, and SQL. Mori still decides
-support from the discovered file path and selected dialect. A scan covers the
-containing workspace root so the unsaved buffer can be compared with existing
-repository source, then filters diagnostics back to the edited document.
+The reference client supports VS Code language IDs for C#, Go, Java,
+JavaScript, TypeScript, JSX, TSX, Python, Rust, shell, Swift, and SQL. Mori
+still decides support from the discovered file path and selected dialect. A
+scan covers the containing workspace root so the unsaved buffer can be
+compared with existing repository source, then filters diagnostics back to the
+edited document.
 
 Mori findings are review leads. They do not prove semantic or behavioral
 equivalence, defects, or a safe refactoring. Inspect the related source and any

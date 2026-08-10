@@ -337,10 +337,11 @@ summary, per-file zero-fragment reasons, and aggregate unsupported-extension
 counts. They do not include a scan timestamp, hostname,
 username, source body, diff, or Git remote.
 
-Normalization version 9 adds low-weight canonical statement-position evidence
-and at most eight anonymous callee/control-position features per fragment.
-Callee names and name digests are never reported or fingerprinted directly;
-the bounded fragment-local slots cannot prove call identity or behavior.
+Normalization version 10 adds Java and C# function boundaries and canonical
+syntax mappings. It also treats redundant parentheses as transparent and maps
+qualified Java method calls through the existing anonymous member/call shape.
+Names and name digests are never reported or fingerprinted directly, and these
+syntax mappings cannot prove call identity or behavior.
 Because this changes scores and fingerprints, baselines created by an older
 normalization version must be reviewed and regenerated.
 
@@ -427,7 +428,9 @@ explicitly with `--baseline`.
 | Parser language | Review family | Comparison domain | File types | Extensionless shebangs |
 | --- | --- | --- | --- | --- |
 | Bash / POSIX shell | Shell | code | `.sh`, `.bash` | `sh`, `dash`, `bash` |
+| C# | C# | code | `.cs` | — |
 | Go | Go | code | `.go` | — |
+| Java | Java | code | `.java` | — |
 | JavaScript and JSX | JavaScript | code | `.js`, `.jsx`, `.mjs`, `.cjs` | `node`, `nodejs` |
 | TypeScript | TypeScript | code | `.ts`, `.mts`, `.cts` | — |
 | TSX | TypeScript | code | `.tsx` | — |
@@ -456,7 +459,11 @@ Scripts, functions, and blocks are never compared with each other.
 
 Tree-sitter recovery is visible in report warnings as potentially incomplete
 comparison coverage, and any comparison fragment containing a parse error is
-skipped with an explicit count. Swift support extracts implemented functions,
+skipped with an explicit count. Java extracts implemented methods,
+constructors, compact constructors, and lambdas; bodyless methods are excluded.
+C# extracts implemented methods, constructors, destructors, operators,
+accessors, local functions, anonymous methods, and lambdas; bodyless members
+are excluded. Swift support extracts implemented functions,
 initializers, deinitializers, and closures. Protocol requirements, computed
 properties, accessors, and subscripts are not independent comparison units;
 Mori applies bounded byte-preserving compatibility adaptations for recognized

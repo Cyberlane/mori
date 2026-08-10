@@ -11,7 +11,9 @@ func TestEveryGrammarHasCompatibleABI(t *testing.T) {
 
 	expectedABI := map[string]uint32{
 		"bash":       15,
+		"csharp":     15,
 		"go":         15,
+		"java":       14,
 		"javascript": 15,
 		"python":     15,
 		"postgresql": 15,
@@ -75,7 +77,9 @@ func TestDetect(t *testing.T) {
 	tests := map[string]string{
 		"build.bash":    "bash",
 		"install.SH":    "bash",
+		"Program.CS":    "csharp",
 		"main.go":       "go",
+		"Service.JAVA":  "java",
 		"view.JSX":      "javascript",
 		"worker.mts":    "typescript",
 		"component.tsx": "tsx",

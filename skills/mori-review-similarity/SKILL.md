@@ -182,6 +182,12 @@ statements and separate `function` units for named functions, each subject to
 the token floor. Require both fragment kinds when claiming shell-file coverage;
 a function-only result does not cover top-level orchestration, and a script
 result excludes function bodies.
+Java support covers implemented methods, constructors, compact constructors,
+and lambdas; bodyless methods are unexamined. C# support covers implemented
+methods, constructors, destructors, operators, accessors, local functions,
+anonymous methods, and lambdas; bodyless members are unexamined. Treat type
+checking, overload resolution, dispatch, exception behavior, and effects as
+source-review concerns rather than conclusions from canonical syntax.
 Swift support covers implemented functions, initializers, deinitializers, and
 closures. Treat protocol requirements, computed properties, accessors, and
 subscripts as unexamined comparison units, and disclose any Swift parser

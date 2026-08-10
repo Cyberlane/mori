@@ -7,6 +7,25 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added Java support for implemented methods, constructors, compact
+  constructors, and lambdas using the official Tree-sitter Java grammar.
+- Added C# support for implemented methods, constructors, destructors,
+  operators, accessors, local functions, anonymous methods, and lambdas using
+  the official Tree-sitter C# grammar.
+- Added a redistributable Java/C# calibration case, a nearby-negative fixture,
+  malformed-source coverage, and both languages to the reference VS Code
+  client.
+
+### Changed
+
+- Normalization now uses version 10, with canonical Java/C# syntax mappings,
+  transparent redundant parentheses, and a bounded anonymous member shape for
+  qualified Java method calls. Existing baselines require deliberate review
+  and regeneration because scores and fingerprints can change. Report schema
+  remains version 17 and baseline schema remains version 3.
+
 ## [0.24.0] - 2026-08-10
 
 ### Added

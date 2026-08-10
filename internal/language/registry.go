@@ -10,7 +10,9 @@ import (
 	tree_sitter_swift "github.com/Cyberlane/mori/internal/grammar/swift"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tree_sitter_bash "github.com/tree-sitter/tree-sitter-bash/bindings/go"
+	tree_sitter_c_sharp "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
 	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
+	tree_sitter_java "github.com/tree-sitter/tree-sitter-java/bindings/go"
 	tree_sitter_javascript "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
 	tree_sitter_python "github.com/tree-sitter/tree-sitter-python/bindings/go"
 	tree_sitter_rust "github.com/tree-sitter/tree-sitter-rust/bindings/go"
@@ -120,6 +122,30 @@ var specs = []Spec{
 		excludeNestedBoundaries: true,
 	},
 	{
+		ID:               "csharp",
+		Family:           "csharp",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "C#",
+		Extensions:       []string{".cs"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_c_sharp.Language())
+		},
+		fragmentKinds: kinds(
+			"accessor_declaration",
+			"anonymous_method_expression",
+			"constructor_declaration",
+			"conversion_operator_declaration",
+			"destructor_declaration",
+			"lambda_expression",
+			"local_function_statement",
+			"method_declaration",
+			"operator_declaration",
+		),
+		acceptBoundary:          acceptsCSharpBoundary,
+		excludeNestedBoundaries: true,
+	},
+	{
 		ID:               "go",
 		Family:           "go",
 		ComparisonDomain: "code",
@@ -130,6 +156,25 @@ var specs = []Spec{
 			return tree_sitter.NewLanguage(tree_sitter_go.Language())
 		},
 		fragmentKinds:           kinds("func_literal", "function_declaration", "method_declaration"),
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "java",
+		Family:           "java",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Java",
+		Extensions:       []string{".java"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_java.Language())
+		},
+		fragmentKinds: kinds(
+			"compact_constructor_declaration",
+			"constructor_declaration",
+			"lambda_expression",
+			"method_declaration",
+		),
+		acceptBoundary:          acceptsJavaBoundary,
 		excludeNestedBoundaries: true,
 	},
 	{
@@ -260,6 +305,19 @@ var specs = []Spec{
 		fragmentKinds:  kinds("toplevel_stmt"),
 		acceptBoundary: isPostgreSQLQueryStatement,
 	},
+}
+
+func acceptsCSharpBoundary(node *tree_sitter.Node) bool {
+	switch node.Kind() {
+	case "anonymous_method_expression", "lambda_expression":
+		return true
+	default:
+		return node.ChildByFieldName("body") != nil
+	}
+}
+
+func acceptsJavaBoundary(node *tree_sitter.Node) bool {
+	return node.Kind() != "method_declaration" || node.ChildByFieldName("body") != nil
 }
 
 func acceptsSwiftBoundary(node *tree_sitter.Node) bool {

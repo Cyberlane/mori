@@ -151,10 +151,9 @@ to reject or explicitly handle unknown report schema versions.
 
 Domain and family selection do not change fragment features. SQL dialect
 selection chooses a different parser and is therefore recorded explicitly.
-Earlier schemas introduced explicit multi-worktree Git focus and review
-evidence. The current normalization version is 8 because the selected
-comparison-unit contract now includes opt-in embedded queries and statement
-blocks in addition to shell top-level scripts. Baselines created with an older
+The current normalization version is 10. It includes the established opt-in
+embedded-query and statement-block units, ordered evidence, and Java/C#
+function boundaries and canonical mappings. Baselines created with an older
 normalization version must be reviewed and regenerated. Changing a selection
 profile still requires the ordinary human review expected for any baseline
 scope change.
