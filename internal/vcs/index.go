@@ -21,6 +21,7 @@ type IndexEntry struct {
 // IndexSnapshot records the deterministic local Git index used by --staged.
 type IndexSnapshot struct {
 	Root         string
+	Prefix       string
 	HeadCommit   string
 	IndexDigest  string
 	Entries      []IndexEntry
@@ -61,6 +62,18 @@ func resolveIndex(ctx context.Context, start string, options resolverOptions) (I
 	if err != nil {
 		return IndexSnapshot{}, fmt.Errorf("canonicalize Git worktree: %w", err)
 	}
+	prefixOutput, err := run(ctx, options, start, "rev-parse", "--show-prefix")
+	if err != nil {
+		return IndexSnapshot{}, fmt.Errorf("resolve Git worktree prefix: %w", err)
+	}
+	prefix := strings.TrimSuffix(strings.TrimSuffix(string(prefixOutput), "\n"), "\r")
+	if prefix != "" {
+		prefix = strings.TrimSuffix(prefix, "/")
+		if err := validateRelativeGitPath(prefix); err != nil {
+			return IndexSnapshot{}, errors.New("Git returned an unsafe worktree prefix")
+		}
+		prefix = filepath.ToSlash(filepath.Clean(filepath.FromSlash(prefix)))
+	}
 	indexOutput, err := run(ctx, options, root, "ls-files", "--stage", "-z", "--")
 	if err != nil {
 		return IndexSnapshot{}, fmt.Errorf("read Git index: %w", err)
@@ -95,7 +108,7 @@ func resolveIndex(ctx context.Context, start string, options resolverOptions) (I
 		fmt.Fprintf(hash, "%s\x00%s\x00%s\x00", entry.Mode, entry.OID, entry.Path)
 	}
 	return IndexSnapshot{
-		Root: root, HeadCommit: head, IndexDigest: fmt.Sprintf("%x", hash.Sum(nil)), Entries: entries,
+		Root: root, Prefix: prefix, HeadCommit: head, IndexDigest: fmt.Sprintf("%x", hash.Sum(nil)), Entries: entries,
 		ChangedPaths: sortedKeys(changed), DeletedPaths: sortedKeys(deleted), options: options,
 	}, nil
 }

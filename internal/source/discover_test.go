@@ -37,6 +37,24 @@ func TestDiscoverSupportedFilesAndDefaultExcludes(t *testing.T) {
 	}
 }
 
+func TestDiscoverSnapshotAtUsesResolvedBase(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	base := filepath.Join(root, "nested")
+	entries := []SnapshotEntry{
+		{Path: "root.go", Mode: "100644", Content: []byte("package root\n")},
+		{Path: "nested/main.go", Mode: "100644", Content: []byte("package nested\n")},
+	}
+	result, err := DiscoverSnapshotAt(context.Background(), root, base, nil, entries, Options{MaxFileBytes: 1024})
+	if err != nil {
+		t.Fatalf("DiscoverSnapshotAt: %v", err)
+	}
+	if len(result.Files) != 1 || result.Files[0].DisplayPath != "main.go" {
+		t.Fatalf("files = %#v, want nested/main.go relative to base", result.Files)
+	}
+}
+
 func TestDiscoverSkipsLinkedWorktreeGitControlFile(t *testing.T) {
 	t.Parallel()
 

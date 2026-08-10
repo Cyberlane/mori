@@ -179,6 +179,21 @@ func TestResolveIndexReadsOnlyStageZeroSnapshot(t *testing.T) {
 	}
 }
 
+func TestResolveIndexRecordsRepositoryRelativePrefix(t *testing.T) {
+	root := initRepository(t)
+	nested := filepath.Join(root, "nested", "deeper")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	snapshot, err := ResolveIndex(context.Background(), nested)
+	if err != nil {
+		t.Fatalf("ResolveIndex: %v", err)
+	}
+	if snapshot.Prefix != "nested/deeper" {
+		t.Fatalf("prefix = %q, want nested/deeper", snapshot.Prefix)
+	}
+}
+
 func TestResolveIndexSupportsUnbornRepository(t *testing.T) {
 	root := initRepository(t)
 	writeFile(t, root, "first.go", "package sample\n")

@@ -589,10 +589,6 @@ func loadStagedConfig(
 	snapshot vcs.IndexSnapshot,
 	requested string,
 ) (config.Settings, string, bool, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return config.Settings{}, "", false, err
-	}
 	var candidates []string
 	if requested != "" {
 		relative, err := vcs.RelativeIndexPath(snapshot, requested)
@@ -601,11 +597,10 @@ func loadStagedConfig(
 		}
 		candidates = []string{relative}
 	} else {
-		relative, err := vcs.RelativeIndexPath(snapshot, cwd)
-		if err != nil {
-			return config.Settings{}, "", false, err
+		current := filepath.FromSlash(snapshot.Prefix)
+		if current == "" {
+			current = "."
 		}
-		current := filepath.FromSlash(relative)
 		for {
 			candidate := config.FileName
 			if current != "." {
@@ -1929,7 +1924,8 @@ func executeScan(
 				discoveryPaths = append(discoveryPaths, filepath.Join(options.stagedSnapshot.Root, filepath.FromSlash(path)))
 			}
 		}
-		discovered, err = source.DiscoverSnapshot(ctx, options.stagedSnapshot.Root, discoveryPaths, entries, discoveryOptions)
+		base := filepath.Join(options.stagedSnapshot.Root, filepath.FromSlash(options.stagedSnapshot.Prefix))
+		discovered, err = source.DiscoverSnapshotAt(ctx, options.stagedSnapshot.Root, base, discoveryPaths, entries, discoveryOptions)
 	} else {
 		discovered, err = source.DiscoverContext(ctx, paths, discoveryOptions)
 	}

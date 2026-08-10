@@ -32,15 +32,28 @@ func DiscoverSnapshot(
 	entries []SnapshotEntry,
 	options Options,
 ) (Result, error) {
+	cwd, err := filepath.Abs(".")
+	if err != nil {
+		cwd = filepath.Clean(root)
+	}
+	return DiscoverSnapshotAt(ctx, root, cwd, requested, entries, options)
+}
+
+// DiscoverSnapshotAt applies snapshot discovery relative to a resolved base directory.
+func DiscoverSnapshotAt(
+	ctx context.Context,
+	root string,
+	base string,
+	requested []string,
+	entries []SnapshotEntry,
+	options Options,
+) (Result, error) {
 	root = filepath.Clean(root)
+	base = filepath.Clean(base)
 	if len(requested) == 0 {
 		requested = []string{"."}
 	}
-	cwd, err := filepath.Abs(".")
-	if err != nil {
-		cwd = root
-	}
-	requested, explicitFiles, err := normalizeSnapshotRoots(root, cwd, requested, entries)
+	requested, explicitFiles, err := normalizeSnapshotRoots(root, base, requested, entries)
 	if err != nil {
 		return Result{}, err
 	}
@@ -53,9 +66,9 @@ func DiscoverSnapshot(
 		Excluded: make([]model.FileCoverage, 0), Unsupported: make([]model.UnsupportedExtension, 0),
 	}
 	state := snapshotDiscoveryState{
-		root: root, cwd: cwd, requested: requested, explicitFiles: explicitFiles, options: options,
+		root: root, cwd: base, requested: requested, explicitFiles: explicitFiles, options: options,
 		result: &result, seen: map[string]struct{}{}, unsupportedSeen: map[string]struct{}{},
-		unsupportedCounts: map[string]int{}, ignores: newIgnoreMatcher(cwd),
+		unsupportedCounts: map[string]int{}, ignores: newIgnoreMatcher(base),
 	}
 	if err := state.walk(ctx, tree, "."); err != nil {
 		return Result{}, err
