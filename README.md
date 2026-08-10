@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/mori-hero.webp" alt="Mori forest-green banner with the kanji for forest" width="100%">
+  <img src="docs/assets/mori-hero.webp" alt="Mori forest-green banner with the forest kanji and the slogan Structural similarity, explained" width="100%">
 </p>
 
 # Mori
