@@ -133,6 +133,51 @@ func TestTextDisclosesLiteralDriftWithoutValues(t *testing.T) {
 	}
 }
 
+func TestTextExplainsWeightedDifferencesAndNormalizedIdentity(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	if err := Text(&output, model.Report{
+		SchemaVersion: model.SchemaVersion,
+		Threshold:     0.7,
+		Groups: []model.MatchGroup{
+			{
+				ID: "different", Similarity: 0.75, LocationPairs: 1,
+				Evidence: model.StructuralEvidence{
+					Intersection: 6,
+					Union:        8,
+					LeftOnly: model.ProfileDifference{
+						Fingerprint: "aaa", Total: 1,
+						Features: []model.SharedFeature{{Feature: "node:left", Count: 1}},
+					},
+					RightOnly: model.ProfileDifference{
+						Fingerprint: "bbb", Total: 1,
+						Features: []model.SharedFeature{{Feature: "node:right", Count: 1}},
+					},
+				},
+			},
+			{
+				ID: "identity", Similarity: 1, LocationPairs: 1,
+				Evidence: model.StructuralEvidence{Intersection: 10, Union: 10},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("Text: %v", err)
+	}
+	rendered := output.String()
+	for _, expected := range []string{
+		"weighted feature evidence: 6 intersection / 8 union",
+		"A-only weighted units: 1 (aaa); top features: node:left ×1",
+		"B-only weighted units: 1 (bbb); top features: node:right ×1",
+		"100.0% normalized feature identity",
+		"not proof of semantic or behavioral equivalence",
+	} {
+		if !strings.Contains(rendered, expected) {
+			t.Fatalf("output missing %q:\n%s", expected, rendered)
+		}
+	}
+}
+
 func TestTextShowsNestedBoundaryAndDiagnostics(t *testing.T) {
 	t.Parallel()
 

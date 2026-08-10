@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 15
+const SchemaVersion = 16
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -71,10 +71,28 @@ func cloneLocation(location *Location) *Location {
 	return &cloned
 }
 
-// SharedFeature explains one contributor to a similarity score.
+// SharedFeature records one canonical feature and its weighted multiset count.
 type SharedFeature struct {
 	Feature string `json:"feature"`
 	Count   int    `json:"count"`
+}
+
+// ProfileDifference records bounded features present more often in one
+// normalized profile than the other. Total counts remain complete even when
+// the feature list is bounded.
+type ProfileDifference struct {
+	Fingerprint string          `json:"fingerprint"`
+	Total       int             `json:"weighted_only_total"`
+	Features    []SharedFeature `json:"features"`
+}
+
+// StructuralEvidence explains the exact weighted Jaccard totals and bounded
+// directional differences for one representative normalized profile pair.
+type StructuralEvidence struct {
+	Intersection int               `json:"weighted_intersection"`
+	Union        int               `json:"weighted_union"`
+	LeftOnly     ProfileDifference `json:"left_only"`
+	RightOnly    ProfileDifference `json:"right_only"`
 }
 
 // FragmentProfile groups source occurrences with the same normalized content
@@ -97,18 +115,19 @@ type LocationPair struct {
 // MatchGroup is one content-pair identity at or above the configured
 // similarity threshold. One group can represent many source-location pairs.
 type MatchGroup struct {
-	ID              string            `json:"content_pair_id"`
-	Similarity      float64           `json:"similarity"`
-	LocationPairs   int               `json:"location_pairs"`
-	Focused         bool              `json:"focused"`
-	FocusedCount    int               `json:"focused_occurrences"`
-	Profiles        []FragmentProfile `json:"profiles"`
-	ShapeSummary    []string          `json:"shape_summary"`
-	SharedFeatures  []SharedFeature   `json:"shared_features"`
-	ReviewPriority  int               `json:"review_priority"`
-	ReviewSignals   []string          `json:"review_signals"`
-	LiteralEvidence *LiteralEvidence  `json:"literal_evidence,omitempty"`
-	PathPairs       []LocationPair    `json:"-"`
+	ID              string             `json:"content_pair_id"`
+	Similarity      float64            `json:"similarity"`
+	LocationPairs   int                `json:"location_pairs"`
+	Focused         bool               `json:"focused"`
+	FocusedCount    int                `json:"focused_occurrences"`
+	Profiles        []FragmentProfile  `json:"profiles"`
+	ShapeSummary    []string           `json:"shape_summary"`
+	SharedFeatures  []SharedFeature    `json:"shared_features"`
+	Evidence        StructuralEvidence `json:"structural_evidence"`
+	ReviewPriority  int                `json:"review_priority"`
+	ReviewSignals   []string           `json:"review_signals"`
+	LiteralEvidence *LiteralEvidence   `json:"literal_evidence,omitempty"`
+	PathPairs       []LocationPair     `json:"-"`
 }
 
 // LiteralEvidence summarizes source-free literal-position comparisons for a

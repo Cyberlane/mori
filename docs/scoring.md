@@ -158,6 +158,18 @@ An explanation helps answer “why did this group score highly?” It is not a
 complete decomposition of the numerator or a proof that the occurrences
 should be refactored. Domain descriptions still require source inspection.
 
+Schema 16 adds `structural_evidence` to every retained group. It records the
+exact weighted multiset intersection and union used by Jaccard scoring. Its
+`left_only` and `right_only` objects align with profile order by fingerprint,
+record the complete directional weighted-only total, and retain at most eight
+top features ordered by descending count then feature name. The bounded lists
+can omit lower-count feature names without losing the exact totals.
+
+Text output labels a 100% score as **normalized feature identity** and states
+that it is not proof of semantic or behavioral equivalence. These fields make
+existing scores easier to inspect; they do not change normalization,
+fingerprints, eligibility, ranking, or scores.
+
 Every fragment report includes a stable content fingerprint derived from its
 normalized feature bag. Feature names are sorted before SHA-256 hashing and
 the result is truncated to 16 hexadecimal characters. Formatting, comments,
@@ -174,7 +186,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 15,
+  "schema_version": 16,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -308,6 +320,10 @@ exclusions, loaded ignore-file paths and content, resource bounds, and strict
 coverage policy. Presentation-only ranking, focus, and output bounds are
 excluded. Normalization remains version 8. Baseline schema advances to 3 for
 the same profile evidence and durable entry classifications.
+
+Schema 16 adds exact and bounded difference-oriented structural evidence to
+each retained group. It changes reporting only. Normalization remains version
+8 and baseline schema remains version 3.
 
 Schema 9 added a deterministic `file_coverage` array with one entry per analyzed
 or generated-excluded supported file. Each entry records its language, review

@@ -25,9 +25,11 @@ For example, it can flag a JavaScript function and a Go function that both:
 - return early when something is wrong.
 
 Each result groups every retained source occurrence with the same normalized
-content-pair identity. It includes a percentage, a shared-shape summary, and
-the code locations to review. A higher percentage means the functions have
-more structural overlap, not that they have identical behavior.
+content-pair identity. It includes a percentage, exact weighted
+intersection/union totals, bounded directional feature differences, a
+shared-shape summary, and the code locations to review. A higher percentage
+means the functions have more structural overlap, not that they have identical
+behavior. A 100% result means normalized feature identity only.
 
 ## Install
 
@@ -116,11 +118,14 @@ This deliberately small fixture uses the broad 12-token exploration floor.
 Abridged example output (first group):
 
 ```text
-1. 71.0% structural similarity · 1 location pair(s)
-   A  fingerprint 1d4f4194cc92c56c · 1 occurrence(s)
-      - validator.go:5-8  [go] LooksLikeEmail
-   B  fingerprint 6d2ab0d68af9fb96 · 1 occurrence(s)
+1. 79.5% structural similarity · 1 location pair(s)
+   weighted feature evidence: 101 intersection / 127 union
+   A-only weighted units: 9 (6d2ab0d68af9fb96); top features: ...
+   B-only weighted units: 17 (73b27acd1df4c66b); top features: ...
+   A  fingerprint 6d2ab0d68af9fb96 · 1 occurrence(s)
       - validator.js:1-4  [javascript] looksLikeEmail
+   B  fingerprint 73b27acd1df4c66b · 1 occurrence(s)
+      - validator.go:5-8  [go] LooksLikeEmail
       shared shape: 3 calls, 1 return, 1 binding
 ```
 
@@ -305,7 +310,7 @@ files. Generated exclusions do not enter that denominator.
 fatal independently. Every scan-backed baseline mutation evaluates the same
 policies before modifying a baseline.
 
-Schema-15 reports embed deterministic `tool` build provenance, the selected
+Schema-16 reports embed deterministic `tool` build provenance, the selected
 profile, comparison selection, domain and fragment-kind metadata, exact focus
 metadata, loaded ignore-file paths and SHA-256 content evidence, a coverage
 summary, per-file zero-fragment reasons, and aggregate unsupported-extension
@@ -350,7 +355,7 @@ mori scan \
 `--changed-worktree PATH=REVISION` values describe the other worktrees. Mori
 requires every discovered file to belong to a resolved root, never inherits a
 parent revision for a nested repository, and records each root's requested
-base, full resolved commits, changed paths, and deleted paths in schema-15 JSON.
+base, full resolved commits, changed paths, and deleted paths in schema-16 JSON.
 Use only repeated `--changed-worktree` values when every scanned root should be
 explicit. Excluding and scanning a nested worktree separately remains valid;
 never interpret an excluded repository as unchanged. Mori bounds one scan to

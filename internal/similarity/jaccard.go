@@ -82,3 +82,62 @@ func Shared(left model.FeatureBag, right model.FeatureBag, limit int) []model.Sh
 	}
 	return shared
 }
+
+// Evidence returns exact weighted totals plus bounded directional differences.
+// Sides are ordered by fingerprint so they align with report profile ordering.
+func Evidence(
+	leftFingerprint string,
+	left model.FeatureBag,
+	rightFingerprint string,
+	right model.FeatureBag,
+	limit int,
+) model.StructuralEvidence {
+	if rightFingerprint < leftFingerprint {
+		leftFingerprint, rightFingerprint = rightFingerprint, leftFingerprint
+		left, right = right, left
+	}
+	_, intersection, union := WeightedJaccard(left, right)
+	leftTotal, leftOnly := directionalDifference(left, right, limit)
+	rightTotal, rightOnly := directionalDifference(right, left, limit)
+	return model.StructuralEvidence{
+		Intersection: intersection,
+		Union:        union,
+		LeftOnly: model.ProfileDifference{
+			Fingerprint: leftFingerprint,
+			Total:       leftTotal,
+			Features:    leftOnly,
+		},
+		RightOnly: model.ProfileDifference{
+			Fingerprint: rightFingerprint,
+			Total:       rightTotal,
+			Features:    rightOnly,
+		},
+	}
+}
+
+func directionalDifference(
+	left model.FeatureBag,
+	right model.FeatureBag,
+	limit int,
+) (int, []model.SharedFeature) {
+	total := 0
+	features := make([]model.SharedFeature, 0)
+	for feature, leftCount := range left {
+		count := leftCount - right[feature]
+		if count <= 0 {
+			continue
+		}
+		total += count
+		features = append(features, model.SharedFeature{Feature: feature, Count: count})
+	}
+	sort.Slice(features, func(i, j int) bool {
+		if features[i].Count == features[j].Count {
+			return features[i].Feature < features[j].Feature
+		}
+		return features[i].Count > features[j].Count
+	})
+	if limit > 0 && len(features) > limit {
+		features = features[:limit]
+	}
+	return total, features
+}

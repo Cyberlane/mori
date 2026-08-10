@@ -49,6 +49,25 @@ func TestSharedIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestEvidenceReportsExactTotalsAndBoundedDirectionalDifferences(t *testing.T) {
+	t.Parallel()
+
+	left := model.FeatureBag{"shared": 2, "left-large": 4, "left-tie": 1}
+	right := model.FeatureBag{"shared": 3, "right-large": 5, "right-tie": 1}
+	evidence := Evidence("b", right, "a", left, 1)
+	if evidence.Intersection != 2 || evidence.Union != 14 {
+		t.Fatalf("weighted totals = %d/%d, want 2/14", evidence.Intersection, evidence.Union)
+	}
+	if evidence.LeftOnly.Fingerprint != "a" || evidence.LeftOnly.Total != 5 ||
+		!reflect.DeepEqual(evidence.LeftOnly.Features, []model.SharedFeature{{Feature: "left-large", Count: 4}}) {
+		t.Fatalf("left-only evidence = %#v", evidence.LeftOnly)
+	}
+	if evidence.RightOnly.Fingerprint != "b" || evidence.RightOnly.Total != 7 ||
+		!reflect.DeepEqual(evidence.RightOnly.Features, []model.SharedFeature{{Feature: "right-large", Count: 5}}) {
+		t.Fatalf("right-only evidence = %#v", evidence.RightOnly)
+	}
+}
+
 func TestShapeSummarizesCanonicalStructureWithoutNames(t *testing.T) {
 	t.Parallel()
 

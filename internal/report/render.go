@@ -217,16 +217,64 @@ func Text(writer io.Writer, report model.Report) error {
 		if group.Focused {
 			focusLabel = fmt.Sprintf(" · focused (%d occurrence(s))", group.FocusedCount)
 		}
+		scoreLabel := "structural similarity"
+		if group.Similarity == 1 {
+			scoreLabel = "normalized feature identity"
+		}
 		if _, err := fmt.Fprintf(
 			writer,
-			"\n%d. %.1f%% structural similarity · %d location pair(s)%s · identity %s\n",
+			"\n%d. %.1f%% %s · %d location pair(s)%s · identity %s\n",
 			index+1,
 			group.Similarity*100,
+			scoreLabel,
 			group.LocationPairs,
 			focusLabel,
 			terminalSafe(group.ID),
 		); err != nil {
 			return err
+		}
+		if group.Evidence.Union > 0 {
+			if _, err := fmt.Fprintf(
+				writer,
+				"   weighted feature evidence: %d intersection / %d union\n",
+				group.Evidence.Intersection,
+				group.Evidence.Union,
+			); err != nil {
+				return err
+			}
+			if group.Similarity == 1 {
+				if _, err := fmt.Fprintln(
+					writer,
+					"   note: normalized feature identity is not proof of semantic or behavioral equivalence",
+				); err != nil {
+					return err
+				}
+			}
+			for _, difference := range []struct {
+				label string
+				value model.ProfileDifference
+			}{
+				{label: "A", value: group.Evidence.LeftOnly},
+				{label: "B", value: group.Evidence.RightOnly},
+			} {
+				if difference.value.Total == 0 {
+					continue
+				}
+				features := make([]string, 0, len(difference.value.Features))
+				for _, feature := range difference.value.Features {
+					features = append(features, fmt.Sprintf("%s ×%d", feature.Feature, feature.Count))
+				}
+				if _, err := fmt.Fprintf(
+					writer,
+					"   %s-only weighted units: %d (%s); top features: %s\n",
+					difference.label,
+					difference.value.Total,
+					terminalSafe(difference.value.Fingerprint),
+					strings.Join(features, ", "),
+				); err != nil {
+					return err
+				}
+			}
 		}
 		if groupHasNestedBoundaries(group) {
 			if _, err := fmt.Fprintln(
