@@ -201,9 +201,6 @@ func RelativeIndexPath(snapshot IndexSnapshot, path string) (string, error) {
 		return "", err
 	}
 	clean := filepath.Clean(absolute)
-	if !strings.HasPrefix(clean+string(filepath.Separator), snapshot.Root+string(filepath.Separator)) && clean != snapshot.Root {
-		return "", errors.New("staged path is outside the Git worktree")
-	}
 	relative, err := filepath.Rel(snapshot.Root, clean)
 	if err != nil {
 		return "", err
@@ -212,7 +209,7 @@ func RelativeIndexPath(snapshot IndexSnapshot, path string) (string, error) {
 		return ".", nil
 	}
 	if err := validateRelativeGitPath(relative); err != nil {
-		return "", err
+		return "", errors.New("staged path is outside the Git worktree")
 	}
 	return filepath.ToSlash(relative), nil
 }

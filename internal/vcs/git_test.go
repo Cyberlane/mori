@@ -202,6 +202,20 @@ func TestParseIndexEntriesRejectsUnsafeAndUnmergedEntries(t *testing.T) {
 	}
 }
 
+func TestRelativeIndexPathAcceptsDescendantsAndRejectsOutside(t *testing.T) {
+	root := t.TempDir()
+	snapshot := IndexSnapshot{Root: root}
+	path := filepath.Join(root, "nested", "config.json")
+	relative, err := RelativeIndexPath(snapshot, path)
+	if err != nil || relative != "nested/config.json" {
+		t.Fatalf("RelativeIndexPath(descendant) = %q, %v", relative, err)
+	}
+	if _, err := RelativeIndexPath(snapshot, filepath.Join(filepath.Dir(root), "outside.json")); err == nil ||
+		!strings.Contains(err.Error(), "outside the Git worktree") {
+		t.Fatalf("RelativeIndexPath(outside) error = %v", err)
+	}
+}
+
 func initRepository(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
