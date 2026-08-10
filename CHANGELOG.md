@@ -18,6 +18,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Compatible receipts change only focused-match policy exit status; findings
   remain visible. Machine-readable reports advance to schema 19 to expose
   compatible receipt evidence.
+- Added original MIT Swift calibration cases for presentation chains and
+  memberwise initializer shapes, including a renamed positive and reviewed
+  unrelated false positives. They document the current structural limit;
+  normalization remains version 12 because identifier or literal heuristics
+  would not justify a safe scoring change.
 
 ## [0.28.1] - 2026-08-11
 

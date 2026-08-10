@@ -22,6 +22,13 @@ Cases for languages added after that release omit reference movement until a
 compatible pinned reference is available; they still enforce reviewed current
 score ranges and ranks.
 
+The Swift fixtures include presentation-chain and memberwise-initializer
+shapes observed as common review noise in large SwiftUI codebases. They are
+small original examples, not copied application source. Exact structural
+scores for unrelated cases intentionally remain visible as false positives;
+the corpus does not reward identifier or literal heuristics that could hide
+legitimate renamed implementations.
+
 Classifications:
 
 - `accepted-positive`: a structurally useful review lead;
