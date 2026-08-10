@@ -15,6 +15,17 @@ mori version
 Source builds can omit the revision and source date when Go does not embed VCS
 settings. Use an official release binary when report provenance matters.
 
+Releases include `mori.rb` for Homebrew, `mori.json` for Scoop, and a three-file
+`Cyberlane.Mori` WinGet manifest alongside the native archives. These are
+release-ready, checksum-pinned manifests; their presence does not mean an
+external package index has accepted the release. Releases also include an SPDX
+source-dependency SBOM and signed GitHub/Sigstore attestations. Verify a
+download with:
+
+```sh
+gh attestation verify path/to/archive --repo Cyberlane/mori
+```
+
 ## Run a first review
 
 From the project root:

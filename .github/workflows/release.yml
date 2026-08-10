@@ -126,6 +126,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      attestations: write
+      id-token: write
     steps:
       - name: Check out tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -170,10 +172,53 @@ jobs:
             --no-dependencies \
             --out "../../dist/mori-vscode_${version}.vsix"
 
+      - name: Create package-manager manifests
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          go run ./internal/cmd/packageindex \
+            -dist dist \
+            -version "${TAG#v}"
+          ruby -c dist/mori.rb
+          jq -e '.bin == "mori.exe"' dist/mori.json >/dev/null
+          grep -q 'NestedInstallerType: portable' dist/Cyberlane.Mori.installer.yaml
+
+      - name: Create source dependency SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: mori-source-sbom_${{ github.ref_name }}.spdx.json
+          output-file: dist/mori-source-sbom_${{ github.ref_name }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
       - name: Create checksums
         run: |
+          checksum_file="$(mktemp)"
           cd dist
-          sha256sum ./*.json ./*.tar.gz ./*.vsix ./*.zip > checksums.txt
+          find . -maxdepth 1 -type f ! -name checksums.txt -printf '%f\0' \
+            | sort -z \
+            | xargs -0 sha256sum > "$checksum_file"
+          mv "$checksum_file" checksums.txt
+
+      - name: Attest release assets
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-checksums: dist/checksums.txt
+
+      - name: Attest checksum manifest
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-path: dist/checksums.txt
+
+      - name: Attest native archives with SBOM
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-path: |
+            dist/mori_*.tar.gz
+            dist/mori_*_windows_*.zip
+          sbom-path: dist/mori-source-sbom_${{ github.ref_name }}.spdx.json
 
       - name: Create or update draft release
         env:
@@ -234,7 +279,7 @@ jobs:
             --dir dist
 
           cd dist
-          expected="$(awk -v name="./$archive" '$2 == name { print $1 }' checksums.txt)"
+          expected="$(awk -v name="$archive" '$2 == name || $2 == "./" name { print $1 }' checksums.txt)"
           if [[ -z "$expected" ]]; then
             echo "No checksum found for $archive." >&2
             exit 1
@@ -250,7 +295,7 @@ jobs:
             extracted/mori-review-similarity
 
           schema=mori-report-v17.schema.json
-          expected="$(awk -v name="./$schema" '$2 == name { print $1 }' checksums.txt)"
+          expected="$(awk -v name="$schema" '$2 == name || $2 == "./" name { print $1 }' checksums.txt)"
           if [[ -z "$expected" ]]; then
             echo "No checksum found for $schema." >&2
             exit 1
@@ -263,7 +308,7 @@ jobs:
           cmp ../schemas/mori-report-v17.schema.json "$schema"
 
           extension="mori-vscode_${version}.vsix"
-          expected="$(awk -v name="./$extension" '$2 == name { print $1 }' checksums.txt)"
+          expected="$(awk -v name="$extension" '$2 == name || $2 == "./" name { print $1 }' checksums.txt)"
           if [[ -z "$expected" ]]; then
             echo "No checksum found for $extension." >&2
             exit 1
@@ -273,6 +318,8 @@ jobs:
             echo "Checksum mismatch for $extension." >&2
             exit 1
           fi
+          gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY"
+          gh attestation verify "$extension" --repo "$GITHUB_REPOSITORY"
 
   verify-downloads:
     name: Verify download ${{ matrix.name }}
@@ -331,7 +378,7 @@ jobs:
             --dir dist
 
           cd dist
-          expected="$(awk -v name="./$archive" '$2 == name { print $1 }' checksums.txt)"
+          expected="$(awk -v name="$archive" '$2 == name || $2 == "./" name { print $1 }' checksums.txt)"
           if [[ -z "$expected" ]]; then
             echo "No checksum found for $archive." >&2
             exit 1
@@ -345,6 +392,7 @@ jobs:
             echo "Checksum mismatch for $archive." >&2
             exit 1
           fi
+          gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY"
 
           if [[ "$TARGET_GOOS" == "windows" ]]; then
             powershell -NoProfile -NonInteractive -Command \

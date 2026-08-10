@@ -34,6 +34,10 @@ mori version
 Official release binaries include complete build provenance and are recommended
 for CI and auditable reports.
 
+Each release also includes checksum-pinned Homebrew, Scoop, and WinGet manifest
+assets, an SPDX SBOM, and GitHub/Sigstore attestations. Package-index submission
+is intentionally separate, so verify the release asset before local use.
+
 ## Quick start
 
 From a project root:
