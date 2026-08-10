@@ -179,6 +179,19 @@ func TestResolveIndexReadsOnlyStageZeroSnapshot(t *testing.T) {
 	}
 }
 
+func TestResolveIndexSupportsUnbornRepository(t *testing.T) {
+	root := initRepository(t)
+	writeFile(t, root, "first.go", "package sample\n")
+	runGit(t, root, "add", "first.go")
+	snapshot, err := ResolveIndex(context.Background(), root)
+	if err != nil {
+		t.Fatalf("ResolveIndex: %v", err)
+	}
+	if snapshot.HeadCommit != "" || !reflect.DeepEqual(snapshot.ChangedPaths, []string{"first.go"}) {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
 func TestParseIndexEntriesRejectsUnsafeAndUnmergedEntries(t *testing.T) {
 	oid := strings.Repeat("a", 40)
 	if _, err := parseIndexEntries([]byte("100644 "+oid+" 0\t../outside.go\x00"), 10); err == nil {
