@@ -251,6 +251,8 @@ type CoverageSummary struct {
 // pair selection.
 type EffectiveConfig struct {
 	Profile           string               `json:"profile,omitempty"`
+	Scope             string               `json:"scope,omitempty"`
+	ScopeRoots        []string             `json:"scope_roots,omitempty"`
 	ConfigPath        string               `json:"config_path,omitempty"`
 	IgnoreFiles       []string             `json:"ignore_files"`
 	IgnoreEvidence    []IgnoreFileEvidence `json:"ignore_file_evidence"`

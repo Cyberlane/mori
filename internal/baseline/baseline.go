@@ -51,6 +51,8 @@ type Entry struct {
 // universe or make comparison coverage incomplete. Presentation-only options
 // are intentionally excluded.
 type ScanProfile struct {
+	Scope             string       `json:"scope,omitempty"`
+	ScopeRoots        []string     `json:"scope_roots,omitempty"`
 	Threshold         float64      `json:"threshold"`
 	MinTokens         int          `json:"min_tokens"`
 	MaxPairs          int          `json:"max_pairs"`

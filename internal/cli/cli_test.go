@@ -1863,6 +1863,43 @@ func TestRunScanRejectsMissingOrBaselinedStdinPath(t *testing.T) {
 	}
 }
 
+func TestRunScanUsesNamedProjectScopeRootsAndOverrides(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for _, directory := range []string{"backend", "frontend"} {
+		if err := os.MkdirAll(filepath.Join(root, directory), 0o700); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		content := fmt.Sprintf("package sample\nfunc %sA(v int) int { return v + 1 }\nfunc %sB(x int) int { return x + 1 }\n", directory, directory)
+		if err := os.WriteFile(filepath.Join(root, directory, "sample.go"), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+	configPath := filepath.Join(root, ".mori.json")
+	if err := os.WriteFile(configPath, []byte(`{
+  "threshold": 0.7,
+  "scopes": {"backend": {"roots": ["backend"], "threshold": 1, "min_tokens": 1, "same_language_only": true}}
+}`), 0o600); err != nil {
+		t.Fatalf("WriteFile config: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"scan", "--config", configPath, "--scope", "backend", "--format", "json",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	if result.Configuration.Scope != "backend" || !reflect.DeepEqual(result.Configuration.ScopeRoots, []string{"backend"}) ||
+		result.Files != 1 || len(result.Groups) != 1 || result.Threshold != 1 {
+		t.Fatalf("scope report = %#v", result)
+	}
+}
+
 func TestRunScanStagedUsesIndexSourcesConfigAndIgnoreRules(t *testing.T) {
 	root := t.TempDir()
 	cliTestGit(t, root, "init", "--initial-branch=main")

@@ -107,6 +107,9 @@ func RunWithInput(
 
 type scanOptions struct {
 	profile            string
+	scope              string
+	scopeRoots         []string
+	scopeRootLabels    []string
 	excludes           stringList
 	languagePairs      stringList
 	comparisonDomain   string
@@ -187,6 +190,7 @@ func defaultScanOptions() scanOptions {
 
 func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string) {
 	flags.StringVar(&options.profile, "profile", options.profile, "scan profile: review, explore, or sql")
+	flags.StringVar(&options.scope, "scope", options.scope, "named project scope from .mori.json")
 	flags.Float64Var(&options.threshold, "threshold", options.threshold, "minimum weighted Jaccard score, from 0 to 1")
 	flags.IntVar(&options.minTokens, "min-tokens", options.minTokens, "minimum normalized AST tokens per fragment")
 	flags.IntVar(&options.maxGroups, "max-groups", options.maxGroups, "maximum reported content-pair groups; 0 is unlimited")
@@ -443,7 +447,15 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 	if err != nil {
 		return scanOptions{}, err
 	}
+	requestedScope, err := findScopeRequest(args)
+	if err != nil {
+		return scanOptions{}, err
+	}
+	options.scope = requestedScope
 	if request.disabled {
+		if requestedScope != "" {
+			return scanOptions{}, errors.New("--scope requires project configuration")
+		}
 		if requestedProfile != "" {
 			if err := applyScanProfile(&options, requestedProfile); err != nil {
 				return scanOptions{}, err
@@ -459,6 +471,9 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 			return scanOptions{}, err
 		}
 		if !found {
+			if requestedScope != "" {
+				return scanOptions{}, fmt.Errorf("scope %q requires project configuration", requestedScope)
+			}
 			if requestedProfile != "" {
 				if err := applyScanProfile(&options, requestedProfile); err != nil {
 					return scanOptions{}, err
@@ -467,6 +482,13 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 			return options, nil
 		}
 		selectedProfile := settings.Profile
+		selectedScope, err := selectConfigScope(settings, requestedScope)
+		if err != nil {
+			return scanOptions{}, err
+		}
+		if selectedScope != nil && selectedScope.Profile != "" {
+			selectedProfile = selectedScope.Profile
+		}
 		if requestedProfile != "" {
 			selectedProfile = requestedProfile
 		}
@@ -476,6 +498,11 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 			}
 		}
 		applyConfig(&options, settings, filepath.Dir(stagedPath))
+		if selectedScope != nil {
+			if err := applyConfigScope(&options, *selectedScope, filepath.Dir(stagedPath)); err != nil {
+				return scanOptions{}, err
+			}
+		}
 		options.configPath = displayCLIPath(stagedPath)
 		return options, nil
 	}
@@ -489,6 +516,9 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 			return scanOptions{}, err
 		}
 		if !found {
+			if requestedScope != "" {
+				return scanOptions{}, fmt.Errorf("scope %q requires project configuration", requestedScope)
+			}
 			if requestedProfile != "" {
 				if err := applyScanProfile(&options, requestedProfile); err != nil {
 					return scanOptions{}, err
@@ -503,6 +533,13 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 		return scanOptions{}, err
 	}
 	selectedProfile := settings.Profile
+	selectedScope, err := selectConfigScope(settings, requestedScope)
+	if err != nil {
+		return scanOptions{}, err
+	}
+	if selectedScope != nil && selectedScope.Profile != "" {
+		selectedProfile = selectedScope.Profile
+	}
 	if requestedProfile != "" {
 		selectedProfile = requestedProfile
 	}
@@ -512,6 +549,11 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 		}
 	}
 	applyConfig(&options, settings, filepath.Dir(path))
+	if selectedScope != nil {
+		if err := applyConfigScope(&options, *selectedScope, filepath.Dir(path)); err != nil {
+			return scanOptions{}, err
+		}
+	}
 	options.configPath = displayCLIPath(path)
 	return options, nil
 }
@@ -621,6 +663,65 @@ func findProfileRequest(args []string) (string, error) {
 		return "", err
 	}
 	return resolved.name, nil
+}
+
+func findScopeRequest(args []string) (string, error) {
+	var scope string
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		switch {
+		case argument == "--scope":
+			if index+1 >= len(args) {
+				return "", errors.New("--scope requires a value")
+			}
+			index++
+			scope = args[index]
+		case strings.HasPrefix(argument, "--scope="):
+			scope = strings.TrimPrefix(argument, "--scope=")
+		}
+	}
+	if strings.TrimSpace(scope) == "" && scope != "" {
+		return "", errors.New("--scope cannot be empty")
+	}
+	return scope, nil
+}
+
+func selectConfigScope(settings config.Settings, name string) (*config.ScopeSettings, error) {
+	if name == "" {
+		return nil, nil
+	}
+	scope, ok := settings.Scopes[name]
+	if !ok {
+		names := make([]string, 0, len(settings.Scopes))
+		for candidate := range settings.Scopes {
+			names = append(names, candidate)
+		}
+		sort.Strings(names)
+		return nil, fmt.Errorf("unknown scope %q; configured scopes: %s", name, strings.Join(names, ", "))
+	}
+	return &scope, nil
+}
+
+func applyConfigScope(options *scanOptions, scope config.ScopeSettings, base string) error {
+	if len(scope.Roots) == 0 {
+		return fmt.Errorf("scope %q must define at least one root", options.scope)
+	}
+	options.scopeRoots = make([]string, 0, len(scope.Roots))
+	options.scopeRootLabels = make([]string, 0, len(scope.Roots))
+	for _, root := range scope.Roots {
+		if root == "" || filepath.IsAbs(root) {
+			return fmt.Errorf("scope %q root %q must be a relative project path", options.scope, root)
+		}
+		clean := filepath.Clean(filepath.FromSlash(root))
+		if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("scope %q root %q escapes the project", options.scope, root)
+		}
+		options.scopeRoots = append(options.scopeRoots, filepath.Join(base, clean))
+		options.scopeRootLabels = append(options.scopeRootLabels, filepath.ToSlash(clean))
+	}
+	options.scopeRootLabels = compactSortedStrings(options.scopeRootLabels)
+	applyConfig(options, scope.Settings(), base)
+	return nil
 }
 
 type configRequest struct {
@@ -1719,6 +1820,8 @@ func baselineScanProfile(
 		})
 	}
 	return baseline.ScanProfile{
+		Scope:             options.scope,
+		ScopeRoots:        append([]string{}, options.scopeRootLabels...),
 		Threshold:         options.threshold,
 		MinTokens:         options.minTokens,
 		MaxPairs:          options.maxPairs,
@@ -1777,6 +1880,9 @@ func executeScan(
 	suppress func(string, model.Location, model.Location) bool,
 	initialWarnings []model.Warning,
 ) (model.Report, error) {
+	if len(paths) == 0 && len(options.scopeRoots) > 0 {
+		paths = append([]string{}, options.scopeRoots...)
+	}
 	domain, domainSet, err := resolveComparisonDomain(options.comparisonDomain)
 	if err != nil {
 		return model.Report{}, err
@@ -1943,6 +2049,8 @@ func executeScan(
 	}
 	result.Configuration = model.EffectiveConfig{
 		Profile:           options.profile,
+		Scope:             options.scope,
+		ScopeRoots:        append([]string{}, options.scopeRootLabels...),
 		ConfigPath:        options.configPath,
 		IgnoreFiles:       discovered.IgnoreFiles,
 		IgnoreEvidence:    append([]model.IgnoreFileEvidence{}, discovered.IgnoreEvidence...),
