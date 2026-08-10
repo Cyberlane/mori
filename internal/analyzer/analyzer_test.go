@@ -305,6 +305,9 @@ func TestAnalyzeReportsEmptyCoverage(t *testing.T) {
 		!strings.Contains(empty.Warnings[0].Message, "no supported source files") {
 		t.Fatalf("empty warnings = %#v", empty.Warnings)
 	}
+	if empty.Coverage.WarningCount != 1 || empty.Coverage.AnalyzedFiles != 0 {
+		t.Fatalf("empty coverage = %#v", empty.Coverage)
+	}
 
 	root := t.TempDir()
 	writeFile := filepath.Join(root, "declarations.go")
@@ -324,8 +327,41 @@ func TestAnalyzeReportsEmptyCoverage(t *testing.T) {
 	if len(noFragments.FileCoverage) != 1 ||
 		noFragments.FileCoverage[0].Path != discovered.Files[0].DisplayPath ||
 		noFragments.FileCoverage[0].Language != "go" ||
-		noFragments.FileCoverage[0].FragmentCount != 0 {
+		noFragments.FileCoverage[0].FragmentCount != 0 ||
+		noFragments.FileCoverage[0].ZeroReason != "no_boundaries" {
 		t.Fatalf("file coverage = %#v, want one zero-fragment Go file", noFragments.FileCoverage)
+	}
+	if noFragments.Coverage.SupportedFiles != 1 || noFragments.Coverage.AnalyzedFiles != 1 ||
+		noFragments.Coverage.ZeroFragmentFiles != 1 || noFragments.Coverage.WarningCount != 1 {
+		t.Fatalf("coverage summary = %#v", noFragments.Coverage)
+	}
+}
+
+func TestAnalyzeExplainsBoundariesBelowTokenFloor(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "small.go")
+	if err := os.WriteFile(path, []byte("package sample\nfunc Small() {}\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	discovered := source.Discover([]string{root}, source.Options{})
+	result, err := Analyze(context.Background(), discovered.Files, nil, Options{
+		Threshold:      0.7,
+		MinTokens:      100,
+		MaxGroups:      10,
+		MaxOccurrences: 10,
+		MaxPairs:       100,
+		Workers:        1,
+	})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if len(result.FileCoverage) != 1 ||
+		result.FileCoverage[0].CandidateCount != 1 ||
+		result.FileCoverage[0].BelowTokenFloor != 1 ||
+		result.FileCoverage[0].ZeroReason != "below_token_floor" {
+		t.Fatalf("file coverage = %#v", result.FileCoverage)
 	}
 }
 

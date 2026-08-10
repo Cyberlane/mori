@@ -174,7 +174,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 13,
+  "schema_version": 14,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -199,6 +199,18 @@ The top-level shape is:
   "groups": [],
   "warnings": [],
   "file_coverage": [],
+	"coverage": {
+		"supported_files": 4,
+		"analyzed_files": 4,
+		"fragment_files": 4,
+		"zero_fragment_files": 0,
+		"generated_excluded_files": 0,
+		"warning_files": 0,
+		"warning_count": 0,
+		"parse_diagnostic_files": 0,
+		"parse_diagnostic_count": 0,
+		"unsupported_extensions": []
+	},
   "configuration": {
     "profile": "review",
     "ignore_files": [],
@@ -219,7 +231,12 @@ The top-level shape is:
     "priority_paths": [],
     "same_language_only": true,
     "cross_language_only": false,
-    "language_pairs": []
+		"language_pairs": [],
+		"require_coverage": true,
+		"min_file_coverage": 0.95,
+		"max_zero_fragment_files": 2,
+		"fail_on_warning": false,
+		"fail_on_parse_diagnostic": true
   }
 }
 ```
@@ -270,6 +287,17 @@ eligibility. Embedded SQL uses source-mapped host literal locations and the
 explicitly selected SQL dialect. Existing baselines require review and
 regeneration because the normalization version changed, even when the new
 extractors remain disabled.
+
+Schema 14 adds an exact `coverage` summary, effective strict coverage-policy
+values, aggregate unsupported-extension counts, and pre-token-floor boundary
+evidence in every `file_coverage` entry. A zero-fragment analyzed file records
+one deterministic reason: `no_boundaries`, `below_token_floor`,
+`invalid_fragments`, or `resource_limit`; generated exclusions record
+`generated_excluded`. Generated exclusions are supported files but never enter
+the analyzed-file coverage denominator. Consumers can therefore enforce exact
+file-level policy without reconstructing totals or receiving a list of
+unsupported paths. Normalization remains version 8 and baseline schema remains
+version 2.
 
 Schema 9 added a deterministic `file_coverage` array with one entry per analyzed
 or generated-excluded supported file. Each entry records its language, review

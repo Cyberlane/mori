@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 13
+const SchemaVersion = 14
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -188,8 +188,33 @@ type FileCoverage struct {
 	Generated        bool   `json:"generated"`
 	GeneratedMarker  string `json:"generated_marker,omitempty"`
 	FragmentCount    int    `json:"fragment_count"`
+	CandidateCount   int    `json:"candidate_fragment_count"`
+	BelowTokenFloor  int    `json:"below_token_floor_count"`
+	ZeroReason       string `json:"zero_fragment_reason,omitempty"`
 	SkippedFragments int    `json:"skipped_fragments"`
 	ParseDiagnostics int    `json:"parse_diagnostics"`
+}
+
+// UnsupportedExtension records an aggregate discovery count without exposing
+// individual unsupported paths.
+type UnsupportedExtension struct {
+	Extension string `json:"extension"`
+	FileCount int    `json:"file_count"`
+}
+
+// CoverageSummary records deterministic evidence used by strict coverage
+// policies. Generated exclusions are supported files but are not analyzed.
+type CoverageSummary struct {
+	SupportedFiles        int                    `json:"supported_files"`
+	AnalyzedFiles         int                    `json:"analyzed_files"`
+	FragmentFiles         int                    `json:"fragment_files"`
+	ZeroFragmentFiles     int                    `json:"zero_fragment_files"`
+	GeneratedExcluded     int                    `json:"generated_excluded_files"`
+	WarningFiles          int                    `json:"warning_files"`
+	WarningCount          int                    `json:"warning_count"`
+	ParseDiagnosticFiles  int                    `json:"parse_diagnostic_files"`
+	ParseDiagnosticCount  int                    `json:"parse_diagnostic_count"`
+	UnsupportedExtensions []UnsupportedExtension `json:"unsupported_extensions"`
 }
 
 // EffectiveConfig records the scan inputs needed to reproduce discovery and
@@ -217,6 +242,11 @@ type EffectiveConfig struct {
 	SameLanguageOnly  bool               `json:"same_language_only"`
 	CrossLanguageOnly bool               `json:"cross_language_only"`
 	LanguagePairs     []string           `json:"language_pairs"`
+	RequireCoverage   bool               `json:"require_coverage"`
+	MinFileCoverage   float64            `json:"min_file_coverage"`
+	MaxZeroFiles      int                `json:"max_zero_fragment_files"`
+	FailOnWarning     bool               `json:"fail_on_warning"`
+	FailOnDiagnostic  bool               `json:"fail_on_parse_diagnostic"`
 	BaselinePath      string             `json:"baseline_path,omitempty"`
 	Focus             *FocusConfig       `json:"focus,omitempty"`
 }
@@ -238,5 +268,6 @@ type Report struct {
 	Groups                  []MatchGroup    `json:"groups"`
 	Warnings                []Warning       `json:"warnings"`
 	FileCoverage            []FileCoverage  `json:"file_coverage"`
+	Coverage                CoverageSummary `json:"coverage"`
 	Configuration           EffectiveConfig `json:"configuration"`
 }

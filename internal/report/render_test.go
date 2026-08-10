@@ -206,7 +206,7 @@ func TestTextDisclosesPerFileCoverage(t *testing.T) {
 		Fragments:     3,
 		FileCoverage: []model.FileCoverage{
 			{Path: "functions.go", Language: "go", Status: "analyzed", FragmentCount: 3},
-			{Path: "script.zsh", Language: "zsh", Status: "analyzed"},
+			{Path: "script.zsh", Language: "zsh", Status: "analyzed", ZeroReason: "no_boundaries"},
 			{Path: "sqlc.go", Language: "go", Status: "excluded_generated", Generated: true},
 		},
 	}); err != nil {
@@ -214,9 +214,9 @@ func TestTextDisclosesPerFileCoverage(t *testing.T) {
 	}
 	rendered := output.String()
 	for _, expected := range []string{
-		"coverage: 1 of 2 analyzed file(s)",
+		"coverage: 1/2 analyzed file(s)",
 		"files without comparison fragments (1):",
-		"script.zsh [zsh]",
+		"script.zsh [zsh; no_boundaries]",
 		"generated sources: 0 analyzed, 1 excluded",
 	} {
 		if !strings.Contains(rendered, expected) {

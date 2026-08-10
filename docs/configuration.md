@@ -37,7 +37,7 @@ Profiles deliberately do not guess project-specific test, migration, generated
 router, or framework exclusions. Add those only after auditing the repository's
 source categories and the first report.
 
-The selected profile is recorded in schema-13 reports. Omitting `profile`
+The selected profile is recorded in schema-14 reports. Omitting `profile`
 retains the legacy defaults. A CLI `--profile` replaces a configured profile;
 explicit fields from the config are then applied, followed by explicit CLI
 flags. An explicit language-selection mode replaces the profile's mode, so
@@ -70,6 +70,10 @@ flags. An explicit language-selection mode replaces the profile's mode, so
   "language_pairs": [],
   "fail_on_match": false,
   "require_coverage": true,
+	"min_file_coverage": 0.95,
+	"max_zero_fragment_files": 2,
+	"fail_on_warning": false,
+	"fail_on_parse_diagnostic": true,
   "exclude_generated": true,
   "baseline": "mori-baseline.json",
   "baseline_scope": "content",
@@ -139,6 +143,24 @@ no qualifying similarity groups. The command-line override is
 `--require-coverage`; use `--require-coverage=false` to disable a configured
 requirement for an explicitly exploratory invocation.
 
+`min_file_coverage` accepts `0` through `1`; zero disables the policy. Its
+numerator is the number of analyzed files producing at least one comparison
+fragment, and its denominator is every analyzed supported file. Files with
+status `excluded_generated` remain visible evidence but do not enter the
+denominator. The command-line form is `--min-file-coverage`.
+
+`max_zero_fragment_files` accepts `-1` or greater; `-1` disables the policy.
+It limits analyzed supported files that produced no comparison fragments. The
+command-line form is `--max-zero-fragment-files`.
+
+`fail_on_warning` fails on any discovery, parsing, resource, focus, or coverage
+warning. `fail_on_parse_diagnostic` is narrower and fails only when a file has
+Tree-sitter parse diagnostics. Their command-line forms are
+`--fail-on-warning` and `--fail-on-parse-diagnostic`. Every strict coverage
+policy writes the report first and then exits with status `4`. Coverage policy
+failure takes precedence over finding status `3`, and baseline update or prune
+checks the policies before changing its baseline file.
+
 `exclude_generated` excludes supported files only when Mori recognizes a
 conservative generated-source comment marker in the first 8 KiB, including
 `Code generated ... DO NOT EDIT`, `@generated`, and common automatically
@@ -168,8 +190,9 @@ Ignore files affect directory traversal only. A file passed explicitly remains
 visible. Repeated `--exclude` globs remain additive and continue to exclude an
 explicitly requested file. Use `--no-ignore` to disable both ignore-file types.
 
-Schema-11 JSON reports record the effective profile, options, and every loaded
-ignore file under `configuration` so a scan can be reproduced. Review focus remains
+Schema-14 JSON reports record the effective profile, strict coverage policies,
+options, and every loaded ignore file under `configuration` so a scan can be
+reproduced. Review focus remains
 CLI-only: `--focus-path` is repeatable, `--changed-since` always requires an
 explicit locally available Git revision, and repeatable
 `--changed-worktree PATH=REVISION` values give every additional Git worktree

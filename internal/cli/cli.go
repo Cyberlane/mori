@@ -106,6 +106,10 @@ type scanOptions struct {
 	failOnMatch        bool
 	failOnFocusedMatch bool
 	requireCoverage    bool
+	minFileCoverage    float64
+	maxZeroFiles       int
+	failOnWarning      bool
+	failOnDiagnostic   bool
 	excludeGenerated   bool
 	baselinePath       string
 	baselineScope      string
@@ -133,6 +137,7 @@ func defaultScanOptions() scanOptions {
 		ranking:          analyzer.RankingStructural,
 		baselineScope:    string(baseline.ScopeContent),
 		respectIgnore:    true,
+		maxZeroFiles:     -1,
 	}
 }
 
@@ -240,6 +245,30 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, includeCheck bool) {
 		"require-coverage",
 		options.requireCoverage,
 		"exit with status 4 unless at least one supported file and comparison fragment are analyzed",
+	)
+	flags.Float64Var(
+		&options.minFileCoverage,
+		"min-file-coverage",
+		options.minFileCoverage,
+		"minimum fraction of analyzed files producing fragments, from 0 to 1; 0 disables",
+	)
+	flags.IntVar(
+		&options.maxZeroFiles,
+		"max-zero-fragment-files",
+		options.maxZeroFiles,
+		"maximum analyzed files allowed without fragments; -1 disables",
+	)
+	flags.BoolVar(
+		&options.failOnWarning,
+		"fail-on-warning",
+		options.failOnWarning,
+		"exit with status 4 when any warning is reported",
+	)
+	flags.BoolVar(
+		&options.failOnDiagnostic,
+		"fail-on-parse-diagnostic",
+		options.failOnDiagnostic,
+		"exit with status 4 when any file has parse diagnostics",
 	)
 	flags.BoolVar(
 		&options.excludeGenerated,
@@ -464,6 +493,18 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	if settings.RequireCoverage != nil {
 		options.requireCoverage = *settings.RequireCoverage
 	}
+	if settings.MinFileCoverage != nil {
+		options.minFileCoverage = *settings.MinFileCoverage
+	}
+	if settings.MaxZeroFiles != nil {
+		options.maxZeroFiles = *settings.MaxZeroFiles
+	}
+	if settings.FailOnWarning != nil {
+		options.failOnWarning = *settings.FailOnWarning
+	}
+	if settings.FailOnDiagnostic != nil {
+		options.failOnDiagnostic = *settings.FailOnDiagnostic
+	}
 	if settings.ExcludeGenerated != nil {
 		options.excludeGenerated = *settings.ExcludeGenerated
 	}
@@ -575,6 +616,13 @@ func validateScanOptions(options scanOptions) error {
 	if options.minTokens < 1 {
 		return errors.New("--min-tokens must be at least 1")
 	}
+	if math.IsNaN(options.minFileCoverage) || math.IsInf(options.minFileCoverage, 0) ||
+		options.minFileCoverage < 0 || options.minFileCoverage > 1 {
+		return errors.New("--min-file-coverage must be from 0 to 1")
+	}
+	if options.maxZeroFiles < -1 {
+		return errors.New("--max-zero-fragment-files must be -1 or greater")
+	}
 	if options.maxGroups < 0 || options.maxOccurrences < 0 || options.maxPairs < 0 ||
 		options.maxFileBytes < 0 {
 		return errors.New("maximum values cannot be negative")
@@ -674,8 +722,8 @@ func runScan(ctx context.Context, args []string, stdout io.Writer, stderr io.Wri
 		fmt.Fprintf(stderr, "mori: write report: %v\n", err)
 		return exitError
 	}
-	if options.requireCoverage && !hasCoverage(result) {
-		return coverageFailure(stderr, result)
+	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
+		return code
 	}
 	if options.failOnMatch && result.TotalMatchGroups > 0 {
 		return exitFindings
@@ -724,8 +772,8 @@ func runBaselineUpdate(ctx context.Context, args []string, stdout io.Writer, std
 		fmt.Fprintf(stderr, "mori: %v\n", err)
 		return exitError
 	}
-	if options.requireCoverage && !hasCoverage(result) {
-		return coverageFailure(stderr, result)
+	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
+		return code
 	}
 	scope := baseline.Scope(options.baselineScope)
 	if err := baseline.Write(options.baselinePath, result, scope); err != nil {
@@ -770,8 +818,8 @@ func runBaselinePrune(ctx context.Context, args []string, stdout io.Writer, stde
 		fmt.Fprintf(stderr, "mori: %v\n", err)
 		return exitError
 	}
-	if options.requireCoverage && !hasCoverage(result) {
-		return coverageFailure(stderr, result)
+	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
+		return code
 	}
 	stale := baseline.Stale(set, result)
 	if options.check {
@@ -819,13 +867,66 @@ func hasCoverage(result model.Report) bool {
 	return result.Files > 0 && result.Fragments > 0
 }
 
-func coverageFailure(stderr io.Writer, result model.Report) int {
-	message := "no supported source files were discovered"
-	if result.Files > 0 {
-		message = "no comparison fragments were extracted"
+func enforceCoveragePolicies(
+	stderr io.Writer,
+	options scanOptions,
+	result model.Report,
+) int {
+	failures := make([]string, 0, 4)
+	if options.requireCoverage && !hasCoverage(result) {
+		message := "no supported source files were discovered"
+		if result.Coverage.SupportedFiles > 0 && result.Files == 0 {
+			message = "no supported source files were analyzed"
+		} else if result.Files > 0 {
+			message = "no comparison fragments were extracted"
+		}
+		failures = append(failures, message)
 	}
-	if _, err := fmt.Fprintf(stderr, "mori: required coverage not met: %s\n", message); err != nil {
-		return exitError
+	if options.minFileCoverage > 0 {
+		actual := 0.0
+		if result.Coverage.AnalyzedFiles > 0 {
+			actual = float64(result.Coverage.FragmentFiles) /
+				float64(result.Coverage.AnalyzedFiles)
+		}
+		if result.Coverage.AnalyzedFiles == 0 || actual < options.minFileCoverage {
+			failures = append(failures, fmt.Sprintf(
+				"file coverage %d/%d (%.1f%%) is below %.1f%%",
+				result.Coverage.FragmentFiles,
+				result.Coverage.AnalyzedFiles,
+				actual*100,
+				options.minFileCoverage*100,
+			))
+		}
+	}
+	if options.maxZeroFiles >= 0 &&
+		result.Coverage.ZeroFragmentFiles > options.maxZeroFiles {
+		failures = append(failures, fmt.Sprintf(
+			"%d zero-fragment file(s) exceed the allowed maximum of %d",
+			result.Coverage.ZeroFragmentFiles,
+			options.maxZeroFiles,
+		))
+	}
+	if options.failOnWarning && result.Coverage.WarningCount > 0 {
+		failures = append(failures, fmt.Sprintf(
+			"%d warning(s) were reported across %d file(s)",
+			result.Coverage.WarningCount,
+			result.Coverage.WarningFiles,
+		))
+	}
+	if options.failOnDiagnostic && result.Coverage.ParseDiagnosticFiles > 0 {
+		failures = append(failures, fmt.Sprintf(
+			"%d parse diagnostic(s) were reported across %d file(s)",
+			result.Coverage.ParseDiagnosticCount,
+			result.Coverage.ParseDiagnosticFiles,
+		))
+	}
+	if len(failures) == 0 {
+		return exitSuccess
+	}
+	for _, failure := range failures {
+		if _, err := fmt.Fprintf(stderr, "mori: coverage policy not met: %s\n", failure); err != nil {
+			return exitError
+		}
 	}
 	return exitCoverage
 }
@@ -914,6 +1015,7 @@ func executeScan(
 		FocusActive:       focus != nil,
 		Suppress:          suppress,
 		ExcludedCoverage:  discovered.Excluded,
+		Unsupported:       discovered.Unsupported,
 		Ranking:           ranking,
 		PriorityPaths:     priorityPaths,
 		EmbeddedSQL:       options.embeddedSQL,
@@ -948,6 +1050,11 @@ func executeScan(
 		SameLanguageOnly:  options.sameLanguageOnly,
 		CrossLanguageOnly: options.crossLanguageOnly,
 		LanguagePairs:     append([]string{}, options.languagePairs...),
+		RequireCoverage:   options.requireCoverage,
+		MinFileCoverage:   options.minFileCoverage,
+		MaxZeroFiles:      options.maxZeroFiles,
+		FailOnWarning:     options.failOnWarning,
+		FailOnDiagnostic:  options.failOnDiagnostic,
 		BaselinePath:      displayOptionalPath(options.baselinePath),
 		Focus:             focus,
 	}

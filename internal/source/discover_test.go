@@ -25,6 +25,10 @@ func TestDiscoverSupportedFilesAndDefaultExcludes(t *testing.T) {
 	if len(result.Files) != 2 {
 		t.Fatalf("files = %d, want 2", len(result.Files))
 	}
+	if len(result.Unsupported) != 1 || result.Unsupported[0].Extension != ".md" ||
+		result.Unsupported[0].FileCount != 1 {
+		t.Fatalf("unsupported = %#v, want one .md file", result.Unsupported)
+	}
 	if !strings.HasSuffix(result.Files[0].DisplayPath, "main.go") {
 		t.Fatalf("first file = %q, want main.go", result.Files[0].DisplayPath)
 	}
@@ -111,7 +115,8 @@ func TestDiscoverClassifiesAndOptionallyExcludesGeneratedFiles(t *testing.T) {
 	}
 	markers := make(map[string]bool)
 	for _, coverage := range excluded.Excluded {
-		if coverage.Status != "excluded_generated" || !coverage.Generated || coverage.GeneratedMarker == "" {
+		if coverage.Status != "excluded_generated" || !coverage.Generated || coverage.GeneratedMarker == "" ||
+			coverage.ZeroReason != "generated_excluded" {
 			t.Fatalf("excluded coverage = %#v", coverage)
 		}
 		markers[coverage.GeneratedMarker] = true
@@ -181,6 +186,22 @@ func TestDiscoverFiltersComparisonDomainsBeforeFileChecks(t *testing.T) {
 	})
 	if len(result.Files) != 1 || result.Files[0].Path != code || len(result.Warnings) != 0 {
 		t.Fatalf("domain-filtered result = %#v", result)
+	}
+}
+
+func TestDiscoverInventoriesSupportedFilesSkippedByResourceLimit(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "large.go")
+	writeFixture(t, path, "package fixture\nfunc Large() {}\n")
+	result := Discover([]string{path}, Options{MaxFileBytes: 1})
+	if len(result.Files) != 0 || len(result.Warnings) != 1 || len(result.Excluded) != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+	coverage := result.Excluded[0]
+	if coverage.Language != "go" || coverage.Status != "skipped_resource" ||
+		coverage.ZeroReason != "resource_limit" {
+		t.Fatalf("coverage = %#v", coverage)
 	}
 }
 

@@ -45,6 +45,10 @@ func TestLoadStrictConfig(t *testing.T) {
   "same_language_only": false,
   "language_pairs": ["go,typescript"],
   "require_coverage": true,
+	"min_file_coverage": 0.95,
+	"max_zero_fragment_files": 2,
+	"fail_on_warning": true,
+	"fail_on_parse_diagnostic": true,
 	"exclude_generated": true,
   "exclude": ["**/*_test.go"],
   "respect_ignore": true
@@ -65,6 +69,10 @@ func TestLoadStrictConfig(t *testing.T) {
 		len(settings.PriorityPaths) != 1 || settings.PriorityPaths[0] != "**/auth/**=25" ||
 		settings.SameLanguageOnly == nil || *settings.SameLanguageOnly ||
 		len(settings.LanguagePairs) != 1 || settings.RequireCoverage == nil || !*settings.RequireCoverage ||
+		settings.MinFileCoverage == nil || *settings.MinFileCoverage != 0.95 ||
+		settings.MaxZeroFiles == nil || *settings.MaxZeroFiles != 2 ||
+		settings.FailOnWarning == nil || !*settings.FailOnWarning ||
+		settings.FailOnDiagnostic == nil || !*settings.FailOnDiagnostic ||
 		settings.ExcludeGenerated == nil || !*settings.ExcludeGenerated ||
 		settings.RespectIgnore == nil || !*settings.RespectIgnore {
 		t.Fatalf("settings = %#v", settings)

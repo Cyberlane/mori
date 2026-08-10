@@ -9,6 +9,9 @@
   "ranking": "review",
   "same_language_only": true,
   "require_coverage": true,
+  "min_file_coverage": 0.9,
+  "max_zero_fragment_files": 5,
+  "fail_on_warning": true,
   "exclude_generated": true,
   "exclude": ["**/*_test.go", "examples/**"],
   "respect_ignore": true

@@ -40,8 +40,9 @@ func embeddedSQLFragments(
 	content []byte,
 	file source.File,
 	options Options,
-) ([]model.Fragment, []model.Warning) {
+) ([]model.Fragment, []model.Warning, Coverage) {
 	candidates := collectGoDatabaseSQL(root, content)
+	coverage := Coverage{CandidateFragments: len(candidates)}
 	if len(candidates) > maxEmbeddedSQLCandidatesPerFile {
 		return nil, []model.Warning{{
 			Kind:     "coverage",
@@ -52,7 +53,7 @@ func embeddedSQLFragments(
 				len(candidates),
 				maxEmbeddedSQLCandidatesPerFile,
 			),
-		}}
+		}}, coverage
 	}
 	fragments := make([]model.Fragment, 0, len(candidates))
 	warnings := make([]model.Warning, 0)
@@ -73,9 +74,12 @@ func embeddedSQLFragments(
 		}
 		parsed, warning, err := parseEmbeddedSQLCandidate(ctx, candidate, content, file, options)
 		if err != nil {
-			return nil, []model.Warning{{Path: file.DisplayPath, Message: err.Error()}}
+			return nil, []model.Warning{{Path: file.DisplayPath, Message: err.Error()}}, coverage
 		}
 		fragments = append(fragments, parsed...)
+		if len(parsed) == 0 && (warning == nil || warning.SkippedFragments == 0) {
+			coverage.BelowTokenFloor++
+		}
 		if warning != nil {
 			warnings = append(warnings, *warning)
 		}
@@ -91,7 +95,7 @@ func embeddedSQLFragments(
 			Diagnostics:      diagnostics,
 		})
 	}
-	return fragments, warnings
+	return fragments, warnings, coverage
 }
 
 func collectGoDatabaseSQL(root *tree_sitter.Node, content []byte) []embeddedSQLCandidate {

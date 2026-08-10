@@ -41,6 +41,10 @@ type Settings struct {
 	LanguagePairs     []string `json:"language_pairs,omitempty"`
 	FailOnMatch       *bool    `json:"fail_on_match,omitempty"`
 	RequireCoverage   *bool    `json:"require_coverage,omitempty"`
+	MinFileCoverage   *float64 `json:"min_file_coverage,omitempty"`
+	MaxZeroFiles      *int     `json:"max_zero_fragment_files,omitempty"`
+	FailOnWarning     *bool    `json:"fail_on_warning,omitempty"`
+	FailOnDiagnostic  *bool    `json:"fail_on_parse_diagnostic,omitempty"`
 	ExcludeGenerated  *bool    `json:"exclude_generated,omitempty"`
 	Baseline          string   `json:"baseline,omitempty"`
 	BaselineScope     string   `json:"baseline_scope,omitempty"`
