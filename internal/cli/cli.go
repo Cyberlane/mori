@@ -1576,6 +1576,14 @@ func executeScan(
 			}
 			discovered.Files[index].Content = make([]byte, len(options.stdinContent))
 			copy(discovered.Files[index].Content, options.stdinContent)
+			if spec, ok := language.DetectWithSourcePrefix(
+				discovered.Files[index].Path,
+				sqlDialect,
+				options.stdinContent,
+			); ok {
+				discovered.Files[index].Language = spec
+				discovered.Files[index].AnalysisDomain = spec.ComparisonDomain
+			}
 			matched = true
 			break
 		}

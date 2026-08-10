@@ -118,15 +118,15 @@ This deliberately small fixture uses the broad 12-token exploration floor.
 Abridged example output (first group):
 
 ```text
-1. 79.5% structural similarity · 1 location pair(s)
-   weighted feature evidence: 101 intersection / 127 union
-   A-only weighted units: 9 (6d2ab0d68af9fb96); top features: ...
-   B-only weighted units: 17 (73b27acd1df4c66b); top features: ...
-   A  fingerprint 6d2ab0d68af9fb96 · 1 occurrence(s)
+1. 92.7% structural similarity · 1 location pair(s)
+   weighted feature evidence: 114 intersection / 123 union
+   A-only weighted units: 8 (135969eb81fc3f97); top features: ...
+   B-only weighted units: 1 (4c1419f1009db578); top features: ...
+   A  fingerprint 135969eb81fc3f97 · 1 occurrence(s)
+      - Validator.java:6-9  [java] looksLikeEmail
+   B  fingerprint 4c1419f1009db578 · 1 occurrence(s)
       - validator.js:1-4  [javascript] looksLikeEmail
-   B  fingerprint 73b27acd1df4c66b · 1 occurrence(s)
-      - validator.go:5-8  [go] LooksLikeEmail
-      shared shape: 3 calls, 1 return, 1 binding
+      shared shape: 3 calls, 1 return, 2 bindings
 ```
 
 Read both fragments before acting on a match. Mori does not understand runtime
@@ -245,6 +245,14 @@ mori scan \
   .
 ```
 
+PHP and Hack use dedicated parsers in one `php-hack` review family. Modern Hack
+uses `.hack`; legacy `.php` is selected as Hack only when its first line, or
+the line after one optional shebang, begins with an exact `<?hh` header:
+
+```sh
+mori scan --language-pair php,hack --threshold 0.70 --min-tokens 12 .
+```
+
 Mori searches the current directory and its parents for `.mori.json`. Use
 `--config <path>`, `--no-config`, or `--no-ignore` to control discovery. See
 [Project configuration](docs/configuration.md) for the complete contract.
@@ -337,9 +345,10 @@ summary, per-file zero-fragment reasons, and aggregate unsupported-extension
 counts. They do not include a scan timestamp, hostname,
 username, source body, diff, or Git remote.
 
-Normalization version 10 adds Java and C# function boundaries and canonical
-syntax mappings. It also treats redundant parentheses as transparent and maps
-qualified Java method calls through the existing anonymous member/call shape.
+Normalization version 11 adds PHP and Hack function boundaries, canonical
+syntax mappings, and curated standard-library operation aliases. It retains
+version 10's Java/C# mappings, transparent redundant parentheses, and anonymous
+member/call shape for qualified Java method calls.
 Names and name digests are never reported or fingerprinted directly, and these
 syntax mappings cannot prove call identity or behavior.
 Because this changes scores and fingerprints, baselines created by an older
@@ -430,12 +439,14 @@ explicitly with `--baseline`.
 | Bash / POSIX shell | Shell | code | `.sh`, `.bash` | `sh`, `dash`, `bash` |
 | C# | C# | code | `.cs` | — |
 | Go | Go | code | `.go` | — |
+| Hack | PHP/Hack | code | `.hack`, or legacy `.php` with an exact `<?hh` header | — |
 | Java | Java | code | `.java` | — |
 | JavaScript and JSX | JavaScript | code | `.js`, `.jsx`, `.mjs`, `.cjs` | `node`, `nodejs` |
 | TypeScript | TypeScript | code | `.ts`, `.mts`, `.cts` | — |
 | TSX | TypeScript | code | `.tsx` | — |
 | Python | Python | code | `.py`, `.pyi` | `python`, `python3` |
 | PostgreSQL queries | SQL | sql-query | `.sql` with `--sql-dialect postgresql` | — |
+| PHP | PHP/Hack | code | `.php`, `.phtml` | — |
 | Rust | Rust | code | `.rs` | — |
 | Swift | Swift | code | `.swift` | — |
 | Zsh | Shell | code | `.zsh` | `zsh` |
@@ -443,7 +454,9 @@ explicitly with `--baseline`.
 
 For files with no extension, Mori reads at most the first 256 bytes and uses a
 supported direct or `/usr/bin/env` shebang without executing the interpreter.
-An extension always takes precedence over a conflicting shebang. Run
+An extension always takes precedence over a conflicting shebang. The one
+content-aware dialect exception is legacy `.php` with the bounded exact Hack
+header described above. Run
 `mori languages` to see the exact languages and shebang names in your installed
 version; `mori languages --help` describes the columns.
 
@@ -485,6 +498,13 @@ Other JavaScript and TSX parse errors remain visible and invalidate affected
 function fragments. The pinned Zsh grammar requires `:` rather than arbitrary
 paired delimiters for the `s::`, `n::`, and `b::` glob-qualifier forms; affected
 functions produce visible parser diagnostics.
+
+PHP extracts implemented functions, methods, anonymous functions, and arrow
+functions; Hack extracts implemented functions, methods, anonymous functions,
+and lambdas. Bodyless declarations are excluded in both. Hack uses a pinned
+MIT-licensed generated-source snapshot from the now-archived
+`slackhq/tree-sitter-hack` repository, so newer Hack syntax can produce visible
+diagnostics until Mori maintains or replaces that grammar.
 
 ## For AI Coding Tools
 

@@ -7,9 +7,11 @@ const vscode = require("vscode");
 const supportedLanguages = new Set([
   "csharp",
   "go",
+  "hack",
   "java",
   "javascript",
   "javascriptreact",
+  "php",
   "python",
   "rust",
   "shellscript",

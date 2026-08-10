@@ -17,7 +17,7 @@ import (
 // Version identifies the normalization contract used to build feature bags.
 // Bump it whenever the selected comparison-unit contract, feature vocabulary,
 // weights, canonical mappings, or semantic-hint list changes.
-const Version = 10
+const Version = 11
 
 const (
 	maxOrderedCallFeatures = 8
@@ -421,6 +421,8 @@ func enterNode(
 		}
 		if role := canonicalRole(field); role != "" {
 			addFeature(profile.Features, "role:"+role+">"+canonical, 1)
+		} else if parentCanonical == "expression:call" && canonical == "arguments" {
+			addFeature(profile.Features, "role:arguments>arguments", 1)
 		}
 		nextParent = canonical
 		if strings.HasPrefix(canonical, "literal:") {
@@ -476,6 +478,9 @@ func canonicalNamed(node *tree_sitter.Node, source []byte) string {
 	if kind == "control_transfer_statement" {
 		return swiftControlTransferKind(node.Utf8Text(source))
 	}
+	if kind == "binary_expression" && directAssignmentOperator(node) {
+		return "expression:assignment"
+	}
 
 	if value, ok := canonicalKinds[kind]; ok {
 		return value
@@ -506,6 +511,8 @@ var canonicalKinds = map[string]string{
 	"arrow_function":                  "function",
 	"accessor_declaration":            "function",
 	"anonymous_method_expression":     "function",
+	"anonymous_function_expression":   "function",
+	"anonymous_function":              "function",
 	"closure_expression":              "function",
 	"compact_constructor_declaration": "function",
 	"constructor_declaration":         "function",
@@ -626,29 +633,36 @@ var canonicalKinds = map[string]string{
 	"kw_null":           "literal:null",
 
 	// Parameters, blocks, and bindings.
-	"block":                       "block",
-	"constructor_body":            "block",
-	"formal_parameters":           "parameters",
-	"formal_parameter":            "parameter",
-	"parameter":                   "parameter",
-	"parameter_declaration":       "parameter",
-	"parameter_list":              "parameters",
-	"parameters":                  "parameters",
-	"required_parameter":          "parameter",
-	"optional_parameter":          "parameter",
-	"typed_parameter":             "parameter",
-	"default_parameter":           "parameter:default",
-	"assignment_pattern":          "parameter:default",
-	"statement_block":             "block",
-	"function_body":               "block",
-	"let_declaration":             "binding",
-	"lexical_declaration":         "binding",
-	"short_var_declaration":       "binding",
-	"variable_declaration":        "binding",
-	"variable_declarator":         "binding",
-	"local_declaration_statement": "binding",
-	"local_variable_declaration":  "binding",
-	"property_declaration":        "binding",
+	"block":                        "block",
+	"compound_statement":           "block",
+	"constructor_body":             "block",
+	"formal_parameters":            "parameters",
+	"formal_parameter":             "parameter",
+	"simple_parameter":             "parameter",
+	"variadic_parameter":           "parameter",
+	"property_promotion_parameter": "parameter",
+	"parameter":                    "parameter",
+	"parameter_declaration":        "parameter",
+	"parameter_list":               "parameters",
+	"parameters":                   "parameters",
+	"required_parameter":           "parameter",
+	"optional_parameter":           "parameter",
+	"typed_parameter":              "parameter",
+	"default_parameter":            "parameter:default",
+	"assignment_pattern":           "parameter:default",
+	"statement_block":              "block",
+	"function_body":                "block",
+	"let_declaration":              "binding",
+	"lexical_declaration":          "binding",
+	"short_var_declaration":        "binding",
+	"variable_declaration":         "binding",
+	"variable_declarator":          "binding",
+	"local_declaration_statement":  "binding",
+	"local_variable_declaration":   "binding",
+	"property_declaration":         "binding",
+	"property_declarator":          "binding",
+	"function_static_declaration":  "binding",
+	"static_variable_declaration":  "binding",
 
 	// Shell grammars use different node names for the same variable expansion
 	// and word shapes. These aliases retain the surrounding command structure
@@ -658,6 +672,10 @@ var canonicalKinds = map[string]string{
 	"simple_variable_name":  "symbol",
 	"special_variable_name": "symbol",
 	"variable_name":         "symbol",
+	"variable":              "symbol",
+	"qualified_identifier":  "symbol",
+	"name":                  "symbol",
+	"scope_identifier":      "symbol",
 	"glob_pattern":          "symbol",
 	"extglob_pattern":       "symbol",
 	"word":                  "symbol",
@@ -693,59 +711,76 @@ var canonicalKinds = map[string]string{
 	"switch_rule":            "flow:case",
 
 	// Expressions and data access.
-	"argument_list":              "arguments",
-	"arguments":                  "arguments",
-	"arrow_expression_clause":    "flow:return",
-	"array":                      "collection",
-	"array_expression":           "collection",
-	"array_literal":              "collection",
-	"assignment":                 "expression:assignment",
-	"assignment_expression":      "expression:assignment",
-	"assignment_statement":       "expression:assignment",
-	"attribute":                  "expression:member",
-	"await_expression":           "expression:await",
-	"binary_expression":          "expression:binary",
-	"binary_operator":            "expression:binary",
-	"boolean_operator":           "expression:boolean",
-	"conjunction_expression":     "expression:boolean",
-	"disjunction_expression":     "expression:boolean",
-	"call":                       "expression:call",
-	"call_expression":            "expression:call",
-	"invocation_expression":      "expression:call",
-	"method_invocation":          "expression:call",
-	"comparison_operator":        "expression:comparison",
-	"additive_expression":        "expression:binary",
-	"comparison_expression":      "expression:binary",
-	"equality_expression":        "expression:binary",
-	"infix_expression":           "expression:binary",
-	"multiplicative_expression":  "expression:binary",
-	"conditional_expression":     "expression:conditional",
-	"dictionary":                 "collection",
-	"element":                    "expression:index",
-	"element_access_expression":  "expression:index",
-	"array_access":               "expression:index",
-	"field_expression":           "expression:member",
-	"index":                      "expression:index",
-	"index_expression":           "expression:index",
-	"list":                       "collection",
-	"map":                        "collection",
-	"member_expression":          "expression:member",
-	"member_access_expression":   "expression:member",
-	"navigation_expression":      "expression:member",
-	"new_expression":             "expression:new",
-	"object_creation_expression": "expression:new",
-	"array_creation_expression":  "expression:new",
-	"object":                     "collection",
-	"parenthesized_expression":   "expression:group",
-	"selector_expression":        "expression:member",
-	"slice_expression":           "expression:slice",
-	"subscript":                  "expression:index",
-	"tuple":                      "collection",
-	"dictionary_literal":         "collection",
-	"unary_expression":           "expression:unary",
-	"prefix_unary_expression":    "expression:unary",
-	"postfix_unary_expression":   "expression:unary",
-	"unary_operator":             "expression:unary",
+	"argument_list":                     "arguments",
+	"arguments":                         "arguments",
+	"arrow_expression_clause":           "flow:return",
+	"array":                             "collection",
+	"array_expression":                  "collection",
+	"array_literal":                     "collection",
+	"collection":                        "collection",
+	"list_expression":                   "collection",
+	"list_literal":                      "collection",
+	"assignment":                        "expression:assignment",
+	"assignment_expression":             "expression:assignment",
+	"augmented_assignment_expression":   "expression:assignment",
+	"reference_assignment_expression":   "expression:assignment",
+	"assignment_statement":              "expression:assignment",
+	"attribute":                         "expression:member",
+	"await_expression":                  "expression:await",
+	"binary_expression":                 "expression:binary",
+	"binary_operator":                   "expression:binary",
+	"boolean_operator":                  "expression:boolean",
+	"conjunction_expression":            "expression:boolean",
+	"disjunction_expression":            "expression:boolean",
+	"call":                              "expression:call",
+	"call_expression":                   "expression:call",
+	"function_call_expression":          "expression:call",
+	"member_call_expression":            "expression:call",
+	"nullsafe_member_call_expression":   "expression:call",
+	"scoped_call_expression":            "expression:call",
+	"invocation_expression":             "expression:call",
+	"method_invocation":                 "expression:call",
+	"comparison_operator":               "expression:comparison",
+	"additive_expression":               "expression:binary",
+	"comparison_expression":             "expression:binary",
+	"equality_expression":               "expression:binary",
+	"infix_expression":                  "expression:binary",
+	"multiplicative_expression":         "expression:binary",
+	"conditional_expression":            "expression:conditional",
+	"dictionary":                        "collection",
+	"element":                           "expression:index",
+	"element_access_expression":         "expression:index",
+	"array_access":                      "expression:index",
+	"field_expression":                  "expression:member",
+	"index":                             "expression:index",
+	"index_expression":                  "expression:index",
+	"list":                              "collection",
+	"map":                               "collection",
+	"member_expression":                 "expression:member",
+	"member_access_expression":          "expression:member",
+	"nullsafe_member_access_expression": "expression:member",
+	"scoped_property_access_expression": "expression:member",
+	"scoped_identifier":                 "expression:member",
+	"selection_expression":              "expression:member",
+	"navigation_expression":             "expression:member",
+	"new_expression":                    "expression:new",
+	"object_creation_expression":        "expression:new",
+	"array_creation_expression":         "expression:new",
+	"object":                            "collection",
+	"parenthesized_expression":          "expression:group",
+	"selector_expression":               "expression:member",
+	"slice_expression":                  "expression:slice",
+	"subscript":                         "expression:index",
+	"subscript_expression":              "expression:index",
+	"tuple":                             "collection",
+	"dictionary_literal":                "collection",
+	"unary_expression":                  "expression:unary",
+	"prefix_unary_expression":           "expression:unary",
+	"postfix_unary_expression":          "expression:unary",
+	"unary_operator":                    "expression:unary",
+	"cast_expression":                   "expression:cast",
+	"ternary_expression":                "expression:conditional",
+	"awaitable_expression":              "expression:await",
 
 	// Names are deliberately anonymous.
 	"field_identifier":              "symbol",
@@ -826,6 +861,20 @@ func canonicalOperator(kind string) string {
 	}
 }
 
+func directAssignmentOperator(node *tree_sitter.Node) bool {
+	for index := uint(0); index < node.ChildCount(); index++ {
+		child := node.Child(index)
+		if child == nil || child.IsNamed() {
+			continue
+		}
+		switch canonicalOperator(child.Kind()) {
+		case "operator:assign", "operator:compound-assign":
+			return true
+		}
+	}
+	return false
+}
+
 func canonicalRole(field string) string {
 	switch field {
 	case "arguments":
@@ -891,7 +940,9 @@ func coarseClass(canonical string) string {
 func semanticOperation(node *tree_sitter.Node, source []byte) string {
 	kind := node.Kind()
 	if kind != "call" && kind != "call_expression" && kind != "invocation" &&
-		kind != "invocation_expression" && kind != "method_invocation" {
+		kind != "invocation_expression" && kind != "method_invocation" &&
+		kind != "function_call_expression" && kind != "member_call_expression" &&
+		kind != "nullsafe_member_call_expression" && kind != "scoped_call_expression" {
 		return ""
 	}
 
@@ -917,15 +968,15 @@ func semanticOperation(node *tree_sitter.Node, source []byte) string {
 		return "aggregate"
 	case "arg", "narg", "slice":
 		return "parameter"
-	case "contains", "containskey", "containsvalue", "has", "haskey", "includes", "indexof":
+	case "contains", "containskey", "containsvalue", "has", "haskey", "includes", "indexof", "str_contains":
 		return "membership"
 	case "match", "matches", "matchstring", "search", "test":
 		return "pattern-match"
-	case "len", "length", "size":
+	case "len", "length", "size", "strlen":
 		return "length"
-	case "lower", "tolower", "tolowercase":
+	case "lower", "strtolower", "tolower", "tolowercase":
 		return "lowercase"
-	case "upper", "toupper", "touppercase":
+	case "strtoupper", "upper", "toupper", "touppercase":
 		return "uppercase"
 	case "strip", "trim", "trimspace":
 		return "trim"
@@ -968,17 +1019,35 @@ func runeBefore(value string, index int) (rune, int) {
 func shouldSkipSubtree(kind string) bool {
 	switch kind {
 	case "comment",
+		"arraykey",
+		"bool",
+		"bottom_type",
 		"decorator",
+		"dynamic",
+		"float",
 		"generic_type",
+		"int",
+		"intersection_type",
 		"lifetime",
 		"lifetime_parameter",
 		"primitive_type",
+		"mixed",
+		"named_type",
+		"nonnull",
+		"noreturn",
+		"nothing",
+		"num",
+		"optional_type",
+		"resource",
 		"type_annotation",
 		"type_arguments",
 		"type_bound",
 		"type_identifier",
 		"type_parameter",
-		"type_parameters":
+		"type_parameters",
+		"type_specifier",
+		"type_list",
+		"union_type":
 		return true
 	case "user_type":
 		return true

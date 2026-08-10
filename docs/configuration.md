@@ -125,9 +125,12 @@ Use them for reviewed project categories such as authorization or security
 paths; a matching path is not evidence that a finding is risky or actionable.
 
 `same_language_only` compares within review families. TypeScript and TSX are
-one family and remain comparable. It is mutually exclusive with
+one family and remain comparable, as do Bash/POSIX shell and Zsh, and PHP and
+Hack. It is mutually exclusive with
 `cross_language_only` and `language_pairs`. `language_pairs` accepts language
-IDs or families; the `typescript` selector includes both TypeScript and TSX.
+IDs or families; the `typescript` selector includes both TypeScript and TSX,
+while `php-hack` includes both PHP and Hack. The concrete `php` selector still
+selects only PHP.
 Explicit pairs must belong to a selected comparison domain.
 
 `max_groups` bounds distinct content-pair identities. `max_occurrences` bounds

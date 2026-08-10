@@ -2,10 +2,12 @@
 package language
 
 import (
+	"bytes"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	tree_sitter_hack "github.com/Cyberlane/mori/internal/grammar/hack"
 	tree_sitter_postgresql "github.com/Cyberlane/mori/internal/grammar/postgresql"
 	tree_sitter_swift "github.com/Cyberlane/mori/internal/grammar/swift"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -14,6 +16,7 @@ import (
 	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
 	tree_sitter_java "github.com/tree-sitter/tree-sitter-java/bindings/go"
 	tree_sitter_javascript "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
+	tree_sitter_php "github.com/tree-sitter/tree-sitter-php/bindings/go"
 	tree_sitter_python "github.com/tree-sitter/tree-sitter-python/bindings/go"
 	tree_sitter_rust "github.com/tree-sitter/tree-sitter-rust/bindings/go"
 	tree_sitter_typescript "github.com/tree-sitter/tree-sitter-typescript/bindings/go"
@@ -192,6 +195,44 @@ var specs = []Spec{
 		excludeNestedBoundaries: true,
 	},
 	{
+		ID:               "php",
+		Family:           "php-hack",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "PHP",
+		Extensions:       []string{".php", ".phtml"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_php.LanguagePHP())
+		},
+		fragmentKinds: kinds(
+			"anonymous_function",
+			"arrow_function",
+			"function_definition",
+			"method_declaration",
+		),
+		acceptBoundary:          acceptsPHPBoundary,
+		excludeNestedBoundaries: true,
+	},
+	{
+		ID:               "hack",
+		Family:           "php-hack",
+		ComparisonDomain: "code",
+		FragmentKind:     "function",
+		DisplayName:      "Hack",
+		Extensions:       []string{".hack"},
+		newLanguage: func() *tree_sitter.Language {
+			return tree_sitter.NewLanguage(tree_sitter_hack.Language())
+		},
+		fragmentKinds: kinds(
+			"anonymous_function_expression",
+			"function_declaration",
+			"lambda_expression",
+			"method_declaration",
+		),
+		acceptBoundary:          acceptsHackBoundary,
+		excludeNestedBoundaries: true,
+	},
+	{
 		ID:               "typescript",
 		Family:           "typescript",
 		ComparisonDomain: "code",
@@ -320,6 +361,24 @@ func acceptsJavaBoundary(node *tree_sitter.Node) bool {
 	return node.Kind() != "method_declaration" || node.ChildByFieldName("body") != nil
 }
 
+func acceptsPHPBoundary(node *tree_sitter.Node) bool {
+	switch node.Kind() {
+	case "anonymous_function", "arrow_function":
+		return true
+	default:
+		return node.ChildByFieldName("body") != nil
+	}
+}
+
+func acceptsHackBoundary(node *tree_sitter.Node) bool {
+	switch node.Kind() {
+	case "anonymous_function_expression", "lambda_expression":
+		return true
+	default:
+		return node.ChildByFieldName("body") != nil
+	}
+}
+
 func acceptsSwiftBoundary(node *tree_sitter.Node) bool {
 	if node.Kind() == "lambda_literal" {
 		parent := node.Parent()
@@ -439,6 +498,39 @@ func DetectWithSQLDialect(path string, dialect string) (Spec, bool) {
 		}
 	}
 	return Spec{}, false
+}
+
+// DetectWithSourcePrefix returns the grammar associated with a file extension
+// and a bounded source prefix. Legacy Hack files share PHP's .php extension,
+// so only an exact first- or optional second-line <?hh header selects Hack.
+func DetectWithSourcePrefix(path string, dialect string, prefix []byte) (Spec, bool) {
+	spec, ok := DetectWithSQLDialect(path, dialect)
+	if !ok || strings.ToLower(filepath.Ext(path)) != ".php" || !HasHackLegacyHeader(prefix) {
+		return spec, ok
+	}
+	return Lookup("hack")
+}
+
+// HasHackLegacyHeader reports whether content begins with the legacy Hack
+// header documented by HHVM, optionally after one shebang line.
+func HasHackLegacyHeader(content []byte) bool {
+	first, rest := firstSourceLine(content)
+	if bytes.HasPrefix(first, []byte("#!")) {
+		first, _ = firstSourceLine(rest)
+	}
+	trimmed := bytes.TrimSpace(first)
+	if !bytes.HasPrefix(trimmed, []byte("<?hh")) {
+		return false
+	}
+	return len(trimmed) == len("<?hh") || trimmed[len("<?hh")] == ' ' || trimmed[len("<?hh")] == '\t' ||
+		bytes.HasPrefix(trimmed[len("<?hh"):], []byte("//"))
+}
+
+func firstSourceLine(content []byte) ([]byte, []byte) {
+	if index := bytes.IndexByte(content, '\n'); index >= 0 {
+		return bytes.TrimSuffix(content[:index], []byte("\r")), content[index+1:]
+	}
+	return bytes.TrimSuffix(content, []byte("\r")), nil
 }
 
 // SQLDialects returns the accepted SQL parser selections.

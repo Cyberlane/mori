@@ -61,8 +61,11 @@ The registry binds:
 Grammar versions are pinned as a compatible ABI set. Swift's upstream project
 publishes generated C sources as a workflow artifact, while the PostgreSQL
 module publishes its generated parser through Git LFS and a release archive.
+The only substantial Hack grammar upstream is archived, so Mori pins its exact
+generated source commit and documents that maintenance boundary.
 Mori vendors the minimum generated sources and required headers under
-`internal/grammar/swift` and `internal/grammar/postgresql`. Those packages
+`internal/grammar/swift`, `internal/grammar/postgresql`, and
+`internal/grammar/hack`. Those packages
 record exact source commits, artifacts, licenses, ABIs, and SHA-256 digests;
 ordinary builds never download or regenerate them. A
 table-driven test calls `Parser.SetLanguage` for every entry; compilation alone
@@ -77,7 +80,7 @@ Each worker:
 2. creates and closes its own Tree-sitter parser;
 3. installs the selected grammar;
 4. parses with cancellation support, applying bounded, byte-preserving
-   adaptations for recognized valid JSX, Swift, SQLite, and SQLC forms, and
+   adaptations for recognized valid JSX, Swift, Hack shebangs, SQLite, and SQLC forms, and
    closes the resulting tree;
 5. walks nodes iteratively to find fragment boundaries and any explicitly
    enabled bounded embedded-SQL or statement-window units; and
@@ -103,7 +106,10 @@ constructors, destructors, operators, accessors, local functions, anonymous
 methods, and lambdas, while excluding bodyless members. Swift extracts implemented
 functions, initializers, deinitializers, and closures; bodyless protocol
 requirements, computed properties, accessors, and subscripts are not separate
-comparison units. Generic SQL and explicitly selected PostgreSQL each extract
+comparison units. PHP extracts implemented functions, methods, anonymous
+functions, and arrow functions. Hack extracts implemented functions, methods,
+anonymous functions, and lambdas. Bodyless PHP and Hack declarations are
+excluded. Generic SQL and explicitly selected PostgreSQL each extract
 only top-level
 `SELECT`/set-operation, `INSERT`, `UPDATE`, and `DELETE` statements. Exact,
 immediately adjacent SQLC name comments label query locations. DDL is ignored,
@@ -155,6 +161,8 @@ calls, member access, construction, expressions, and control transfers into
 the existing language-neutral families. Qualified Java calls use an anonymous
 member shape rather than preserving receiver or method names. Swift maps its declarations, expressions,
 arguments, identifiers, and control transfers into existing language-neutral
+families. PHP and Hack map function boundaries, parameters, blocks, bindings,
+calls, access, collections, expressions, and control transfers into the same
 families. Generic SQL and PostgreSQL additionally map
 query clauses, relational structure, and data-manipulation operations. All are
 score hints, not semantic facts.
@@ -175,8 +183,9 @@ bag \(B\), weighted Jaccard cannot exceed:
 Pairs whose upper bound is below the threshold are never scored. SQL queries,
 code functions, shell scripts, and code blocks therefore never cross comparison-unit
 boundaries. Same-language scans score within each review family, while
-cross-language scans score across review families. TypeScript and TSX, and
-Bash/POSIX shell and Zsh, therefore remain same-family comparisons. Explicit language-pair selectors expand
+cross-language scans score across review families. TypeScript and TSX,
+Bash/POSIX shell and Zsh, and PHP and Hack in `php-hack` therefore remain same-family
+comparisons. Explicit language-pair selectors expand
 families into concrete grammar-ID pairs within one compatible domain without
 enumerating unrelated combinations. The `--max-pairs` cap bounds the remaining
 scored pairs and fails with an actionable error rather than returning an

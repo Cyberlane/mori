@@ -177,6 +177,10 @@ Never combine
 TypeScript and TSX belong to one family and do not count as cross-language.
 Bash/POSIX shell and Zsh likewise belong to the `shell` family. Use
 `--language-pair bash,zsh` when only cross-dialect shell results are wanted.
+PHP and Hack likewise belong to the `php-hack` family. Use `--language-pair
+php,hack` for a dialect-only review. Modern Hack uses `.hack`; legacy `.php`
+is selected as Hack only from an exact bounded `<?hh` header on the first line
+or after one optional shebang.
 Shell files produce a `script` comparison unit for top-level executable
 statements and separate `function` units for named functions, each subject to
 the token floor. Require both fragment kinds when claiming shell-file coverage;
@@ -188,6 +192,11 @@ methods, constructors, destructors, operators, accessors, local functions,
 anonymous methods, and lambdas; bodyless members are unexamined. Treat type
 checking, overload resolution, dispatch, exception behavior, and effects as
 source-review concerns rather than conclusions from canonical syntax.
+PHP support covers implemented functions, methods, anonymous functions, and
+arrow functions. Hack covers implemented functions, methods, anonymous
+functions, and lambdas. Bodyless declarations are unexamined. The pinned Hack
+grammar upstream is archived, so disclose Hack parser warnings as incomplete
+coverage and inspect newer syntax directly.
 Swift support covers implemented functions, initializers, deinitializers, and
 closures. Treat protocol requirements, computed properties, accessors, and
 subscripts as unexamined comparison units, and disclose any Swift parser

@@ -85,6 +85,8 @@ func FileWithCoverage(
 	parserInput := content
 	if file.Language.ID == "sql" {
 		parserInput = repairSQLParserInput(content)
+	} else if file.Language.ID == "hack" {
+		parserInput = repairHackParserInput(content)
 	}
 	tree := treeParser.ParseCtx(ctx, parserInput, nil)
 	if tree == nil {

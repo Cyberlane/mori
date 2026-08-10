@@ -1166,3 +1166,121 @@ export const View = () => {
 		})
 	}
 }
+
+func TestPHPAndHackExtractImplementedFunctions(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		content  string
+		language string
+	}{
+		"functions.php": {
+			language: "php",
+			content: `<?php
+interface Worker {
+  public function requirement(int $value): int;
+}
+
+function topLevel(int $value): int {
+  return $value + 1;
+}
+
+final class Service {
+  public function method(int $value): int {
+    $transform = fn(int $input): int => $input + 1;
+    return $transform($value);
+  }
+}
+`,
+		},
+		"functions.hack": {
+			language: "hack",
+			content: `function topLevel(int $value): int {
+  return $value + 1;
+}
+
+interface Worker {
+  public function requirement(int $value): int;
+}
+
+final class Service {
+  public function method(int $value): int {
+    $transform = (int $input): int ==> $input + 1;
+    return $transform($value);
+  }
+}
+`,
+		},
+	}
+	for name, test := range tests {
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), name)
+			if err := os.WriteFile(path, []byte(test.content), 0o600); err != nil {
+				t.Fatalf("WriteFile: %v", err)
+			}
+			spec, ok := language.Detect(path)
+			if !ok || spec.ID != test.language {
+				t.Fatalf("Detect(%s) = %q/%t", name, spec.ID, ok)
+			}
+			fragments, warnings := File(context.Background(), source.File{
+				Path: path, DisplayPath: name, Language: spec,
+			}, 1)
+			if len(warnings) != 0 || len(fragments) != 3 {
+				t.Fatalf("fragments/warnings = %#v/%#v, want three/none", fragments, warnings)
+			}
+			names := make(map[string]bool)
+			for _, fragment := range fragments {
+				names[fragment.Location.Name] = true
+				if fragment.Location.LanguageFamily != "php-hack" {
+					t.Fatalf("fragment family = %q, want php-hack", fragment.Location.LanguageFamily)
+				}
+			}
+			if !names["topLevel"] || !names["method"] || names["requirement"] {
+				t.Fatalf("fragment names = %#v", names)
+			}
+		})
+	}
+}
+
+func TestLegacyHackShebangPreservesLocations(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "legacy.php")
+	content := "#!/usr/bin/env hhvm\n<?hh // strict\nfunction run(int $value): int {\n  return $value + 1;\n}\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, ok := language.DetectWithSourcePrefix(path, language.SQLDialectGeneric, []byte(content))
+	if !ok || spec.ID != "hack" {
+		t.Fatalf("legacy Hack detection = %q/%t", spec.ID, ok)
+	}
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "legacy.php", Language: spec,
+	}, 1)
+	if len(warnings) != 0 || len(fragments) != 1 {
+		t.Fatalf("fragments/warnings = %#v/%#v", fragments, warnings)
+	}
+	if fragments[0].Location.StartLine != 3 || fragments[0].Location.Name != "run" {
+		t.Fatalf("legacy fragment location = %#v", fragments[0].Location)
+	}
+}
+
+func TestHackMalformedFunctionProducesParseWarning(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "broken.hack")
+	if err := os.WriteFile(path, []byte("function broken(int $value: int {\n  return $value;\n}\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	spec, _ := language.Detect(path)
+	fragments, warnings := File(context.Background(), source.File{
+		Path: path, DisplayPath: "broken.hack", Language: spec,
+	}, 1)
+	if len(fragments) != 0 || len(warnings) != 1 || warnings[0].Kind != "parse" ||
+		warnings[0].Language != "hack" || warnings[0].TotalDiagnostics == 0 {
+		t.Fatalf("fragments/warnings = %#v/%#v", fragments, warnings)
+	}
+}

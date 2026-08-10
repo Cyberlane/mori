@@ -87,6 +87,36 @@ func TestDiscoverDoesNotUseShebangToOverrideExtension(t *testing.T) {
 	}
 }
 
+func TestDiscoverSelectsModernAndLegacyHack(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	modern := filepath.Join(root, "modern.hack")
+	legacy := filepath.Join(root, "legacy.php")
+	php := filepath.Join(root, "ordinary.php")
+	nearby := filepath.Join(root, "nearby.php")
+	writeFixture(t, modern, "function modern(): void {}\n")
+	writeFixture(t, legacy, "#!/usr/bin/env hhvm\n<?hh // strict\nfunction legacy(): void {}\n")
+	writeFixture(t, php, "<?php\nfunction ordinary(): void {}\n")
+	writeFixture(t, nearby, "<?hhx\nfunction nearby(): void {}\n")
+
+	result := Discover([]string{root}, Options{})
+	if len(result.Warnings) != 0 || len(result.Files) != 4 {
+		t.Fatalf("result = %#v, want four supported files", result)
+	}
+	want := map[string]string{
+		"legacy.php":   "hack",
+		"modern.hack":  "hack",
+		"nearby.php":   "php",
+		"ordinary.php": "php",
+	}
+	for _, file := range result.Files {
+		if got := file.Language.ID; got != want[filepath.Base(file.Path)] {
+			t.Errorf("%s language = %q, want %q", file.Path, got, want[filepath.Base(file.Path)])
+		}
+	}
+}
+
 func TestDiscoverClassifiesAndOptionallyExcludesGeneratedFiles(t *testing.T) {
 	t.Parallel()
 

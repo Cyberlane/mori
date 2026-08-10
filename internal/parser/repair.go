@@ -54,6 +54,26 @@ func repairSQLParserInput(content []byte) []byte {
 	return repaired
 }
 
+// repairHackParserInput hides an optional first-line shebang from the pinned
+// Hack grammar. The grammar accepts legacy <?hh headers but not shebangs; a
+// same-length replacement preserves all source offsets and line numbers.
+func repairHackParserInput(content []byte) []byte {
+	if !bytes.HasPrefix(content, []byte("#!")) {
+		return content
+	}
+	lineEnd := bytes.IndexByte(content, '\n')
+	if lineEnd < 0 {
+		lineEnd = len(content)
+	}
+	repaired := bytes.Clone(content)
+	for index := 0; index < lineEnd; index++ {
+		if repaired[index] != '\r' {
+			repaired[index] = ' '
+		}
+	}
+	return repaired
+}
+
 // repairSwiftParserInput adapts a bounded set of valid Swift forms that the
 // pinned grammar does not accept. Replacements preserve byte length and the
 // closest available syntax shape so locations remain exact. The caller only

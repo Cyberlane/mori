@@ -14,6 +14,8 @@
 | Tree-sitter Go grammar | 0.25.0 | Copyright (c) 2014 Max Brunsfeld | MIT |
 | Tree-sitter Java grammar | 0.23.5 | Copyright (c) 2017 Ayman Nadeem | MIT |
 | Tree-sitter JavaScript grammar | 0.25.0 | Copyright (c) 2014 Max Brunsfeld | MIT |
+| Tree-sitter Hack grammar (`github.com/slackhq/tree-sitter-hack`) | source at `1a7ded90288189746c54861ac144ede97df95081` (archived upstream) | Copyright (c) 2020 Antonio de Jesus Ochoa Solano | MIT |
+| Tree-sitter PHP grammar | 0.24.2 | Copyright (c) 2017 Josh Vera, GitHub; Copyright (c) 2019 Max Brunsfeld, Amaan Qureshi, Christian Frøystad, Caleb White | MIT |
 | Tree-sitter TypeScript/TSX grammars | 0.23.2 | Copyright (c) 2017 Max Brunsfeld | MIT |
 | Tree-sitter Python grammar | 0.25.0 | Copyright (c) 2016 Max Brunsfeld | MIT |
 | Tree-sitter PostgreSQL grammar (`github.com/gmr/tree-sitter-postgres`) | 1.2.4 | Copyright (c) 2026 Gavin M. Roy, AWeber | BSD 3-Clause |

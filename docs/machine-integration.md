@@ -15,13 +15,14 @@ equivalence. A client should present every match as a source-review lead.
 
 Schema 17 is described by the Draft 2020-12 artifact at
 [`schemas/mori-report-v17.schema.json`](../schemas/mori-report-v17.schema.json).
-Official v0.24.0 release assets include the same file and its SHA-256 checksum.
+Official releases include the same file and its SHA-256 checksum.
 Consumers should select a validator that supports Draft 2020-12, require
 `schema_version` to equal `17`, and reject or explicitly handle unknown report
 versions.
 
-Schema 17 adds only the optional `configuration.stdin_path` field.
-Normalization remains version 9 and the baseline contract remains schema 3.
+Schema 17 originally added only the optional `configuration.stdin_path` field.
+The current normalization version is 11 and the baseline contract remains
+schema 3.
 
 ## SARIF contract
 
@@ -64,8 +65,10 @@ status.
 
 `--stdin-path PATH` replaces one source file's bytes for that scan with bytes
 read from standard input. The disk file is used only during ignore-aware,
-regular-file discovery and language selection; the parser receives the stdin
-content. This lets an editor compare an unsaved document with the rest of the
+regular-file discovery; the parser receives the stdin content. Language
+selection follows the path except that an overlaid legacy `.php` buffer is
+re-evaluated for the bounded exact Hack `<?hh` header. This lets an editor
+compare an unsaved document with the rest of the
 repository without a temporary source file or network transfer.
 
 The overlay contract is intentionally strict:

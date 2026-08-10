@@ -13,8 +13,10 @@ func TestEveryGrammarHasCompatibleABI(t *testing.T) {
 		"bash":       15,
 		"csharp":     15,
 		"go":         15,
+		"hack":       13,
 		"java":       14,
 		"javascript": 15,
+		"php":        15,
 		"python":     15,
 		"postgresql": 15,
 		"rust":       15,
@@ -75,19 +77,22 @@ func TestDetect(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]string{
-		"build.bash":    "bash",
-		"install.SH":    "bash",
-		"Program.CS":    "csharp",
-		"main.go":       "go",
-		"Service.JAVA":  "java",
-		"view.JSX":      "javascript",
-		"worker.mts":    "typescript",
-		"component.tsx": "tsx",
-		"module.pyi":    "python",
-		"lib.rs":        "rust",
-		"queries.SQL":   "sql",
-		"service.SWIFT": "swift",
-		"plugin.zsh":    "zsh",
+		"build.bash":     "bash",
+		"install.SH":     "bash",
+		"Program.CS":     "csharp",
+		"main.go":        "go",
+		"legacy.php":     "php",
+		"template.PHTML": "php",
+		"module.HACK":    "hack",
+		"Service.JAVA":   "java",
+		"view.JSX":       "javascript",
+		"worker.mts":     "typescript",
+		"component.tsx":  "tsx",
+		"module.pyi":     "python",
+		"lib.rs":         "rust",
+		"queries.SQL":    "sql",
+		"service.SWIFT":  "swift",
+		"plugin.zsh":     "zsh",
 	}
 	for path, expected := range tests {
 		spec, ok := Detect(path)
@@ -101,6 +106,33 @@ func TestDetect(t *testing.T) {
 
 	if _, ok := Detect("README.md"); ok {
 		t.Fatal("Detect(README.md) unexpectedly returned a language")
+	}
+}
+
+func TestDetectLegacyHackByBoundedHeader(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{name: "plain header", content: "<?hh\nfunction run(): void {}\n", want: "hack"},
+		{name: "strict header", content: "<?hh // strict\nfunction run(): void {}\n", want: "hack"},
+		{name: "shebang header", content: "#!/usr/bin/env hhvm\n<?hh // strict\n", want: "hack"},
+		{name: "ordinary php", content: "<?php\nfunction run(): void {}\n", want: "php"},
+		{name: "nearby token", content: "<?hhx\n", want: "php"},
+		{name: "late header", content: "// comment\n<?hh\n", want: "php"},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			spec, ok := DetectWithSourcePrefix("legacy.php", SQLDialectGeneric, []byte(test.content))
+			if !ok || spec.ID != test.want {
+				t.Fatalf("DetectWithSourcePrefix() = %q/%t, want %q/true", spec.ID, ok, test.want)
+			}
+		})
 	}
 }
 
@@ -191,5 +223,18 @@ func TestTypeScriptSelectorsIncludeTSXFamily(t *testing.T) {
 	}
 	if _, ok := ResolveSelector("unknown"); ok {
 		t.Fatal("unknown selector resolved successfully")
+	}
+}
+
+func TestPHPHackFamilySelectorAndConcreteIDs(t *testing.T) {
+	t.Parallel()
+
+	resolved, ok := ResolveSelector("php-hack")
+	if !ok || len(resolved) != 2 || resolved[0] != "hack" || resolved[1] != "php" {
+		t.Fatalf("ResolveSelector(php-hack) = %#v/%t", resolved, ok)
+	}
+	resolved, ok = ResolveSelector("php")
+	if !ok || len(resolved) != 1 || resolved[0] != "php" {
+		t.Fatalf("ResolveSelector(php) = %#v/%t", resolved, ok)
 	}
 }

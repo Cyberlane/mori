@@ -675,6 +675,73 @@ func TestSQLKeywordsAndValuesDoNotLeakIntoFeatures(t *testing.T) {
 	}
 }
 
+func TestPHPHackAliasesPreservePositiveAndNegativeSeparation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	fixtures := map[string]string{
+		"validate.php": `<?php
+function validate_email(string $value): bool {
+  $clean = trim($value);
+  if ($clean === '') {
+    return false;
+  }
+  return str_contains($clean, '@') && str_contains($clean, '.');
+}
+`,
+		"check.hack": `function check_address(string $candidate): bool {
+  $normalized = Str\trim($candidate);
+  if ($normalized === '') {
+    return false;
+  }
+  return Str\contains($normalized, '@') && Str\contains($normalized, '.');
+}
+`,
+		"total.hack": `function total_values(vec<int> $values): int {
+  $total = 0;
+  foreach ($values as $value) {
+    $total += $value;
+  }
+  return $total;
+}
+`,
+	}
+	fragments := make(map[string]model.Fragment, len(fixtures))
+	for name, content := range fixtures {
+		path := filepath.Join(root, name)
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+		spec, ok := language.Detect(path)
+		if !ok {
+			t.Fatalf("Detect(%s) returned unsupported", name)
+		}
+		parsed, warnings := parser.File(context.Background(), source.File{
+			Path: path, DisplayPath: name, Language: spec,
+		}, 1)
+		if len(warnings) != 0 || len(parsed) != 1 {
+			t.Fatalf("%s warnings/fragments = %#v/%d", name, warnings, len(parsed))
+		}
+		fragments[name] = parsed[0]
+	}
+
+	positive, _, _ := similarity.WeightedJaccard(
+		fragments["validate.php"].Features,
+		fragments["check.hack"].Features,
+	)
+	nearby, _, _ := similarity.WeightedJaccard(
+		fragments["validate.php"].Features,
+		fragments["total.hack"].Features,
+	)
+	t.Logf("PHP/Hack positive = %.3f, nearby negative = %.3f", positive, nearby)
+	if positive < 0.70 {
+		t.Fatalf("PHP/Hack positive score = %.3f, want at least 0.70", positive)
+	}
+	if nearby >= 0.60 {
+		t.Fatalf("PHP/Hack nearby-negative score = %.3f, want below 0.60", nearby)
+	}
+}
+
 func parseSQL(t *testing.T, content string) []model.Fragment {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "queries.sql")
