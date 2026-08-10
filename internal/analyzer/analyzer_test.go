@@ -42,8 +42,8 @@ func TestAnalyzeCrossLanguageExamples(t *testing.T) {
 		t.Fatalf("Analyze second run: %v", err)
 	}
 
-	if first.Files != 6 || first.Fragments != 6 {
-		t.Fatalf("files/fragments = %d/%d, want 6/6", first.Files, first.Fragments)
+	if first.Files != 8 || first.Fragments != 8 {
+		t.Fatalf("files/fragments = %d/%d, want 8/8", first.Files, first.Fragments)
 	}
 	if len(first.Groups) < 2 {
 		t.Fatalf("groups = %d, want at least 2", len(first.Groups))
@@ -84,6 +84,58 @@ func TestAnalyzeCrossLanguageExamples(t *testing.T) {
 			t.Fatalf("right evidence does not align with profile B: %#v", group)
 		}
 	}
+}
+
+func TestAnalyzePHPHackPositiveAndNearbyNegative(t *testing.T) {
+	t.Parallel()
+
+	positive := t.TempDir()
+	writeAnalyzerFixture(t, positive, "validate.php", `<?php
+function validate_email(string $value): bool {
+  $clean = trim($value);
+  if ($clean === '') return false;
+  return str_contains($clean, '@') && str_contains($clean, '.');
+}
+`)
+	writeAnalyzerFixture(t, positive, "check.hack", `function check_address(string $candidate): bool {
+  $normalized = Str\trim($candidate);
+  if ($normalized === '') return false;
+  return Str\contains($normalized, '@') && Str\contains($normalized, '.');
+}
+`)
+	positiveResult := analyzePHPHackFixture(t, positive, 0.70)
+	if positiveResult.CandidatePairs != 1 || positiveResult.TotalMatchGroups != 1 ||
+		len(positiveResult.Groups) != 1 || positiveResult.Groups[0].Similarity < 0.94 {
+		t.Fatalf("PHP/Hack positive result = %#v", positiveResult)
+	}
+
+	negative := t.TempDir()
+	writeAnalyzerFixture(t, negative, "validate.php", `<?php
+function validate_email(string $value): bool {
+  $clean = trim($value);
+  return str_contains($clean, '@') && str_contains($clean, '.');
+}
+`)
+	writeAnalyzerFixture(t, negative, "total.hack", `function total_values(vec<int> $values): int {
+  $total = 0;
+  foreach ($values as $value) $total += $value;
+  return $total;
+}
+`)
+	negativeResult := analyzePHPHackFixture(t, negative, 0.70)
+	if negativeResult.CandidatePairs != 0 || negativeResult.TotalMatchGroups != 0 ||
+		len(negativeResult.Groups) != 0 {
+		t.Fatalf("PHP/Hack nearby-negative result = %#v", negativeResult)
+	}
+}
+
+func analyzePHPHackFixture(t *testing.T, root string, threshold float64) model.Report {
+	t.Helper()
+	return analyzeTwoFileFixture(t, root, Options{
+		Threshold: threshold, MinTokens: 1, MaxGroups: 10, MaxOccurrences: 10,
+		MaxPairs: 10, Workers: 2,
+		LanguagePairs: []LanguagePair{{Left: "php", Right: "hack"}},
+	})
 }
 
 func TestAnalyzeJavaCSharpPositiveAndNearbyNegative(t *testing.T) {
@@ -162,14 +214,19 @@ func writeAnalyzerFixture(t *testing.T, root string, name string, content string
 
 func analyzeLanguageExpansionFixture(t *testing.T, root string, threshold float64) model.Report {
 	t.Helper()
+	return analyzeTwoFileFixture(t, root, Options{
+		Threshold: threshold, MinTokens: 12, MaxGroups: 10, MaxOccurrences: 10,
+		MaxPairs: 10, Workers: 2, CrossLanguageOnly: true,
+	})
+}
+
+func analyzeTwoFileFixture(t *testing.T, root string, options Options) model.Report {
+	t.Helper()
 	discovered := source.Discover([]string{root}, source.Options{MaxFileBytes: 1024 * 1024})
 	if len(discovered.Warnings) != 0 || len(discovered.Files) != 2 {
 		t.Fatalf("discovery = %#v", discovered)
 	}
-	result, err := Analyze(context.Background(), discovered.Files, nil, Options{
-		Threshold: threshold, MinTokens: 12, MaxGroups: 10, MaxOccurrences: 10,
-		MaxPairs: 10, Workers: 2, CrossLanguageOnly: true,
-	})
+	result, err := Analyze(context.Background(), discovered.Files, nil, options)
 	if err != nil {
 		t.Fatalf("Analyze: %v", err)
 	}

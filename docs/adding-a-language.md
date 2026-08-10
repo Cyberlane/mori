@@ -66,6 +66,9 @@ document constructs that remain unsupported.
 Shebang support is only for extensionless regular files. Detection must remain
 bounded, must not require an executable bit, and must never execute or resolve
 the named interpreter. A recognized extension remains authoritative.
+The exception must be an explicit documented shared-extension dialect selector,
+such as legacy Hack's exact bounded `<?hh` header, with positive and
+nearby-negative detection tests.
 
 ## 4. Extend normalization deliberately
 

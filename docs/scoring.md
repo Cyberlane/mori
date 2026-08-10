@@ -57,6 +57,13 @@ shape aligns with other grammars without preserving receiver or method names.
 These mappings do not model types, overload resolution, dispatch, exceptions,
 effects, or runtime behavior.
 
+PHP and Hack use separate grammars in one `php-hack` review family. Mori maps
+implemented function-like declarations, parameters, blocks, bindings, calls,
+member access, collections, expressions, and control flow into shared code
+features. Curated aliases include PHP spellings such as `str_contains` and
+`strlen`. These are structural hints only; the score does not model types,
+coercions, dispatch, effects, or runtime behavior.
+
 The normalizer has a version constant for persisted review artifacts. Any
 change to the feature vocabulary, weights, canonical mappings, or
 semantic-hint list increments that version.
@@ -215,7 +222,7 @@ The top-level shape is:
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 10
+    "normalization_version": 11
   },
   "threshold": 0.85,
   "files": 4,
@@ -362,6 +369,12 @@ anonymous member wrapper for qualified Java method calls. Report schema 17 and
 baseline schema 3 are unchanged. Scores, fingerprints, and accepted identities
 can change, so older-normalization baselines fail closed and require deliberate
 review and regeneration.
+
+Normalization version 11 adds PHP and Hack function boundaries, shared
+canonical mappings, and curated PHP standard-library operation aliases. Report
+schema 17 and baseline schema 3 are unchanged. Scores, fingerprints, and
+accepted identities can change, so older-normalization baselines fail closed
+and require deliberate review and regeneration.
 
 Schema 9 added a deterministic `file_coverage` array with one entry per analyzed
 or generated-excluded supported file. Each entry records its language, review

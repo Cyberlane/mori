@@ -307,6 +307,17 @@ func addFile(
 		}
 		return
 	}
+	if supported && spec.ID == "php" {
+		prefix, err := readLanguagePrefix(path, info)
+		if err != nil {
+			result.Warnings = append(result.Warnings, warning(displayPath(cwd, path), err))
+			return
+		}
+		spec, supported = language.DetectWithSourcePrefix(path, options.SQLDialect, prefix)
+		if !supported {
+			return
+		}
+	}
 	if needsShebang {
 		firstLine, err := readShebangLine(path, info)
 		if err != nil {
@@ -484,22 +495,26 @@ func generatedComment(line string, inBlock *bool) (string, bool) {
 
 const maxShebangBytes = 256
 
-func readShebangLine(path string, expected os.FileInfo) (string, error) {
+func readLanguagePrefix(path string, expected os.FileInfo) ([]byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer file.Close()
 
 	opened, err := file.Stat()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !opened.Mode().IsRegular() || !os.SameFile(expected, opened) {
-		return "", errors.New("source changed during discovery")
+		return nil, errors.New("source changed during discovery")
 	}
 
-	content, err := io.ReadAll(io.LimitReader(file, maxShebangBytes+1))
+	return io.ReadAll(io.LimitReader(file, maxShebangBytes+1))
+}
+
+func readShebangLine(path string, expected os.FileInfo) (string, error) {
+	content, err := readLanguagePrefix(path, expected)
 	if err != nil {
 		return "", err
 	}

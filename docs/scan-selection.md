@@ -54,7 +54,7 @@ incompatible with embedded-SQL mode and the `sql-query` domain.
 `--same-language-only` compares fragments only when their review families are
 the same. A family can contain multiple parser grammars, so TypeScript and TSX
 remain comparable in `typescript`, while Bash/POSIX shell and Zsh remain
-comparable in `shell`. The filter
+comparable in `shell`, and PHP and Hack remain comparable in `php-hack`. The filter
 partitions by comparison domain first; cross-domain pairs remain impossible.
 
 ```sh
@@ -151,9 +151,9 @@ to reject or explicitly handle unknown report schema versions.
 
 Domain and family selection do not change fragment features. SQL dialect
 selection chooses a different parser and is therefore recorded explicitly.
-The current normalization version is 10. It includes the established opt-in
+The current normalization version is 11. It includes the established opt-in
 embedded-query and statement-block units, ordered evidence, and Java/C#
-function boundaries and canonical mappings. Baselines created with an older
+and PHP/Hack function boundaries and canonical mappings. Baselines created with an older
 normalization version must be reviewed and regenerated. Changing a selection
 profile still requires the ordinary human review expected for any baseline
 scope change.
@@ -164,7 +164,7 @@ Tests must prove:
 
 - code selection omits SQL files before parsing and warning generation;
 - SQL selection omits code files;
-- same-family mode includes TypeScript-to-TSX and same-language pairs while
+- same-family mode includes TypeScript-to-TSX, PHP-to-Hack, and same-language pairs while
   excluding Go-to-TypeScript pairs;
 - cross-language and same-language modes are mutually exclusive;
 - explicit language pairs incompatible with selected domains are rejected;

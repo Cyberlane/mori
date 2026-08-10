@@ -58,7 +58,7 @@ func TestRunLanguages(t *testing.T) {
 	if code != exitSuccess {
 		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
 	}
-	for _, expected := range []string{"FRAGMENTS", "Bash / POSIX shell", "Go", "JavaScript / JSX", "PostgreSQL queries", "Python", "Rust", "SQL queries", "Swift", "TypeScript / TSX", "Zsh", "shell", "sql-query", "function, script", "bash, dash, sh"} {
+	for _, expected := range []string{"FRAGMENTS", "Bash / POSIX shell", "Go", "Hack", "JavaScript / JSX", "PHP", "PostgreSQL queries", "Python", "Rust", "SQL queries", "Swift", "TypeScript / TSX", "Zsh", "shell", "sql-query", "function, script", "bash, dash, sh"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Errorf("languages output missing %q", expected)
 		}
@@ -1453,7 +1453,7 @@ func TestBaselineMigrationIsExplicitAndWarningsBlockMutation(t *testing.T) {
 	if err := os.WriteFile(legacyPath, []byte(`{
   "schema_version": 2,
   "mori_version": "0.20.0",
-  "normalization_version": 10,
+  "normalization_version": 11,
   "identity_scope": "content",
   "threshold": 0.7,
   "entries": []
@@ -1804,6 +1804,43 @@ func Second(flag bool) { logEvent(); if flag { storeRecord() } }
 
 	if _, err := readStdinOverlay(context.Background(), strings.NewReader("12345"), 4); err == nil {
 		t.Fatal("oversized stdin overlay succeeded")
+	}
+}
+
+func TestRunScanStdinOverlayReselectsLegacyHack(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "legacy.php")
+	if err := os.WriteFile(path, []byte("<?php\nfunction disk(): int { return 1; }\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	overlay := `<?hh // strict
+function first(int $value): int { return $value + 1; }
+function second(int $input): int { return $input + 1; }
+`
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := RunWithInput(context.Background(), []string{
+		"scan", "--no-config", "--format", "json", "--same-language-only",
+		"--threshold", "1", "--min-tokens", "1", "--stdin-path", path, root,
+	}, strings.NewReader(overlay), &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	if len(result.Groups) != 1 || len(result.Warnings) != 0 {
+		t.Fatalf("overlay report = %#v", result)
+	}
+	for _, profile := range result.Groups[0].Profiles {
+		for _, occurrence := range profile.Occurrences {
+			if occurrence.Location.Language != "hack" || occurrence.Location.LanguageFamily != "php-hack" {
+				t.Fatalf("overlay location = %#v", occurrence.Location)
+			}
+		}
 	}
 }
 

@@ -7,6 +7,26 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added PHP support for `.php` and `.phtml` using the official Tree-sitter PHP
+  grammar, covering implemented functions, methods, anonymous functions, and
+  arrow functions.
+- Added Hack support for `.hack` and bounded legacy `<?hh` `.php` detection,
+  using a checksum-verified MIT-licensed generated-source snapshot of the
+  archived Slack Tree-sitter Hack grammar.
+- Added PHP/Hack positive and nearby-negative calibration cases, examples,
+  malformed-source and legacy-header coverage, and both language IDs to the
+  reference VS Code client.
+
+### Changed
+
+- Normalization now uses version 11, with canonical PHP/Hack syntax mappings
+  and curated PHP standard-library operation aliases. Existing baselines
+  require deliberate review and regeneration because scores and fingerprints
+  can change. Report schema remains version 17 and baseline schema remains
+  version 3.
+
 ## [0.25.0] - 2026-08-10
 
 ### Added
