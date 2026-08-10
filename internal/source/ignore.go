@@ -240,11 +240,48 @@ func (rule ignoreRule) matches(relative string, directory bool) bool {
 
 func (matcher *ignoreMatcher) mayReinclude(path string) bool {
 	for _, rule := range matcher.rules {
-		if rule.negated && pathutil.Within(rule.base, path) {
+		if !rule.negated || !pathutil.Within(rule.base, path) {
+			continue
+		}
+		relative := relativeSlash(rule.base, path)
+		if relative == "." {
+			return true
+		}
+		// A basename-only negation can re-include entries in directories Mori
+		// already traverses, but it is not a reason to reopen every ignored
+		// directory below its base. Slash-qualified rules retain Mori's
+		// deliberate support for re-including a descendant of an ignored tree.
+		if !rule.anchored && !strings.Contains(rule.pattern, "/") {
+			continue
+		}
+		if patternCouldMatchDescendant(rule.pattern, relative) {
 			return true
 		}
 	}
 	return false
+}
+
+func patternCouldMatchDescendant(pattern string, directory string) bool {
+	pattern = filepath.ToSlash(strings.TrimPrefix(pattern, "/"))
+	directory = filepath.ToSlash(strings.Trim(directory, "/"))
+	if pattern == "" || directory == "" {
+		return true
+	}
+	wildcard := strings.IndexAny(pattern, "*?[")
+	if wildcard < 0 {
+		return pattern == directory || strings.HasPrefix(pattern, directory+"/")
+	}
+	prefix := strings.TrimSuffix(pattern[:wildcard], "/")
+	if slash := strings.LastIndex(prefix, "/"); slash >= 0 {
+		prefix = prefix[:slash]
+	} else if wildcard < len(pattern) && !strings.Contains(pattern[:wildcard], "/") {
+		prefix = ""
+	}
+	if prefix == "" {
+		return true
+	}
+	return prefix == directory || strings.HasPrefix(prefix, directory+"/") ||
+		strings.HasPrefix(directory, prefix+"/")
 }
 
 func (matcher *ignoreMatcher) paths() []string {

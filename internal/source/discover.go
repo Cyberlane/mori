@@ -54,6 +54,7 @@ type Result struct {
 }
 
 var defaultExcludedDirectories = map[string]struct{}{
+	".build":       {},
 	".git":         {},
 	".hg":          {},
 	".svn":         {},
@@ -169,24 +170,22 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 				return nil
 			}
 
-			if entry.IsDir() && options.IgnoreFiles {
-				if err := ignores.loadDirectory(path); err != nil {
-					return ignoreLoadError{err: err}
-				}
-			}
-
-			if path != root && entry.IsDir() {
-				if _, excluded := defaultExcludedDirectories[strings.ToLower(entry.Name())]; excluded {
-					return fs.SkipDir
-				}
-				if matchesAny(relativeSlash(root, path), displayPath(cwd, path), options.Excludes) {
-					return fs.SkipDir
-				}
-				if options.IgnoreFiles && ignores.ignored(path, true) {
-					if ignores.mayReinclude(path) {
-						return nil
+			if entry.IsDir() {
+				if path != root {
+					if _, excluded := defaultExcludedDirectories[strings.ToLower(entry.Name())]; excluded {
+						return fs.SkipDir
 					}
-					return fs.SkipDir
+					if matchesAny(relativeSlash(root, path), displayPath(cwd, path), options.Excludes) {
+						return fs.SkipDir
+					}
+					if options.IgnoreFiles && ignores.ignored(path, true) && !ignores.mayReinclude(path) {
+						return fs.SkipDir
+					}
+				}
+				if options.IgnoreFiles {
+					if err := ignores.loadDirectory(path); err != nil {
+						return ignoreLoadError{err: err}
+					}
 				}
 				return nil
 			}
