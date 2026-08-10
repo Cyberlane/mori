@@ -111,6 +111,65 @@ func TestConfigInspectAndDoctor(t *testing.T) {
 	}
 }
 
+func TestProjectUpgradeCoordinatesPinAndAgentSkill(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, configFileNameForTest), []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".mori-version"), []byte("v0.1.0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	skillPath := filepath.Join(root, ".agents", "skills", "mori-review-similarity")
+	if err := os.MkdirAll(skillPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillPath, "SKILL.md"), []byte("old\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"project", "upgrade", "--check", "--format", "json", root}, &stdout, &stderr)
+	if code != exitUpgrade {
+		t.Fatalf("check exit = %d, stderr = %q", code, stderr.String())
+	}
+	var plan projectUpgradePlan
+	if err := json.Unmarshal(stdout.Bytes(), &plan); err != nil {
+		t.Fatalf("decode check plan: %v", err)
+	}
+	if plan.Version != projectUpgradePlanVersion || !plan.Drift || plan.ToolVersion != projectPinnedVersion() {
+		t.Fatalf("check plan = %#v", plan)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"project", "upgrade", "--dry-run", "--format", "json", root}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("dry-run exit = %d, stderr = %q", code, stderr.String())
+	}
+	content, err := os.ReadFile(filepath.Join(root, ".mori-version"))
+	if err != nil || string(content) != "v0.1.0\n" {
+		t.Fatalf("dry-run changed pin: %q, %v", content, err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"project", "upgrade", "--apply", "--format", "json", root}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("apply exit = %d, stderr = %q, stdout = %q", code, stderr.String(), stdout.String())
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &plan); err != nil {
+		t.Fatalf("decode apply plan: %v", err)
+	}
+	content, err = os.ReadFile(filepath.Join(root, ".mori-version"))
+	if err != nil || string(content) != projectPinnedVersion()+"\n" || plan.Drift || len(plan.Backups) != 2 {
+		t.Fatalf("applied pin = %q, plan = %#v, err = %v", content, plan, err)
+	}
+	if content, err := os.ReadFile(filepath.Join(skillPath, "SKILL.md")); err != nil || string(content) == "old\n" {
+		t.Fatalf("skill was not updated: %q, %v", content, err)
+	}
+}
+
 func TestSetupRefusesSymlinkConfig(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation is not generally available")

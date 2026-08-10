@@ -36,6 +36,7 @@ const (
 	exitUsage            = 2
 	exitFindings         = 3
 	exitCoverage         = 4
+	exitUpgrade          = 5
 	maxChangedWorktrees  = 64
 	maxFocusedGitPaths   = 100_000
 	maxStdinOverlayBytes = 16 * 1024 * 1024
@@ -77,6 +78,11 @@ func RunWithInput(
 		return runInspect(ctx, args[1:], stdout, stderr)
 	case "doctor":
 		return runDoctor(ctx, args[1:], stdout, stderr)
+	case "project":
+		if len(args) >= 2 && args[1] == "upgrade" {
+			return runProjectUpgrade(ctx, args[2:], stdout, stderr)
+		}
+		return usageError(stderr, "project requires the upgrade subcommand")
 	case "lsp":
 		return runLSP(ctx, args[1:], stdin, stdout, stderr)
 	case "init":
@@ -2728,6 +2734,7 @@ func writeRootUsage(writer io.Writer) error {
 		"  mori config <show|validate> [options] [directory]\n",
 		"  mori inspect [--format text|json] [directory]\n",
 		"  mori doctor [--format text|json] [directory]\n",
+		"  mori project upgrade [--check|--dry-run|--apply] [directory]\n",
 		"  mori lsp\n",
 		"  mori init [--profile review|explore|sql] [--stdout | [--force] [directory]]\n",
 		"  mori baseline add --baseline <path> --identity <id> [options] [path ...]\n",

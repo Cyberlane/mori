@@ -29,6 +29,8 @@ const (
 	StatusInstalled Status = "installed"
 	StatusCurrent   Status = "current"
 	StatusReplaced  Status = "replaced"
+	StatusMissing   Status = "missing"
+	StatusDifferent Status = "different"
 )
 
 // Result records the installed path and any recoverable backup.
@@ -36,6 +38,41 @@ type Result struct {
 	Path       string
 	BackupPath string
 	Status     Status
+}
+
+// Inspect compares a project skill with the embedded package without writing.
+func Inspect(parent string) (Result, error) {
+	if strings.TrimSpace(parent) == "" {
+		return Result{}, errors.New("skill parent directory is required")
+	}
+	parent, err := filepath.Abs(parent)
+	if err != nil {
+		return Result{}, fmt.Errorf("resolve skill parent: %w", err)
+	}
+	destination := filepath.Join(parent, skills.ReviewSimilarityName)
+	info, err := os.Lstat(destination)
+	if errors.Is(err, os.ErrNotExist) {
+		return Result{Path: destination, Status: StatusMissing}, nil
+	}
+	if err != nil {
+		return Result{}, fmt.Errorf("inspect installed skill: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return Result{}, errors.New("installed skill path must be a real directory, not a symlink")
+	}
+	files, directories, err := packageContents()
+	if err != nil {
+		return Result{}, err
+	}
+	current, err := equalPackage(destination, files, directories)
+	if err != nil {
+		return Result{}, err
+	}
+	status := StatusDifferent
+	if current {
+		status = StatusCurrent
+	}
+	return Result{Path: destination, Status: status}, nil
 }
 
 // Install copies the embedded Mori review skill below parent. Existing
