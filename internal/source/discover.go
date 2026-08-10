@@ -192,6 +192,9 @@ func DiscoverContext(ctx context.Context, paths []string, options Options) (Resu
 			if entry.Type()&os.ModeSymlink != 0 || entry.IsDir() {
 				return nil
 			}
+			if entry.Name() == ".git" {
+				return nil
+			}
 			if matchesAny(relativeSlash(root, path), displayPath(cwd, path), options.Excludes) {
 				return nil
 			}
