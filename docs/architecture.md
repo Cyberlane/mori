@@ -239,21 +239,24 @@ explicit worktrees and 100,000 combined changed and deleted paths.
 ### `internal/similarity`
 
 The scorer computes multiset Jaccard using minimum counts for the intersection
-and maximum counts for the union. It also returns the highest-count shared
-features, sorted by count and feature name.
+and maximum counts for the union. It also returns exact weighted totals, the
+highest-count shared features, and bounded directional differences sorted by
+count and feature name. Explanation fields do not alter scoring.
 
 ### `internal/report`
 
 Text output is compact and review-oriented. JSON output has an explicit
 `schema_version`; arrays are encoded as empty arrays rather than `null`.
 
-Schema-15 reports expose deterministic binary provenance, the selected scan
+Schema-16 reports expose deterministic binary provenance, the selected scan
 profile, comparison selection, comparison domains, fragment kinds, optional
 exact focus metadata, grouped
 content-pair identities, fragment fingerprints, occurrence samples and exact
 counts, nesting metadata, structured parser
 diagnostics, effective configuration, ignore-source content evidence, and
 separate baseline suppression counts for identities and source-location pairs.
+Every retained group includes exact weighted intersection/union totals and
+bounded fingerprint-aligned directional feature differences.
 They also include a deterministic coverage summary and per-file inventory so
 supported files with no comparison fragments remain visible with an exact
 reason and pre-token-floor boundary counts.

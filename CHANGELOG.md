@@ -7,6 +7,19 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added exact weighted intersection/union evidence and bounded deterministic
+  profile-aligned directional feature differences for every retained group.
+
+### Changed
+
+- Text output now labels 100% as normalized feature identity and explicitly
+  states that it is not proof of semantic or behavioral equivalence.
+- Machine-readable reports now use schema version 16. Normalization remains
+  version 8 and baseline schema remains version 3 because scoring,
+  fingerprints, and acceptance compatibility are unchanged.
+
 ## [0.21.0] - 2026-08-10
 
 ### Added

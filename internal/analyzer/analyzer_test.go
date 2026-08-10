@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"context"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -66,6 +67,21 @@ func TestAnalyzeCrossLanguageExamples(t *testing.T) {
 			if profile.Fingerprint == "" {
 				t.Fatalf("group has incomplete fragment identities: %#v", group)
 			}
+		}
+		if group.Evidence.Union == 0 || math.Abs(
+			group.Similarity-float64(group.Evidence.Intersection)/float64(group.Evidence.Union),
+		) > 1e-12 {
+			t.Fatalf("group has inconsistent structural evidence: %#v", group)
+		}
+		if group.Evidence.LeftOnly.Fingerprint != group.Profiles[0].Fingerprint {
+			t.Fatalf("left evidence does not align with profile A: %#v", group)
+		}
+		if group.Evidence.LeftOnly.Features == nil || group.Evidence.RightOnly.Features == nil {
+			t.Fatalf("directional evidence arrays must not be null: %#v", group.Evidence)
+		}
+		if len(group.Profiles) == 2 &&
+			group.Evidence.RightOnly.Fingerprint != group.Profiles[1].Fingerprint {
+			t.Fatalf("right evidence does not align with profile B: %#v", group)
 		}
 	}
 }

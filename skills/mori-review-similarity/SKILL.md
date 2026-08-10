@@ -75,7 +75,7 @@ status `4` means at least one configured coverage policy failed. The report is
 still written; classify the scan as not applicable or insufficiently covered,
 never as a clean result.
 
-Schema-15 reports include `coverage` and `file_coverage`. Verify the exact
+Schema-16 reports include `coverage` and `file_coverage`. Verify the exact
 fragment-file numerator and analyzed-file denominator, then inspect every
 supported file with zero fragments, its zero-fragment reason, boundary counts,
 skipped-fragment count, and parse-diagnostic count. Generated exclusions remain
@@ -248,7 +248,7 @@ requires it.
 
 ## Validate the report
 
-Require `schema_version` to equal `15`. Validate the mandatory `tool` object,
+Require `schema_version` to equal `16`. Validate the mandatory `tool` object,
 including version, revision, source date, modified flag, platform, Go version,
 and normalization version. Official release binaries provide a full revision
 and source date. A version-pinned source build can report its version while
@@ -301,7 +301,10 @@ revision or date from the version string. Inspect:
   inferred security or refactoring confidence;
 - `configuration.embedded_sql`, `statement_blocks`, `block_statements`, and
   `max_blocks_per_function`: disclose the opt-in extraction scope and bounds;
-- `similarity`: report it as structural similarity only; and
+- `similarity`: report it as structural similarity only;
+- `structural_evidence`: verify exact weighted intersection/union totals,
+  complete A-only/B-only totals, fingerprint alignment, and bounded feature
+  lists; describe 100% only as normalized feature identity; and
 - `shape_summary` and `shared_features`: use them to explain why a group ranked
   highly without treating the summary as behavioral evidence.
 - `review_priority` and `review_signals`: when review ranking is selected,
