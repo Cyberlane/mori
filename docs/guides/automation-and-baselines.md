@@ -62,6 +62,22 @@ additional Git root.
 Prefer the focused policy during initial adoption so old untouched candidates
 remain visible without blocking unrelated work.
 
+For an explicitly owner-authorized one-commit exception, create the local
+receipt with the same focused inclusion and coverage policy as the enforcing
+scan:
+
+```sh
+mori review acknowledge --staged --include-focused \
+  --require-focused-coverage --accept-focused .
+mori scan --staged --include-focused --require-focused-coverage \
+  --fail-on-focused-match \
+  --review-receipt "$(git rev-parse --git-path mori/staged-review.json)" .
+```
+
+The receipt keeps findings visible and is bound to the exact HEAD, index,
+scan profile, tool, normalization version, and complete focused identity set.
+It does not create durable suppression.
+
 ## Accept intentional similarity selectively
 
 Inspect both source locations before accepting an identity:

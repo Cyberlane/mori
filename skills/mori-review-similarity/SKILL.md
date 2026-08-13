@@ -409,8 +409,14 @@ explicit. Mutations use complete internal reports and reject warnings unless
 each reviewed kind is repeated with `--allow-warning`.
 
 When the owner explicitly accepts focused findings for exactly one staged
-commit and durable suppression would be misleading, use `mori review
-acknowledge --staged --accept-focused`. The default local receipt lives under
+commit and durable suppression would be misleading, use:
+
+```sh
+mori review acknowledge --staged --include-focused \
+  --require-focused-coverage --accept-focused .
+```
+
+The default local receipt lives under
 private Git metadata and uses owner-only permissions on POSIX filesystems.
 Pass it to the hook with `--review-receipt`; require a
 compatible receipt in schema-19 evidence. It changes only the focused-match

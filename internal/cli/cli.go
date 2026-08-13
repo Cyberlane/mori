@@ -317,7 +317,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 		options.failOnFocusedMatch,
 		"exit with status 3 when one or more focused match groups are found",
 	)
-	if baselineAction == "" {
+	if baselineAction == "" || baselineAction == "acknowledge" {
 		flags.BoolVar(&options.includeFocused, "include-focused", options.includeFocused, "include focused files that ordinary ignore rules would omit")
 		flags.BoolVar(&options.requireFocus, "require-focused-coverage", options.requireFocus, "exit with status 4 unless every supported non-deleted focused file is analyzed")
 	}
@@ -2949,7 +2949,7 @@ func writeRootUsage(writer io.Writer) error {
 		"  mori baseline migrate --baseline <path> --accept-profile [options] [path ...]\n",
 		"  mori baseline update --baseline <path> [options] [path ...]\n",
 		"  mori baseline prune --baseline <path> [options] [path ...]\n",
-		"  mori review acknowledge --staged --accept-focused [options] [path ...]\n",
+		"  mori review acknowledge --staged --include-focused --require-focused-coverage --accept-focused [options] [path ...]\n",
 		"  mori languages\n",
 		"  mori skill install (--project <path> | --global | --target <path>)\n",
 		"  mori skill --help\n",
