@@ -78,16 +78,16 @@ are recorded and participate in baseline compatibility.
 ## Review exactly what is staged
 
 ```sh
-mori scan --staged --format compact \
-  --include-focused \
-  --require-focused-coverage
+mori review staged check --format compact .
 ```
 
 Staged mode reads tracked source, ignore rules, and configuration from one Git
 index snapshot. It records a digest and does not include unstaged or untracked
 content. Focused coverage reports every staged path and exits `4` if a
 supported non-deleted path was not analyzed; unsupported paths remain evidence
-but do not enter the denominator.
+but do not enter the denominator. The canonical command includes otherwise
+ignored staged source and requires complete focused-file coverage. Use the
+lower-level `scan --staged` form only for a deliberately custom policy.
 
 ## Explore across languages
 

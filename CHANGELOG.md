@@ -7,6 +7,26 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added `mori review staged check` and `mori review staged acknowledge` as one
+  canonical immutable-index workflow. Both commands now share focused-file
+  inclusion and complete focused-coverage policy by construction, so hooks and
+  one-commit acknowledgments cannot silently select different staged universes.
+- Added a deterministic staged-review lifecycle dogfood gate to `make check`,
+  covering ignored staged source, strict coverage, acknowledgment, compatible
+  enforcement, and stale-index rejection.
+- Staged-review receipt schema 2 records the focused inclusion and coverage
+  contract and reports safe field-level differences when that contract drifts.
+  Schema-1 receipts remain readable but fail stale across the Mori-version
+  boundary. Report schema remains 19, baseline schema remains 4, and
+  normalization remains 12.
+
+### Changed
+
+- The earlier `mori review acknowledge --staged ...` form remains compatible
+  but now points users toward the canonical staged-review workflow.
+
 ## [0.29.0] - 2026-08-11
 
 ### Added

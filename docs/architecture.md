@@ -49,6 +49,20 @@ working directory or selected with `--config`. Unknown fields and non-regular
 files fail closed. Command-line flags override configured scalar values, while
 repeatable exclusions and language pairs are additive.
 
+### `internal/cli` staged review contract
+
+`mori review staged check` and `mori review staged acknowledge` resolve one
+canonical immutable-index contract before analysis. Staged paths are the only
+focus set, otherwise ignored focused source is included, and every supported
+non-deleted focused path must be analyzed. The check applies focused-match
+policy; acknowledgment records an explicit owner decision without hiding the
+findings. Lower-level scan options cannot override those fixed dimensions.
+
+Receipt schema 2 binds the contract, HEAD, Git-index digest, scan-profile
+digest, tool and normalization versions, focused coverage totals, and complete
+focused identity set. Any drift fails closed with source-free field-level
+diagnostics. Report schema and baseline compatibility remain independent.
+
 ### `internal/language`
 
 The registry binds:

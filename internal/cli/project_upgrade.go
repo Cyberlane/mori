@@ -263,6 +263,7 @@ func inspectProjectAutomation(root string) projectUpgradeComponent {
 	}
 	files := make([]detectedFile, 0)
 	legacyStagedFocus := false
+	customStagedContract := false
 	for _, pattern := range patterns {
 		matches, _ := filepath.Glob(filepath.Join(root, filepath.FromSlash(pattern)))
 		for _, match := range matches {
@@ -284,9 +285,14 @@ func inspectProjectAutomation(root string) projectUpgradeComponent {
 			if info.Size() <= 1024*1024 {
 				content, readErr := os.ReadFile(match)
 				if readErr == nil && bytes.Contains(content, []byte("mori")) &&
-					bytes.Contains(content, []byte("git diff --cached")) &&
-					!bytes.Contains(content, []byte("--staged")) {
-					legacyStagedFocus = true
+					!bytes.Contains(content, []byte("review staged check")) {
+					if bytes.Contains(content, []byte("git diff --cached")) &&
+						!bytes.Contains(content, []byte("--staged")) {
+						legacyStagedFocus = true
+					}
+					if bytes.Contains(content, []byte("--staged")) {
+						customStagedContract = true
+					}
 				}
 			}
 		}
@@ -306,7 +312,11 @@ func inspectProjectAutomation(root string) projectUpgradeComponent {
 	if legacyStagedFocus {
 		component.Status = "review"
 		component.Detail += "; found custom staged-path enumeration without native --staged input"
-		component.Action = "review migration to mori scan --staged --include-focused --require-focused-coverage"
+		component.Action = "review migration to mori review staged check"
+	} else if customStagedContract {
+		component.Status = "review"
+		component.Detail += "; found a lower-level staged scan instead of the canonical staged-review contract"
+		component.Action = "review migration to mori review staged check"
 	}
 	return component
 }

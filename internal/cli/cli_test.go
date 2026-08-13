@@ -18,6 +18,7 @@ import (
 	"github.com/Cyberlane/mori/internal/baseline"
 	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/normalize"
+	"github.com/Cyberlane/mori/internal/reviewreceipt"
 )
 
 type failingWriter struct{}
@@ -2196,6 +2197,152 @@ func TestStagedReviewReceiptIncludesIgnoredFocusedFiles(t *testing.T) {
 		result.Configuration.Focus.RequiredFocusFiles != 1 || result.Configuration.Focus.CoveredFocusFiles != 1 ||
 		result.Configuration.ReviewReceipt == nil || result.Configuration.ReviewReceipt.Status != "compatible" {
 		t.Fatalf("acknowledged ignored-file report = %#v", result)
+	}
+}
+
+func TestCanonicalStagedReviewLifecycleAndContractParity(t *testing.T) {
+	root := t.TempDir()
+	cliTestGit(t, root, "init", "--initial-branch=main")
+	cliTestGit(t, root, "config", "user.name", "Mori Test")
+	cliTestGit(t, root, "config", "user.email", "mori@example.invalid")
+	write := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+	write(".mori.json", `{"threshold":1,"min_tokens":1,"same_language_only":true}`)
+	write(".moriignore", "ignored.go\n")
+	write("left.go", "package sample\nfunc Left(v int) int { return v + 1 }\n")
+	write("ignored.go", "package sample\nfunc Ignored(x int) int { return x + 2 }\n")
+	cliTestGit(t, root, "add", ".mori.json", ".moriignore", "left.go", "ignored.go")
+	cliTestGit(t, root, "commit", "-m", "base")
+	write("ignored.go", "package sample\nfunc Ignored(x int) int { return x + 1 }\n")
+	cliTestGit(t, root, "add", "ignored.go")
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"review", "staged", "check", "--format", "json", ".",
+	}, &stdout, &stderr)
+	if code != exitFindings {
+		t.Fatalf("check exit = %d, stderr = %q", code, stderr.String())
+	}
+	var unacknowledged model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &unacknowledged); err != nil {
+		t.Fatalf("decode unacknowledged report: %v", err)
+	}
+	if unacknowledged.TotalFocusedMatchGroups != 1 || unacknowledged.Configuration.Focus == nil ||
+		unacknowledged.Configuration.Focus.RequiredFocusFiles != 1 ||
+		unacknowledged.Configuration.Focus.CoveredFocusFiles != 1 {
+		t.Fatalf("unacknowledged report = %#v", unacknowledged)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"review", "staged", "acknowledge", "--accept-focused", ".",
+	}, &stdout, &stderr)
+	if code != exitSuccess || !strings.Contains(stdout.String(), "1 focused structural match") {
+		t.Fatalf("acknowledge exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+	receiptPath := strings.TrimSpace(cliTestGit(t, root, "rev-parse", "--git-path", "mori/staged-review.json"))
+	if !filepath.IsAbs(receiptPath) {
+		receiptPath = filepath.Join(root, receiptPath)
+	}
+	receipt, err := reviewreceipt.Load(receiptPath)
+	if err != nil {
+		t.Fatalf("Load receipt: %v", err)
+	}
+	if receipt.ScanProfileDigest != unacknowledged.Configuration.ScanProfileDigest ||
+		receipt.StagedReviewContract == nil || !receipt.StagedReviewContract.IncludeFocused ||
+		!receipt.StagedReviewContract.RequireFocusCoverage ||
+		receipt.StagedReviewContract.CoveredFocusedFiles != 1 ||
+		receipt.StagedReviewContract.RequiredFocusedFiles != 1 {
+		t.Fatalf("receipt contract = %#v", receipt)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"review", "staged", "check", "--review-receipt", receiptPath,
+		"--format", "json", ".",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("acknowledged check exit = %d, stderr = %q", code, stderr.String())
+	}
+	var acknowledged model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &acknowledged); err != nil {
+		t.Fatalf("decode acknowledged report: %v", err)
+	}
+	if acknowledged.Configuration.ScanProfileDigest != receipt.ScanProfileDigest ||
+		acknowledged.Configuration.ReviewReceipt == nil ||
+		acknowledged.Configuration.ReviewReceipt.Status != "compatible" {
+		t.Fatalf("acknowledged report = %#v", acknowledged)
+	}
+
+	write("ignored.go", "package sample\nfunc Ignored(x int) int { return x + 3 }\n")
+	cliTestGit(t, root, "add", "ignored.go")
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"review", "staged", "check", "--review-receipt", receiptPath, ".",
+	}, &stdout, &stderr)
+	if code != exitError || !strings.Contains(stderr.String(), "index digest is stale") {
+		t.Fatalf("stale check exit = %d, stderr = %q", code, stderr.String())
+	}
+}
+
+func TestCanonicalStagedReviewRejectsPolicyOverrides(t *testing.T) {
+	t.Parallel()
+	for _, argument := range []string{
+		"--staged=false",
+		"--include-focused=false",
+		"--require-focused-coverage=false",
+		"--fail-on-match",
+		"--fail-on-focused-match=false",
+		"--focus-path=other.go",
+		"--changed-since=HEAD",
+	} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := Run(context.Background(), []string{
+			"review", "staged", "check", argument, ".",
+		}, &stdout, &stderr)
+		if code != exitUsage || !strings.Contains(stderr.String(), "fixed by the canonical staged review contract") {
+			t.Fatalf("argument %q exit = %d, stderr = %q", argument, code, stderr.String())
+		}
+	}
+}
+
+func TestCanonicalStagedReviewCommandsAreDocumented(t *testing.T) {
+	t.Parallel()
+	for _, path := range []string{
+		"../../docs/scoring.md",
+		"../../docs/guides/automation-and-baselines.md",
+		"../../skills/mori-review-similarity/SKILL.md",
+	} {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%s): %v", path, err)
+		}
+		for _, command := range []string{
+			"mori review staged check",
+			"mori review staged acknowledge --accept-focused",
+		} {
+			if !bytes.Contains(content, []byte(command)) {
+				t.Errorf("%s does not document %q", path, command)
+			}
+		}
 	}
 }
 

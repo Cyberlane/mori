@@ -64,6 +64,55 @@ func TestReceiptRejectsStaleEvidenceAndMalformedDocuments(t *testing.T) {
 	}
 }
 
+func TestReceiptExplainsStagedReviewContractDrift(t *testing.T) {
+	t.Parallel()
+	evidence := testEvidence()
+	receipt, err := New(evidence)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	active := evidence
+	active.StagedReviewContract = StagedReviewContract{
+		IncludeFocused:       false,
+		RequireFocusCoverage: false,
+		RequiredFocusedFiles: 24,
+		CoveredFocusedFiles:  16,
+	}
+	err = Validate(receipt, active)
+	if err == nil || !strings.Contains(err.Error(), "include_focused: receipt=true, active=false") ||
+		!strings.Contains(err.Error(), "require_focused_coverage: receipt=true, active=false") ||
+		!strings.Contains(err.Error(), "focused coverage: receipt=24/24, active=16/24") {
+		t.Fatalf("contract drift error = %v", err)
+	}
+}
+
+func TestReceiptLoadsLegacySchemaAndFailsItStale(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "receipt.json")
+	content := `{
+  "schema_version": 1,
+  "decision": "accept-focused-structural-matches",
+  "mori_version": "0.29.0",
+  "normalization_version": 12,
+  "head_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "index_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "scan_profile_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "focused_match_ids": ["aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb"]
+}`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	receipt, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load legacy: %v", err)
+	}
+	evidence := testEvidence()
+	evidence.FocusedMatchIDs = []string{"aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb"}
+	if err := Validate(receipt, evidence); err == nil || !strings.Contains(err.Error(), "contract is legacy and stale") {
+		t.Fatalf("legacy validation error = %v", err)
+	}
+}
+
 func TestReceiptRequiresFocusedFindings(t *testing.T) {
 	t.Parallel()
 	evidence := testEvidence()
@@ -83,6 +132,12 @@ func testEvidence() Evidence {
 		FocusedMatchIDs: []string{
 			"cccccccccccccccc:dddddddddddddddd",
 			"aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb",
+		},
+		StagedReviewContract: StagedReviewContract{
+			IncludeFocused:       true,
+			RequireFocusCoverage: true,
+			RequiredFocusedFiles: 24,
+			CoveredFocusedFiles:  24,
 		},
 	}
 }
