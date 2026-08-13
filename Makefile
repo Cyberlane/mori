@@ -4,7 +4,7 @@ GO ?= go
 ACTIONLINT_VERSION := v1.7.12
 GOVULNCHECK_VERSION := v1.6.0
 
-.PHONY: actionlint build check corpus dogfood editors-check fmt fmt-check policy-test scan-example test tidy-check vet vuln
+.PHONY: actionlint build check corpus dogfood editors-check fmt fmt-check policy-test scan-example test tidy-check vet vuln workflow-dogfood
 
 build:
 	mkdir -p bin
@@ -35,6 +35,9 @@ vet:
 test:
 	$(GO) test -race -coverprofile=coverage.out ./...
 
+workflow-dogfood:
+	$(GO) test ./internal/cli -run '^TestCanonicalStagedReviewLifecycleAndContractParity$$' -count=1
+
 vuln:
 	$(GO) run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 
@@ -50,4 +53,4 @@ policy-test:
 scan-example:
 	$(GO) run ./cmd/mori scan --threshold 0.70 --cross-language-only examples/email-validation
 
-check: fmt-check tidy-check vet test corpus build editors-check policy-test actionlint vuln
+check: fmt-check tidy-check vet test workflow-dogfood corpus build editors-check policy-test actionlint vuln

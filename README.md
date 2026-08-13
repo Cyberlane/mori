@@ -83,7 +83,8 @@ effects, types, external calls, permissions, transactions, or error behavior.
 | Review one language pair | `mori scan --language-pair go,typescript .` |
 | Review SQL queries | `mori scan --profile sql path/to/sql` |
 | Produce CI or agent evidence | `mori scan --profile review --format json .` |
-| Review exactly what is staged | `mori scan --staged --include-focused --require-focused-coverage` |
+| Enforce the canonical staged review | `mori review staged check .` |
+| Acknowledge one exact staged review | `mori review staged acknowledge --accept-focused .` |
 | Produce a concise terminal shortlist | `mori scan --profile review --format compact .` |
 | Produce editor diagnostics | `mori scan --profile review --format sarif .` |
 | Save a local visual report | `mori scan --profile review --format html . > mori.html` |

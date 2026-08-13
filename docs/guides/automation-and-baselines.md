@@ -29,10 +29,7 @@ For a local pre-commit gate, scan exactly the index and require every
 non-deleted staged path to participate:
 
 ```sh
-mori scan --staged --format json \
-  --include-focused \
-  --require-focused-coverage \
-  --fail-on-focused-match
+mori review staged check --format json .
 ```
 
 The report records an index digest and explicitly excludes unstaged and
@@ -63,20 +60,21 @@ Prefer the focused policy during initial adoption so old untouched candidates
 remain visible without blocking unrelated work.
 
 For an explicitly owner-authorized one-commit exception, create the local
-receipt with the same focused inclusion and coverage policy as the enforcing
+receipt through the same canonical staged-review contract as the enforcing
 scan:
 
 ```sh
-mori review acknowledge --staged --include-focused \
-  --require-focused-coverage --accept-focused .
-mori scan --staged --include-focused --require-focused-coverage \
-  --fail-on-focused-match \
+mori review staged acknowledge --accept-focused .
+mori review staged check \
   --review-receipt "$(git rev-parse --git-path mori/staged-review.json)" .
 ```
 
 The receipt keeps findings visible and is bound to the exact HEAD, index,
-scan profile, tool, normalization version, and complete focused identity set.
-It does not create durable suppression.
+scan profile, staged inclusion and coverage contract, tool, normalization
+version, and complete focused identity set. It does not create durable
+suppression. The lower-level `scan --staged` and `review acknowledge --staged`
+forms remain available for custom policies; prefer the canonical commands for
+commit gates.
 
 ## Accept intentional similarity selectively
 

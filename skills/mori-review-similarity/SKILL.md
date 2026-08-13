@@ -123,11 +123,7 @@ review includes additional files. The two focus inputs are additive.
 For a pre-commit review, prefer the immutable index snapshot:
 
 ```sh
-mori scan \
-  --staged \
-  --format json \
-  --include-focused \
-  --require-focused-coverage
+mori review staged check --format json .
 ```
 
 Confirm `configuration.input.mode` is `git-index`, retain its HEAD and index
@@ -412,16 +408,17 @@ When the owner explicitly accepts focused findings for exactly one staged
 commit and durable suppression would be misleading, use:
 
 ```sh
-mori review acknowledge --staged --include-focused \
-  --require-focused-coverage --accept-focused .
+mori review staged acknowledge --accept-focused .
 ```
 
 The default local receipt lives under
 private Git metadata and uses owner-only permissions on POSIX filesystems.
-Pass it to the hook with `--review-receipt`; require a
-compatible receipt in schema-19 evidence. It changes only the focused-match
-policy exit status, never hides findings, and any HEAD, index, profile, tool,
-normalization, or focused-identity change invalidates it.
+Pass it to `mori review staged check` with `--review-receipt`; require a
+compatible receipt in schema-19 evidence. The canonical check and acknowledge
+commands share staged focused-file inclusion and complete focused coverage by
+construction. The receipt changes only the focused-match policy exit status,
+never hides findings, and any HEAD, index, staged-review contract, profile,
+tool, normalization, or focused-identity change invalidates it.
 
 Schema-4 baselines bind acceptance to the effective scan-profile digest and
 support `false-positive` as a precise durable classification.

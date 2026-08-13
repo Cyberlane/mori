@@ -222,10 +222,10 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 		)
 		flags.BoolVar(&options.staged, "staged", options.staged, "analyze the immutable Git index instead of working-tree files")
 	}
-	if baselineAction == "" {
+	if baselineAction == "" || baselineAction == "staged-check" {
 		flags.StringVar(&options.reviewReceiptPath, "review-receipt", options.reviewReceiptPath, "local receipt that acknowledges the exact staged focused findings")
 	}
-	if baselineAction == "acknowledge" {
+	if baselineAction == "acknowledge" || baselineAction == "staged-acknowledge" {
 		flags.StringVar(&options.reviewReceiptPath, "receipt", options.reviewReceiptPath, "local receipt file to write")
 		flags.BoolVar(&options.acceptFocused, "accept-focused", options.acceptFocused, "explicitly acknowledge every focused structural match in this staged scan")
 	}
@@ -293,30 +293,34 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 		"language-pair",
 		"compare one language ID or family pair, such as go,typescript; repeatable",
 	)
-	flags.Var(&options.focusPaths, "focus-path", "prioritize groups containing this exact path; repeatable")
-	flags.StringVar(
-		&options.changedSince,
-		"changed-since",
-		options.changedSince,
-		"prioritize files in the primary Git worktree changed since this local revision",
-	)
-	flags.Var(
-		&options.changedWorktrees,
-		"changed-worktree",
-		"prioritize changes in an explicit Git worktree as PATH=REVISION; repeatable",
-	)
-	flags.BoolVar(
-		&options.failOnMatch,
-		"fail-on-match",
-		options.failOnMatch,
-		"exit with status 3 when one or more match groups are found",
-	)
-	flags.BoolVar(
-		&options.failOnFocusedMatch,
-		"fail-on-focused-match",
-		options.failOnFocusedMatch,
-		"exit with status 3 when one or more focused match groups are found",
-	)
+	if baselineAction != "staged-check" && baselineAction != "staged-acknowledge" {
+		flags.Var(&options.focusPaths, "focus-path", "prioritize groups containing this exact path; repeatable")
+		flags.StringVar(
+			&options.changedSince,
+			"changed-since",
+			options.changedSince,
+			"prioritize files in the primary Git worktree changed since this local revision",
+		)
+		flags.Var(
+			&options.changedWorktrees,
+			"changed-worktree",
+			"prioritize changes in an explicit Git worktree as PATH=REVISION; repeatable",
+		)
+	}
+	if baselineAction != "staged-check" && baselineAction != "staged-acknowledge" {
+		flags.BoolVar(
+			&options.failOnMatch,
+			"fail-on-match",
+			options.failOnMatch,
+			"exit with status 3 when one or more match groups are found",
+		)
+		flags.BoolVar(
+			&options.failOnFocusedMatch,
+			"fail-on-focused-match",
+			options.failOnFocusedMatch,
+			"exit with status 3 when one or more focused match groups are found",
+		)
+	}
 	if baselineAction == "" || baselineAction == "acknowledge" {
 		flags.BoolVar(&options.includeFocused, "include-focused", options.includeFocused, "include focused files that ordinary ignore rules would omit")
 		flags.BoolVar(&options.requireFocus, "require-focused-coverage", options.requireFocus, "exit with status 4 unless every supported non-deleted focused file is analyzed")
@@ -382,7 +386,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 		flags.StringVar(&options.note, "note", "", "durable human review note; an empty value clears it")
 		flags.StringVar(&options.classification, "classification", "", "durable review classification")
 	}
-	if baselineAction != "" {
+	if baselineAction != "" && baselineAction != "staged-check" {
 		flags.Var(&options.allowedWarnings, "allow-warning", "warning kind permitted for this baseline operation; repeatable")
 	}
 }
@@ -393,7 +397,11 @@ func parseScanOptions(
 	stderr io.Writer,
 	baselineAction string,
 ) (scanOptions, []string, int, bool) {
-	options, err := configuredScanOptions(args)
+	configArgs := args
+	if baselineAction == "staged-check" || baselineAction == "staged-acknowledge" {
+		configArgs = append([]string{"--staged"}, args...)
+	}
+	options, err := configuredScanOptions(configArgs)
 	if err != nil {
 		if _, writeErr := fmt.Fprintf(stderr, "mori: load config: %s\n", diagnostic.Message(err)); writeErr != nil {
 			return scanOptions{}, nil, exitError, false
@@ -430,6 +438,13 @@ func parseScanOptions(
 	})
 	options.noteSet = visited["note"]
 	options.classificationSet = visited["classification"]
+	if baselineAction == "staged-check" || baselineAction == "staged-acknowledge" {
+		options.staged = true
+		options.includeFocused = true
+		options.requireFocus = true
+		options.failOnMatch = false
+		options.failOnFocusedMatch = baselineAction == "staged-check"
+	}
 	if !options.staged {
 		options.stagedSnapshot = nil
 	}
@@ -1048,7 +1063,19 @@ func runScan(
 	stdout io.Writer,
 	stderr io.Writer,
 ) int {
-	options, paths, code, ok := parseScanOptions("scan", args, stderr, "")
+	return runScanCommand(ctx, "scan", args, "", stdin, stdout, stderr)
+}
+
+func runScanCommand(
+	ctx context.Context,
+	command string,
+	args []string,
+	mode string,
+	stdin io.Reader,
+	stdout io.Writer,
+	stderr io.Writer,
+) int {
+	options, paths, code, ok := parseScanOptions(command, args, stderr, mode)
 	if !ok {
 		return code
 	}
@@ -1101,7 +1128,7 @@ func runScan(
 			fmt.Fprintf(stderr, "mori: load review receipt: %v\n", err)
 			return exitError
 		}
-		if err := reviewreceipt.Validate(receipt, receiptEvidence(result)); err != nil {
+		if err := reviewreceipt.Validate(receipt, receiptEvidence(result, options)); err != nil {
 			fmt.Fprintf(stderr, "mori: validate review receipt: %v\n", err)
 			return exitError
 		}
@@ -1136,10 +1163,91 @@ func runScan(
 }
 
 func runReview(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
-	if len(args) == 0 || args[0] != "acknowledge" {
-		return usageError(stderr, "review requires the acknowledge subcommand")
+	if len(args) == 0 {
+		return usageError(stderr, "review requires staged check, staged acknowledge, or acknowledge")
 	}
-	options, paths, code, ok := parseScanOptions("review acknowledge", args[1:], stderr, "acknowledge")
+	if args[0] == "staged" {
+		return runCanonicalStagedReview(ctx, args[1:], stdout, stderr)
+	}
+	if args[0] != "acknowledge" {
+		return usageError(stderr, "review requires staged check, staged acknowledge, or acknowledge")
+	}
+	if _, err := fmt.Fprintln(
+		stderr,
+		"mori: note: prefer 'mori review staged acknowledge --accept-focused'; it applies the canonical staged inclusion and coverage contract",
+	); err != nil {
+		return exitError
+	}
+	return runReviewAcknowledge(ctx, args[1:], stdout, stderr)
+}
+
+func runCanonicalStagedReview(
+	ctx context.Context,
+	args []string,
+	stdout io.Writer,
+	stderr io.Writer,
+) int {
+	if len(args) == 0 || (args[0] != "check" && args[0] != "acknowledge") {
+		return usageError(stderr, "review staged requires check or acknowledge")
+	}
+	canonicalArgs, err := canonicalStagedReviewArgs(args[1:], args[0])
+	if err != nil {
+		return usageError(stderr, err.Error())
+	}
+	if args[0] == "check" {
+		return runScanCommand(
+			ctx,
+			"review staged check",
+			canonicalArgs,
+			"staged-check",
+			strings.NewReader(""),
+			stdout,
+			stderr,
+		)
+	}
+	return runReviewAcknowledgeCommand(ctx, canonicalArgs, "staged-acknowledge", stdout, stderr)
+}
+
+func canonicalStagedReviewArgs(args []string, _ string) ([]string, error) {
+	reserved := []string{
+		"staged",
+		"include-focused",
+		"require-focused-coverage",
+		"fail-on-match",
+		"fail-on-focused-match",
+		"focus-path",
+		"changed-since",
+		"changed-worktree",
+	}
+	for _, argument := range args {
+		if argument == "--" {
+			break
+		}
+		for _, name := range reserved {
+			if argument == "--"+name || strings.HasPrefix(argument, "--"+name+"=") {
+				return nil, fmt.Errorf("--%s is fixed by the canonical staged review contract", name)
+			}
+		}
+	}
+	return append([]string{}, args...), nil
+}
+
+func runReviewAcknowledge(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
+	return runReviewAcknowledgeCommand(ctx, args, "acknowledge", stdout, stderr)
+}
+
+func runReviewAcknowledgeCommand(
+	ctx context.Context,
+	args []string,
+	mode string,
+	stdout io.Writer,
+	stderr io.Writer,
+) int {
+	command := "review acknowledge"
+	if mode == "staged-acknowledge" {
+		command = "review staged acknowledge"
+	}
+	options, paths, code, ok := parseScanOptions(command, args, stderr, mode)
 	if !ok {
 		return code
 	}
@@ -1193,7 +1301,7 @@ func runReview(ctx context.Context, args []string, stdout io.Writer, stderr io.W
 	if code := enforceMutationCompleteness(stderr, options, result, "review acknowledgment"); code != exitSuccess {
 		return code
 	}
-	receipt, err := reviewreceipt.New(receiptEvidence(result))
+	receipt, err := reviewreceipt.New(receiptEvidence(result, options))
 	if err != nil {
 		return commandError(stderr, "create review receipt", err)
 	}
@@ -1225,7 +1333,7 @@ func pathWithin(directory string, path string) bool {
 	return err == nil && relative != "." && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
-func receiptEvidence(result model.Report) reviewreceipt.Evidence {
+func receiptEvidence(result model.Report, options scanOptions) reviewreceipt.Evidence {
 	input := result.Configuration.Input
 	headCommit := ""
 	indexDigest := ""
@@ -1239,6 +1347,12 @@ func receiptEvidence(result model.Report) reviewreceipt.Evidence {
 			ids = append(ids, group.ID)
 		}
 	}
+	requiredFocusedFiles := 0
+	coveredFocusedFiles := 0
+	if result.Configuration.Focus != nil {
+		requiredFocusedFiles = result.Configuration.Focus.RequiredFocusFiles
+		coveredFocusedFiles = result.Configuration.Focus.CoveredFocusFiles
+	}
 	return reviewreceipt.Evidence{
 		Tool:                 result.Tool,
 		NormalizationVersion: result.Tool.NormalizationVersion,
@@ -1246,6 +1360,12 @@ func receiptEvidence(result model.Report) reviewreceipt.Evidence {
 		IndexDigest:          indexDigest,
 		ScanProfileDigest:    result.Configuration.ScanProfileDigest,
 		FocusedMatchIDs:      ids,
+		StagedReviewContract: reviewreceipt.StagedReviewContract{
+			IncludeFocused:       options.includeFocused,
+			RequireFocusCoverage: options.requireFocus,
+			RequiredFocusedFiles: requiredFocusedFiles,
+			CoveredFocusedFiles:  coveredFocusedFiles,
+		},
 	}
 }
 
@@ -2949,6 +3069,8 @@ func writeRootUsage(writer io.Writer) error {
 		"  mori baseline migrate --baseline <path> --accept-profile [options] [path ...]\n",
 		"  mori baseline update --baseline <path> [options] [path ...]\n",
 		"  mori baseline prune --baseline <path> [options] [path ...]\n",
+		"  mori review staged check [options] [path ...]\n",
+		"  mori review staged acknowledge --accept-focused [options] [path ...]\n",
 		"  mori review acknowledge --staged --include-focused --require-focused-coverage --accept-focused [options] [path ...]\n",
 		"  mori languages\n",
 		"  mori skill install (--project <path> | --global | --target <path>)\n",

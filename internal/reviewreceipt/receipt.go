@@ -20,7 +20,7 @@ import (
 
 const (
 	// SchemaVersion is the current local review-receipt contract.
-	SchemaVersion = 1
+	SchemaVersion = 2
 	// MaxDocumentBytes bounds a receipt before JSON decoding.
 	MaxDocumentBytes int64 = 1024 * 1024
 	decision               = "accept-focused-structural-matches"
@@ -29,14 +29,25 @@ const (
 // Receipt binds an explicit decision to every input that can change the
 // focused finding set. It intentionally stores no timestamps or source text.
 type Receipt struct {
-	SchemaVersion        int      `json:"schema_version"`
-	Decision             string   `json:"decision"`
-	MoriVersion          string   `json:"mori_version"`
-	NormalizationVersion int      `json:"normalization_version"`
-	HeadCommit           string   `json:"head_commit"`
-	IndexDigest          string   `json:"index_digest"`
-	ScanProfileDigest    string   `json:"scan_profile_digest"`
-	FocusedMatchIDs      []string `json:"focused_match_ids"`
+	SchemaVersion        int                   `json:"schema_version"`
+	Decision             string                `json:"decision"`
+	MoriVersion          string                `json:"mori_version"`
+	NormalizationVersion int                   `json:"normalization_version"`
+	HeadCommit           string                `json:"head_commit"`
+	IndexDigest          string                `json:"index_digest"`
+	ScanProfileDigest    string                `json:"scan_profile_digest"`
+	FocusedMatchIDs      []string              `json:"focused_match_ids"`
+	StagedReviewContract *StagedReviewContract `json:"staged_review_contract,omitempty"`
+}
+
+// StagedReviewContract records the focused inclusion and coverage policy that
+// the owner reviewed. The scan-profile digest binds the remaining candidate-
+// universe options; these fields make staged workflow drift explainable.
+type StagedReviewContract struct {
+	IncludeFocused       bool `json:"include_focused"`
+	RequireFocusCoverage bool `json:"require_focused_coverage"`
+	RequiredFocusedFiles int  `json:"required_focused_files"`
+	CoveredFocusedFiles  int  `json:"covered_focused_files"`
 }
 
 // Evidence is the exact active state a receipt must match.
@@ -47,6 +58,7 @@ type Evidence struct {
 	IndexDigest          string
 	ScanProfileDigest    string
 	FocusedMatchIDs      []string
+	StagedReviewContract StagedReviewContract
 }
 
 // New constructs one canonical receipt and refuses an empty acceptance.
@@ -70,6 +82,7 @@ func New(evidence Evidence) (Receipt, error) {
 		IndexDigest:          evidence.IndexDigest,
 		ScanProfileDigest:    evidence.ScanProfileDigest,
 		FocusedMatchIDs:      ids,
+		StagedReviewContract: &evidence.StagedReviewContract,
 	}, nil
 }
 
@@ -96,8 +109,8 @@ func Load(path string) (Receipt, error) {
 	if decoder.Decode(&struct{}{}) != io.EOF {
 		return Receipt{}, errors.New("decode review receipt: trailing JSON content")
 	}
-	if receipt.SchemaVersion != SchemaVersion {
-		return Receipt{}, fmt.Errorf("review receipt schema version %d is unsupported; expected %d", receipt.SchemaVersion, SchemaVersion)
+	if receipt.SchemaVersion != 1 && receipt.SchemaVersion != SchemaVersion {
+		return Receipt{}, fmt.Errorf("review receipt schema version %d is unsupported; expected 1 or %d", receipt.SchemaVersion, SchemaVersion)
 	}
 	if receipt.Decision != decision {
 		return Receipt{}, errors.New("review receipt has an unsupported decision")
@@ -108,6 +121,14 @@ func Load(path string) (Receipt, error) {
 	}
 	if len(ids) == 0 || !equalStrings(ids, receipt.FocusedMatchIDs) {
 		return Receipt{}, errors.New("review receipt focused match IDs must be non-empty, unique, and sorted")
+	}
+	if receipt.SchemaVersion == SchemaVersion {
+		if receipt.StagedReviewContract == nil {
+			return Receipt{}, errors.New("review receipt staged review contract is missing")
+		}
+		if err := validateStagedReviewContract(*receipt.StagedReviewContract); err != nil {
+			return Receipt{}, err
+		}
 	}
 	return receipt, nil
 }
@@ -136,11 +157,17 @@ func Validate(receipt Receipt, evidence Evidence) error {
 			return fmt.Errorf("review receipt %s is stale", check.name)
 		}
 	}
+	if receipt.SchemaVersion != SchemaVersion || receipt.StagedReviewContract == nil {
+		return errors.New("review receipt staged review contract is legacy and stale")
+	}
 	if receipt.NormalizationVersion != evidence.NormalizationVersion {
 		return errors.New("review receipt normalization version is stale")
 	}
 	if !equalStrings(receipt.FocusedMatchIDs, ids) {
 		return errors.New("review receipt focused findings are stale")
+	}
+	if differences := stagedReviewContractDifferences(*receipt.StagedReviewContract, evidence.StagedReviewContract); len(differences) > 0 {
+		return fmt.Errorf("review receipt staged review contract is stale:\n  %s", strings.Join(differences, "\n  "))
 	}
 	return nil
 }
@@ -198,7 +225,44 @@ func validateEvidence(evidence Evidence) error {
 		!validHex(evidence.IndexDigest, 64) || !validHex(evidence.ScanProfileDigest, 64) {
 		return errors.New("review receipt evidence is incomplete")
 	}
+	return validateStagedReviewContract(evidence.StagedReviewContract)
+}
+
+func validateStagedReviewContract(contract StagedReviewContract) error {
+	if contract.RequiredFocusedFiles < 0 || contract.CoveredFocusedFiles < 0 ||
+		contract.CoveredFocusedFiles > contract.RequiredFocusedFiles {
+		return errors.New("review receipt staged review contract is invalid")
+	}
 	return nil
+}
+
+func stagedReviewContractDifferences(stored StagedReviewContract, active StagedReviewContract) []string {
+	differences := make([]string, 0, 3)
+	if stored.IncludeFocused != active.IncludeFocused {
+		differences = append(differences, fmt.Sprintf(
+			"include_focused: receipt=%t, active=%t",
+			stored.IncludeFocused,
+			active.IncludeFocused,
+		))
+	}
+	if stored.RequireFocusCoverage != active.RequireFocusCoverage {
+		differences = append(differences, fmt.Sprintf(
+			"require_focused_coverage: receipt=%t, active=%t",
+			stored.RequireFocusCoverage,
+			active.RequireFocusCoverage,
+		))
+	}
+	if stored.RequiredFocusedFiles != active.RequiredFocusedFiles ||
+		stored.CoveredFocusedFiles != active.CoveredFocusedFiles {
+		differences = append(differences, fmt.Sprintf(
+			"focused coverage: receipt=%d/%d, active=%d/%d",
+			stored.CoveredFocusedFiles,
+			stored.RequiredFocusedFiles,
+			active.CoveredFocusedFiles,
+			active.RequiredFocusedFiles,
+		))
+	}
+	return differences
 }
 
 func normalizedIDs(values []string) ([]string, error) {
