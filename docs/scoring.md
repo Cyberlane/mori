@@ -480,8 +480,10 @@ For a one-commit staged exception that should not become durable suppression,
 first inspect the complete staged report, then record explicit acceptance:
 
 ```sh
-mori review acknowledge --staged --accept-focused .
+mori review acknowledge --staged --include-focused \
+  --require-focused-coverage --accept-focused .
 mori scan --staged --fail-on-focused-match \
+  --include-focused --require-focused-coverage \
   --review-receipt "$(git rev-parse --git-path mori/staged-review.json)" .
 ```
 
@@ -489,4 +491,6 @@ The receipt is local state under private Git metadata by default and uses
 owner-only file permissions on POSIX filesystems. It stores no source or
 timestamp, does not suppress findings, and becomes stale after the commit
 because HEAD changes. A missing, malformed, or stale requested receipt fails
-closed.
+closed. When the enforcing scan includes otherwise ignored focused files or
+requires their coverage, repeat those options while creating the receipt so
+both commands review the same staged universe.

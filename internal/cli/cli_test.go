@@ -2123,6 +2123,82 @@ func TestStagedReviewReceiptAcknowledgesWithoutSuppressingAndFailsStale(t *testi
 	}
 }
 
+func TestStagedReviewReceiptIncludesIgnoredFocusedFiles(t *testing.T) {
+	root := t.TempDir()
+	cliTestGit(t, root, "init", "--initial-branch=main")
+	cliTestGit(t, root, "config", "user.name", "Mori Test")
+	cliTestGit(t, root, "config", "user.email", "mori@example.invalid")
+	write := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", name, err)
+		}
+	}
+	write(".mori.json", `{"threshold":1,"min_tokens":1,"same_language_only":true}`)
+	write(".moriignore", "ignored.go\n")
+	write("left.go", "package sample\nfunc Left(v int) int { return v + 1 }\n")
+	write("ignored.go", "package sample\nfunc Ignored(x int) int { return x + 2 }\n")
+	cliTestGit(t, root, "add", ".mori.json", ".moriignore", "left.go", "ignored.go")
+	cliTestGit(t, root, "commit", "-m", "base")
+	write("ignored.go", "package sample\nfunc Ignored(x int) int { return x + 1 }\n")
+	cliTestGit(t, root, "add", "ignored.go")
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{
+		"review", "acknowledge", "--staged", "--require-focused-coverage",
+		"--accept-focused", ".",
+	}, &stdout, &stderr)
+	if code != exitCoverage || !strings.Contains(stderr.String(), "focused file coverage 0/1") {
+		t.Fatalf("incomplete acknowledge exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+	receiptPath := strings.TrimSpace(cliTestGit(t, root, "rev-parse", "--git-path", "mori/staged-review.json"))
+	if !filepath.IsAbs(receiptPath) {
+		receiptPath = filepath.Join(root, receiptPath)
+	}
+	if _, err := os.Stat(receiptPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("incomplete acknowledgment wrote receipt: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"review", "acknowledge", "--staged", "--include-focused",
+		"--require-focused-coverage", "--accept-focused", ".",
+	}, &stdout, &stderr)
+	if code != exitSuccess || !strings.Contains(stdout.String(), "1 focused structural match") {
+		t.Fatalf("acknowledge exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{
+		"scan", "--staged", "--include-focused", "--require-focused-coverage",
+		"--fail-on-focused-match", "--review-receipt", receiptPath, "--format", "json", ".",
+	}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("acknowledged scan exit = %d, stderr = %q", code, stderr.String())
+	}
+	var result model.Report
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode acknowledged report: %v", err)
+	}
+	if result.TotalFocusedMatchGroups != 1 || result.Configuration.Focus == nil ||
+		result.Configuration.Focus.RequiredFocusFiles != 1 || result.Configuration.Focus.CoveredFocusFiles != 1 ||
+		result.Configuration.ReviewReceipt == nil || result.Configuration.ReviewReceipt.Status != "compatible" {
+		t.Fatalf("acknowledged ignored-file report = %#v", result)
+	}
+}
+
 func TestRunScanStagedRejectsBaselineOutsideIndex(t *testing.T) {
 	root := t.TempDir()
 	cliTestGit(t, root, "init", "--initial-branch=main")
