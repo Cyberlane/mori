@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-08-13
+
 ### Added
 
 - Added `mori review staged check` and `mori review staged acknowledge` as one
