@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/Cyberlane/mori/internal/model"
 )
 
 // IndexEntry identifies one stage-zero Git index entry without reading its blob.
@@ -20,14 +22,15 @@ type IndexEntry struct {
 
 // IndexSnapshot records the deterministic local Git index used by --staged.
 type IndexSnapshot struct {
-	Root         string
-	Prefix       string
-	HeadCommit   string
-	IndexDigest  string
-	Entries      []IndexEntry
-	ChangedPaths []string
-	DeletedPaths []string
-	options      resolverOptions
+	Root                 string
+	Prefix               string
+	HeadCommit           string
+	IndexDigest          string
+	Entries              []IndexEntry
+	ChangedPaths         []string
+	DeletedPaths         []string
+	ChangedLineIntervals map[string][]model.LineInterval
+	options              resolverOptions
 }
 
 // ResolveIndex snapshots the local Git index without writing Git objects.
@@ -121,13 +124,26 @@ func resolveIndex(ctx context.Context, start string, options resolverOptions) (I
 	if err != nil {
 		return IndexSnapshot{}, err
 	}
+	var patchOutput []byte
+	if head != "" {
+		patchOutput, err = run(ctx, options, root, "diff", "--cached", "--unified=0", "--no-ext-diff", "--no-color", "--no-renames", head, "--")
+	} else {
+		patchOutput, err = run(ctx, options, root, "diff", "--cached", "--unified=0", "--no-ext-diff", "--no-color", "--no-renames", "--root", "--")
+	}
+	if err != nil {
+		return IndexSnapshot{}, fmt.Errorf("read staged Git line changes: %w", err)
+	}
+	intervals, err := parseUnifiedDiffIntervals(patchOutput, options.maxPaths)
+	if err != nil {
+		return IndexSnapshot{}, err
+	}
 	hash := sha256.New()
 	for _, entry := range entries {
 		fmt.Fprintf(hash, "%s\x00%s\x00%s\x00", entry.Mode, entry.OID, entry.Path)
 	}
 	return IndexSnapshot{
 		Root: root, Prefix: prefix, HeadCommit: head, IndexDigest: fmt.Sprintf("%x", hash.Sum(nil)), Entries: entries,
-		ChangedPaths: sortedKeys(changed), DeletedPaths: sortedKeys(deleted), options: options,
+		ChangedPaths: sortedKeys(changed), DeletedPaths: sortedKeys(deleted), ChangedLineIntervals: intervals, options: options,
 	}, nil
 }
 

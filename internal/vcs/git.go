@@ -9,10 +9,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/pathutil"
 )
 
@@ -34,6 +37,14 @@ type Changes struct {
 	HeadCommit    string
 	ChangedPaths  []string
 	DeletedPaths  []string
+	// WholeFileFocusPaths contains untracked paths that have no diff hunk and
+	// therefore require path-wide focus.
+	WholeFileFocusPaths []string
+	// ChangedLineIntervals contains added/nearest-surviving new-file lines by
+	// repository-relative path. A deletion-only hunk is represented by the
+	// new-file insertion point and the immediately following line (with line 1
+	// as the minimum), conservatively focusing the nearest surviving function.
+	ChangedLineIntervals map[string][]model.LineInterval
 }
 
 type resolverOptions struct {
@@ -240,12 +251,24 @@ func resolveChangedInCanonicalRoot(
 	if err != nil {
 		return Changes{}, err
 	}
+	patch, err := run(ctx, options, root, "diff", "--unified=0", "--no-ext-diff", "--no-color", "--no-renames", mergeBase, "--")
+	if err != nil {
+		return Changes{}, fmt.Errorf("read tracked Git line changes: %w", err)
+	}
+	intervals, err := parseUnifiedDiffIntervals(patch, options.maxPaths)
+	if err != nil {
+		return Changes{}, err
+	}
 	untracked, err := run(ctx, options, root, "ls-files", "--others", "--exclude-standard", "-z", "--")
 	if err != nil {
 		return Changes{}, fmt.Errorf("read untracked Git files: %w", err)
 	}
+	wholeFileFocus := make(map[string]struct{})
 	for _, path := range splitNUL(untracked) {
 		if err := addSafePath(changed, path); err != nil {
+			return Changes{}, err
+		}
+		if err := addSafePath(wholeFileFocus, path); err != nil {
 			return Changes{}, err
 		}
 		if len(changed)+len(deleted) > options.maxPaths {
@@ -254,13 +277,15 @@ func resolveChangedInCanonicalRoot(
 	}
 
 	return Changes{
-		Root:          root,
-		RequestedBase: revision,
-		BaseCommit:    base,
-		MergeBase:     mergeBase,
-		HeadCommit:    head,
-		ChangedPaths:  sortedKeys(changed),
-		DeletedPaths:  sortedKeys(deleted),
+		Root:                 root,
+		RequestedBase:        revision,
+		BaseCommit:           base,
+		MergeBase:            mergeBase,
+		HeadCommit:           head,
+		ChangedPaths:         sortedKeys(changed),
+		DeletedPaths:         sortedKeys(deleted),
+		WholeFileFocusPaths:  sortedKeys(wholeFileFocus),
+		ChangedLineIntervals: intervals,
 	}, nil
 }
 
@@ -356,6 +381,114 @@ func parseNameStatus(content []byte, pathLimit int) (map[string]struct{}, map[st
 		}
 	}
 	return changed, deleted, nil
+}
+
+var unifiedHunkPattern = regexp.MustCompile(`^@@ -[0-9]+(?:,[0-9]+)? \+([0-9]+)(?:,([0-9]+))? @@`)
+
+// parseUnifiedDiffIntervals extracts inclusive new-file line ranges from a
+// zero-context unified diff. Added lines are exact. For deletion-only hunks,
+// Git reports no new lines, so the insertion point and following line are
+// retained as deterministic nearest-surviving focus evidence.
+func parseUnifiedDiffIntervals(content []byte, pathLimit int) (map[string][]model.LineInterval, error) {
+	result := make(map[string][]model.LineInterval)
+	currentPath := ""
+	seenOldHeader := false
+	inHunk := false
+	for _, raw := range strings.Split(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n") {
+		if strings.HasPrefix(raw, "diff --git ") {
+			currentPath = ""
+			seenOldHeader = false
+			inHunk = false
+			continue
+		}
+		// Header-looking lines are only meaningful before the first hunk. Once
+		// in a hunk, all +++/--- lines are source content, not patch headers.
+		if !inHunk && strings.HasPrefix(raw, "--- ") {
+			seenOldHeader = true
+			continue
+		}
+		if !inHunk && seenOldHeader && strings.HasPrefix(raw, "+++ ") {
+			path, err := parsePatchPath(strings.TrimSuffix(strings.TrimPrefix(raw, "+++ "), "\r"), "b/")
+			if err != nil {
+				return nil, err
+			}
+			if path == "/dev/null" {
+				currentPath = ""
+			} else {
+				validated := make(map[string]struct{}, 1)
+				if err := addSafePath(validated, path); err != nil {
+					return nil, err
+				}
+				currentPath = path
+			}
+			continue
+		}
+		matches := unifiedHunkPattern.FindStringSubmatch(raw)
+		if matches == nil {
+			continue
+		}
+		inHunk = true
+		if currentPath == "" {
+			continue
+		}
+		start, err := strconv.Atoi(matches[1])
+		if err != nil {
+			return nil, errors.New("Git returned malformed unified diff hunk")
+		}
+		count := 1
+		if matches[2] != "" {
+			count, err = strconv.Atoi(matches[2])
+			if err != nil {
+				return nil, errors.New("Git returned malformed unified diff hunk")
+			}
+		}
+		if count == 0 {
+			if start < 1 {
+				start = 1
+			}
+			end := start + 1
+			result[currentPath] = append(result[currentPath], model.LineInterval{StartLine: start, EndLine: end})
+			continue
+		}
+		result[currentPath] = append(result[currentPath], model.LineInterval{StartLine: start, EndLine: start + count - 1})
+	}
+	if len(result) > pathLimit {
+		return nil, fmt.Errorf("Git changed path count exceeded the %d path safety limit", pathLimit)
+	}
+	for path, intervals := range result {
+		sort.Slice(intervals, func(i, j int) bool {
+			if intervals[i].StartLine != intervals[j].StartLine {
+				return intervals[i].StartLine < intervals[j].StartLine
+			}
+			return intervals[i].EndLine < intervals[j].EndLine
+		})
+		merged := intervals[:0]
+		for _, interval := range intervals {
+			if len(merged) > 0 && interval.StartLine <= merged[len(merged)-1].EndLine+1 {
+				if interval.EndLine > merged[len(merged)-1].EndLine {
+					merged[len(merged)-1].EndLine = interval.EndLine
+				}
+				continue
+			}
+			merged = append(merged, interval)
+		}
+		result[path] = merged
+	}
+	return result, nil
+}
+
+func parsePatchPath(value string, prefix string) (string, error) {
+	if strings.HasPrefix(value, `"`) {
+		decoded, err := strconv.Unquote(value)
+		if err != nil {
+			return "", errors.New("Git returned malformed patch path")
+		}
+		value = decoded
+	}
+	if strings.HasPrefix(value, prefix) {
+		value = strings.TrimPrefix(value, prefix)
+	}
+	return filepath.ToSlash(value), nil
 }
 
 func splitNUL(content []byte) []string {

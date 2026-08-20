@@ -493,7 +493,7 @@ func TestRunScanFocusPathAndFocusedPolicy(t *testing.T) {
 		"--focus-path", left, "--fail-on-focused-match", root,
 	}, &stdout, &stderr)
 	if code != exitFindings {
-		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+		t.Fatalf("exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
 	}
 	var result model.Report
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
@@ -522,7 +522,8 @@ func TestRunScanChangedSinceIncludesWorkingTree(t *testing.T) {
 	runTestGit(t, root, "add", ".")
 	runTestGit(t, root, "commit", "-m", "base")
 	base := strings.TrimSpace(runTestGit(t, root, "rev-parse", "HEAD"))
-	if err := os.WriteFile(left, []byte(content+"// changed\n"), 0o600); err != nil {
+	changedContent := strings.ReplaceAll(content, "value", "input")
+	if err := os.WriteFile(left, []byte(changedContent), 0o600); err != nil {
 		t.Fatalf("WriteFile change: %v", err)
 	}
 
@@ -533,7 +534,7 @@ func TestRunScanChangedSinceIncludesWorkingTree(t *testing.T) {
 		"--changed-since", base, "--fail-on-focused-match", root,
 	}, &stdout, &stderr)
 	if code != exitFindings {
-		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+		t.Fatalf("exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
 	}
 	var result model.Report
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
@@ -580,10 +581,12 @@ func TestRunScanChangedWorktreeResolvesNestedRepositoriesIndependently(t *testin
 	runTestGit(t, nested, "add", ".")
 	runTestGit(t, nested, "commit", "-m", "base")
 	nestedBase := strings.TrimSpace(runTestGit(t, nested, "rev-parse", "HEAD"))
-	if err := os.WriteFile(filepath.Join(root, "left.go"), []byte(content+"// parent change\n"), 0o600); err != nil {
+	parentChanged := strings.ReplaceAll(content, "value", "parentValue")
+	if err := os.WriteFile(filepath.Join(root, "left.go"), []byte(parentChanged), 0o600); err != nil {
 		t.Fatalf("WriteFile parent change: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(nested, "nested.go"), []byte(content+"// nested change\n"), 0o600); err != nil {
+	nestedChanged := strings.ReplaceAll(content, "value", "nestedValue")
+	if err := os.WriteFile(filepath.Join(nested, "nested.go"), []byte(nestedChanged), 0o600); err != nil {
 		t.Fatalf("WriteFile nested change: %v", err)
 	}
 
@@ -2061,7 +2064,7 @@ func TestStagedReviewReceiptAcknowledgesWithoutSuppressingAndFailsStale(t *testi
 	write("right.go", "package sample\nfunc Right(x int) int { return x + 1 }\n")
 	cliTestGit(t, root, "add", ".mori.json", "left.go", "right.go")
 	cliTestGit(t, root, "commit", "-m", "base")
-	write("left.go", "package sample\n// reviewed staged change\nfunc Left(v int) int { return v + 1 }\n")
+	write("left.go", "package sample\nfunc Left(v int) int { return v + 2 }\n")
 	cliTestGit(t, root, "add", "left.go")
 
 	previous, err := os.Getwd()
@@ -2079,7 +2082,7 @@ func TestStagedReviewReceiptAcknowledgesWithoutSuppressingAndFailsStale(t *testi
 		"scan", "--staged", "--fail-on-focused-match", ".",
 	}, &stdout, &stderr)
 	if code != exitFindings {
-		t.Fatalf("unacknowledged exit = %d, stderr = %q", code, stderr.String())
+		t.Fatalf("unacknowledged exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
 	}
 
 	stdout.Reset()
@@ -2329,7 +2332,7 @@ func TestCanonicalStagedReviewCommandsAreDocumented(t *testing.T) {
 	for _, path := range []string{
 		"../../docs/scoring.md",
 		"../../docs/guides/automation-and-baselines.md",
-		"../../skills/mori-review-similarity/SKILL.md",
+		"../../skills/mori-review-similarity/references/changed-code.md",
 	} {
 		content, err := os.ReadFile(path)
 		if err != nil {

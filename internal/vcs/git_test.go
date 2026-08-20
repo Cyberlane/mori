@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Cyberlane/mori/internal/model"
 )
 
 func TestResolveChangedIncludesCommittedAndWorkingTreeState(t *testing.T) {
@@ -50,6 +52,9 @@ func TestResolveChangedIncludesCommittedAndWorkingTreeState(t *testing.T) {
 	}
 	if !reflect.DeepEqual(changes.DeletedPaths, []string{"delete.go"}) {
 		t.Fatalf("deleted = %#v", changes.DeletedPaths)
+	}
+	if got := changes.ChangedLineIntervals["kept.go"]; !reflect.DeepEqual(got, []model.LineInterval{{StartLine: 2, EndLine: 2}}) {
+		t.Fatalf("changed line intervals = %#v", got)
 	}
 	if changes.BaseCommit != base || changes.MergeBase != base || !isFullSHA(changes.HeadCommit) {
 		t.Fatalf("commits = %#v", changes)
@@ -150,6 +155,72 @@ func TestParseNameStatusRejectsUnsafeAndUnboundedPaths(t *testing.T) {
 	}
 }
 
+func TestParseUnifiedDiffIntervalsAndDeletionNearestLine(t *testing.T) {
+	content := []byte("diff --git a/sample.go b/sample.go\n--- a/sample.go\n+++ b/sample.go\n@@ -2,0 +3,2 @@\n+added\n+line\n@@ -8,2 +10,0 @@\n")
+	intervals, err := parseUnifiedDiffIntervals(content, 10)
+	if err != nil {
+		t.Fatalf("parseUnifiedDiffIntervals: %v", err)
+	}
+	want := []model.LineInterval{{StartLine: 3, EndLine: 4}, {StartLine: 10, EndLine: 11}}
+	if !reflect.DeepEqual(intervals["sample.go"], want) {
+		t.Fatalf("intervals = %#v, want %#v", intervals["sample.go"], want)
+	}
+}
+
+func TestParseUnifiedDiffIntervalsDoesNotTreatHunkContentAsHeader(t *testing.T) {
+	content := []byte("diff --git a/space name.go b/space name.go\n--- a/space name.go\n+++ b/space name.go\n@@ -1 +1,2 @@\n-old\n+new\n+++ source begins with pluses\n")
+	intervals, err := parseUnifiedDiffIntervals(content, 10)
+	if err != nil {
+		t.Fatalf("parseUnifiedDiffIntervals: %v", err)
+	}
+	want := []model.LineInterval{{StartLine: 1, EndLine: 2}}
+	if !reflect.DeepEqual(intervals["space name.go"], want) {
+		t.Fatalf("space path intervals = %#v, want %#v", intervals["space name.go"], want)
+	}
+	if len(intervals) != 1 {
+		t.Fatalf("hunk content created extra paths: %#v", intervals)
+	}
+}
+
+func TestParseUnifiedDiffIntervalsDecodesQuotedPaths(t *testing.T) {
+	content := []byte("diff --git \"a/tab\\tname.go\" \"b/tab\\tname.go\"\n--- \"a/tab\\tname.go\"\n+++ \"b/tab\\tname.go\"\n@@ -1 +1,1 @@\n-old\n+new\n")
+	intervals, err := parseUnifiedDiffIntervals(content, 10)
+	if err != nil {
+		t.Fatalf("parseUnifiedDiffIntervals: %v", err)
+	}
+	if got := intervals["tab\tname.go"]; !reflect.DeepEqual(got, []model.LineInterval{{StartLine: 1, EndLine: 1}}) {
+		t.Fatalf("quoted path intervals = %#v", got)
+	}
+}
+
+func TestParseUnifiedDiffIntervalsSkipsDeletedFile(t *testing.T) {
+	content := []byte("diff --git a/deleted.go b/deleted.go\ndeleted file mode 100644\n--- a/deleted.go\n+++ /dev/null\n@@ -1,3 +0,0 @@\n")
+	intervals, err := parseUnifiedDiffIntervals(content, 10)
+	if err != nil {
+		t.Fatalf("parseUnifiedDiffIntervals: %v", err)
+	}
+	if len(intervals) != 0 {
+		t.Fatalf("deleted file intervals = %#v, want empty", intervals)
+	}
+}
+
+func TestResolveChangedCapturesDeletionOnlyNearestSurvivors(t *testing.T) {
+	root := initRepository(t)
+	writeFile(t, root, "sample.go", "package sample\n// remove this line\nfunc Keep() {}\n")
+	runGit(t, root, "add", "sample.go")
+	runGit(t, root, "commit", "-m", "base")
+	base := strings.TrimSpace(runGit(t, root, "rev-parse", "HEAD"))
+	writeFile(t, root, "sample.go", "package sample\nfunc Keep() {}\n")
+	changes, err := ResolveChanged(context.Background(), []string{filepath.Join(root, "sample.go")}, base)
+	if err != nil {
+		t.Fatalf("ResolveChanged: %v", err)
+	}
+	want := []model.LineInterval{{StartLine: 1, EndLine: 2}}
+	if !reflect.DeepEqual(changes.ChangedLineIntervals["sample.go"], want) {
+		t.Fatalf("deletion-only intervals = %#v, want %#v", changes.ChangedLineIntervals["sample.go"], want)
+	}
+}
+
 func TestResolveIndexReadsOnlyStageZeroSnapshot(t *testing.T) {
 	root := initRepository(t)
 	writeFile(t, root, "sample.go", "package sample\nfunc First() int { return 1 }\n")
@@ -165,6 +236,9 @@ func TestResolveIndexReadsOnlyStageZeroSnapshot(t *testing.T) {
 	}
 	if !reflect.DeepEqual(snapshot.ChangedPaths, []string{"sample.go"}) || snapshot.IndexDigest == "" {
 		t.Fatalf("snapshot = %#v", snapshot)
+	}
+	if got := snapshot.ChangedLineIntervals["sample.go"]; !reflect.DeepEqual(got, []model.LineInterval{{StartLine: 2, EndLine: 2}}) {
+		t.Fatalf("staged line intervals = %#v", got)
 	}
 	entry, ok := IndexEntryForPath(snapshot, "sample.go")
 	if !ok {

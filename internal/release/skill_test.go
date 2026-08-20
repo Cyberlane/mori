@@ -21,9 +21,13 @@ func TestPackageSkillIsDeterministicAndPortable(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(skillRoot, "agents"), 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
+	if err := os.MkdirAll(filepath.Join(skillRoot, "references"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(references): %v", err)
+	}
 	for path, content := range map[string]string{
-		filepath.Join(skillRoot, "SKILL.md"):              "skill",
-		filepath.Join(skillRoot, "agents", "openai.yaml"): "metadata",
+		filepath.Join(skillRoot, "SKILL.md"):                "skill",
+		filepath.Join(skillRoot, "agents", "openai.yaml"):   "metadata",
+		filepath.Join(skillRoot, "references", "detail.md"): "detail",
 	} {
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatalf("WriteFile(%s): %v", path, err)
@@ -75,6 +79,7 @@ func TestPackageSkillIsDeterministicAndPortable(t *testing.T) {
 	want := []string{
 		"mori-review-similarity/SKILL.md",
 		"mori-review-similarity/agents/openai.yaml",
+		"mori-review-similarity/references/detail.md",
 	}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("archive names = %#v, want %#v", names, want)

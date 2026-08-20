@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/Cyberlane/mori/internal/agentskill"
 	"github.com/Cyberlane/mori/internal/config"
+	"github.com/Cyberlane/mori/internal/projectcontract"
 )
 
 func TestSetupAgentPlanIsReadOnlyAndProjectRelative(t *testing.T) {
@@ -121,12 +124,6 @@ func TestProjectUpgradeCoordinatesPinAndAgentSkill(t *testing.T) {
 		t.Fatal(err)
 	}
 	skillPath := filepath.Join(root, ".agents", "skills", "mori-review-similarity")
-	if err := os.MkdirAll(skillPath, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(skillPath, "SKILL.md"), []byte("old\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 
 	var stdout, stderr bytes.Buffer
 	code := Run(context.Background(), []string{"project", "upgrade", "--check", "--format", "json", root}, &stdout, &stderr)
@@ -162,11 +159,144 @@ func TestProjectUpgradeCoordinatesPinAndAgentSkill(t *testing.T) {
 		t.Fatalf("decode apply plan: %v", err)
 	}
 	content, err = os.ReadFile(filepath.Join(root, ".mori-version"))
-	if err != nil || string(content) != projectPinnedVersion()+"\n" || plan.Drift || len(plan.Backups) != 2 {
+	if err != nil || string(content) != projectPinnedVersion()+"\n" || plan.Drift || plan.Blocked || len(plan.Backups) != 1 {
 		t.Fatalf("applied pin = %q, plan = %#v, err = %v", content, plan, err)
 	}
-	if content, err := os.ReadFile(filepath.Join(skillPath, "SKILL.md")); err != nil || string(content) == "old\n" {
+	if content, err := os.ReadFile(filepath.Join(skillPath, "SKILL.md")); err != nil || len(content) == 0 {
 		t.Fatalf("skill was not updated: %q, %v", content, err)
+	}
+}
+
+func TestProjectUpgradeApplyPreservesUnknownSkillAndMakesNoManagedChanges(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".mori-version"), []byte(projectPinnedVersion()+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	skillPath := filepath.Join(root, ".agents", "skills", "mori-review-similarity")
+	if err := os.MkdirAll(skillPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	custom := []byte("custom local skill\n")
+	if err := os.WriteFile(filepath.Join(skillPath, "SKILL.md"), custom, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"project", "upgrade", "--apply", "--format", "json", root}, &stdout, &stderr)
+	if code != exitUpgrade {
+		t.Fatalf("apply exit = %d, stderr = %q, stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var plan projectUpgradePlan
+	if err := json.Unmarshal(stdout.Bytes(), &plan); err != nil || !plan.Blocked {
+		t.Fatalf("blocked plan = %#v, err = %v", plan, err)
+	}
+	content, err := os.ReadFile(filepath.Join(skillPath, "SKILL.md"))
+	if err != nil || !bytes.Equal(content, custom) {
+		t.Fatalf("custom skill changed: %q, %v", content, err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, projectcontract.FileName)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("blocked apply wrote contract: %v", err)
+	}
+}
+
+func TestProjectUpgradeApplyReplacesRecordedContractWithBackup(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".mori-version"), []byte(projectPinnedVersion()+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := agentskill.Install(filepath.Join(root, ".agents", "skills"), false); err != nil {
+		t.Fatal(err)
+	}
+	packageDigest, err := agentskill.PackageDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := desiredProjectContract(projectPinnedVersion(), packageDigest)
+	old.ReportSchemaVersion--
+	content, err := projectcontract.Marshal(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contractPath := filepath.Join(root, projectcontract.FileName)
+	if _, err := projectcontract.WriteAtomic(contractPath, content, false); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"project", "upgrade", "--apply", "--format", "json", root}, &stdout, &stderr)
+	if code != exitSuccess {
+		t.Fatalf("apply exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+	var plan projectUpgradePlan
+	if err := json.Unmarshal(stdout.Bytes(), &plan); err != nil {
+		t.Fatal(err)
+	}
+	if plan.Drift || plan.Blocked || len(plan.Backups) != 1 {
+		t.Fatalf("applied plan = %#v", plan)
+	}
+	current, exists, err := projectcontract.Load(contractPath)
+	if err != nil || !exists || current != desiredProjectContract(projectPinnedVersion(), packageDigest) {
+		t.Fatalf("current contract = %#v, %t, %v", current, exists, err)
+	}
+	backup, exists, err := projectcontract.Load(plan.Backups[0])
+	if err != nil || !exists || backup != old {
+		t.Fatalf("backup contract = %#v, %t, %v", backup, exists, err)
+	}
+}
+
+func TestProjectUpgradeApplyRejectsSymlinkedManagedSkillParent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not generally available")
+	}
+	t.Parallel()
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(root, ".agents")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".mori-version"), []byte("v0.1.0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"project", "upgrade", "--apply", "--format", "json", root}, &stdout, &stderr)
+	if code != exitUpgrade {
+		t.Fatalf("apply exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+	var plan projectUpgradePlan
+	if err := json.Unmarshal(stdout.Bytes(), &plan); err != nil || !plan.Blocked {
+		t.Fatalf("blocked plan = %#v, err = %v", plan, err)
+	}
+	pin, err := os.ReadFile(filepath.Join(root, ".mori-version"))
+	if err != nil || string(pin) != "v0.1.0\n" {
+		t.Fatalf("blocked apply changed pin: %q, %v", pin, err)
+	}
+	entries, err := os.ReadDir(outside)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("blocked apply wrote outside project: %v, %v", entries, err)
+	}
+}
+
+func TestProjectUpgradeCheckFailsForManagedConflictWithoutDrift(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	if code := Run(context.Background(), []string{"project", "upgrade", "--apply", root}, &stdout, &stderr); code != exitSuccess {
+		t.Fatalf("bootstrap exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+	skillPath := filepath.Join(root, ".agents", "skills", "mori-review-similarity", "SKILL.md")
+	if err := os.WriteFile(skillPath, []byte("customized\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code := Run(context.Background(), []string{"project", "upgrade", "--check", "--format", "json", root}, &stdout, &stderr)
+	if code != exitUpgrade {
+		t.Fatalf("check exit = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+	var plan projectUpgradePlan
+	if err := json.Unmarshal(stdout.Bytes(), &plan); err != nil || !plan.Blocked || plan.Drift {
+		t.Fatalf("managed-conflict plan = %#v, err = %v", plan, err)
 	}
 }
 

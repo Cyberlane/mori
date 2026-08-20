@@ -79,13 +79,15 @@ mori project upgrade --dry-run .
 mori project upgrade --apply .
 ```
 
-Check mode exits `5` when the `.mori-version` pin or project Agent Skill is
-outdated, or configuration/baseline validation needs attention. Apply mode
-atomically updates the pin, replaces a differing skill with a recoverable
-backup, and then rechecks the project. It inventories conventional hooks,
-scripts, and CI files but does not rewrite them because their policy is
-project-specific. It also never installs a CLI, creates a baseline, commits,
-pushes, or releases.
+Check mode exits `5` when required Mori-managed migration remains or a managed
+conflict blocks compatibility. Apply mode
+updates the pin and tracked project contract, replaces only a missing,
+contract-recorded, or known official prior skill with a recoverable backup,
+and then rechecks the project. Unknown skill changes are preserved and marked
+as a manual conflict. Configuration, protected baseline evidence, hooks,
+scripts, and CI remain project-owned; they are inventoried but never rewritten.
+The command also never installs a CLI, creates a baseline, commits, pushes, or
+releases.
 
 ## Agent-guided project setup
 

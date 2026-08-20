@@ -10,7 +10,7 @@ import (
 // structural-similarity review skill.
 const ReviewSimilarityName = "mori-review-similarity"
 
-//go:embed mori-review-similarity/SKILL.md mori-review-similarity/agents/openai.yaml
+//go:embed mori-review-similarity
 var embedded embed.FS
 
 // ReviewSimilarity returns the complete portable Agent Skill package.

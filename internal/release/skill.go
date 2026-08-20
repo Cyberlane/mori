@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -43,49 +45,9 @@ func PackageSkill(options SkillOptions) (string, error) {
 		options.OutputDir,
 		fmt.Sprintf("%s_%s.zip", skills.ReviewSimilarityName, version),
 	)
-	files := []archiveFile{
-		{
-			sourcePath: filepath.Join(
-				options.Root,
-				"skills",
-				skills.ReviewSimilarityName,
-				"SKILL.md",
-			),
-			name: filepath.ToSlash(filepath.Join(skills.ReviewSimilarityName, "SKILL.md")),
-			mode: 0o644,
-		},
-		{
-			sourcePath: filepath.Join(
-				options.Root,
-				"skills",
-				skills.ReviewSimilarityName,
-				"agents",
-				"openai.yaml",
-			),
-			name: filepath.ToSlash(filepath.Join(
-				skills.ReviewSimilarityName,
-				"agents",
-				"openai.yaml",
-			)),
-			mode: 0o644,
-		},
-	}
-	for index := range files {
-		info, err := os.Lstat(files[index].sourcePath)
-		if err != nil {
-			return "", fmt.Errorf("package %s: %w", files[index].sourcePath, err)
-		}
-		if !info.Mode().IsRegular() {
-			return "", fmt.Errorf("package %s: input is not a regular file", files[index].sourcePath)
-		}
-		relative, err := filepath.Rel(options.Root, files[index].sourcePath)
-		if err != nil {
-			return "", fmt.Errorf("resolve package input %s: %w", files[index].sourcePath, err)
-		}
-		if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			return "", fmt.Errorf("package input is outside repository root: %s", files[index].sourcePath)
-		}
-		files[index].info = info
+	files, err := skillFiles(options.Root)
+	if err != nil {
+		return "", err
 	}
 	if err := rejectOutputCollision(archivePath, files); err != nil {
 		return "", err
@@ -96,4 +58,54 @@ func PackageSkill(options SkillOptions) (string, error) {
 		return "", err
 	}
 	return archivePath, nil
+}
+
+func skillFiles(root string) ([]archiveFile, error) {
+	skillRoot := filepath.Join(root, "skills", skills.ReviewSimilarityName)
+	rootInfo, err := os.Lstat(skillRoot)
+	if err != nil {
+		return nil, fmt.Errorf("package %s: %w", skillRoot, err)
+	}
+	if rootInfo.Mode()&os.ModeSymlink != 0 || !rootInfo.IsDir() {
+		return nil, fmt.Errorf("package %s: input is not a real directory", skillRoot)
+	}
+
+	files := make([]archiveFile, 0, 4)
+	err = filepath.WalkDir(skillRoot, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("package %s: input contains a symlink", path)
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !entry.Type().IsRegular() {
+			return fmt.Errorf("package %s: input is not a regular file", path)
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return fmt.Errorf("inspect package input %s: %w", path, err)
+		}
+		relative, err := filepath.Rel(skillRoot, path)
+		if err != nil {
+			return fmt.Errorf("resolve package input %s: %w", path, err)
+		}
+		files = append(files, archiveFile{
+			sourcePath: path,
+			name: filepath.ToSlash(filepath.Join(
+				skills.ReviewSimilarityName,
+				relative,
+			)),
+			mode: 0o644,
+			info: info,
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("walk skill package: %w", err)
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].name < files[j].name })
+	return files, nil
 }

@@ -4,6 +4,7 @@ package agentskill
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -22,6 +23,11 @@ var ErrDifferent = errors.New("installed skill has different contents")
 // Name is Mori's official structural-review Agent Skill name.
 const Name = skills.ReviewSimilarityName
 
+// v030PackageDigest is the complete official v0.30.0 package identity. It is
+// retained so the first contract-aware upgrade can recognize and safely
+// replace that known pre-contract installation.
+const v030PackageDigest = "57a869a422efaf5b3336397e7ff332bb82cef8b85b5733e65232536064e3bc34"
+
 // Status describes the result of an installation request.
 type Status string
 
@@ -38,6 +44,35 @@ type Result struct {
 	Path       string
 	BackupPath string
 	Status     Status
+}
+
+// PackageDigest is the stable digest of the embedded skill package. It is
+// based on sorted portable paths and bytes, not filesystem metadata.
+func PackageDigest() (string, error) {
+	files, _, err := packageContents()
+	if err != nil {
+		return "", err
+	}
+	paths := make([]string, 0, len(files))
+	for path := range files {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	hash := sha256.New()
+	for _, path := range paths {
+		_, _ = hash.Write([]byte(path))
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write(files[path])
+		_, _ = hash.Write([]byte{0})
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
+}
+
+// IsKnownPriorPackageDigest reports whether a package is an exact official
+// pre-contract Mori skill that can be upgraded without treating it as local
+// customization.
+func IsKnownPriorPackageDigest(digest string) bool {
+	return digest == v030PackageDigest
 }
 
 // Inspect compares a project skill with the embedded package without writing.

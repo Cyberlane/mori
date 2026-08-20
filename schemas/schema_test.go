@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/Cyberlane/mori/internal/model"
+	"github.com/Cyberlane/mori/internal/reviewreceipt"
 )
 
 func TestCurrentReportSchemaMatchesPublicModel(t *testing.T) {
@@ -19,7 +20,7 @@ func TestCurrentReportSchemaMatchesPublicModel(t *testing.T) {
 	if !ok {
 		t.Fatal("resolve schema test path")
 	}
-	schemaPath := filepath.Join(filepath.Dir(currentFile), "mori-report-v19.schema.json")
+	schemaPath := filepath.Join(filepath.Dir(currentFile), "mori-report-v20.schema.json")
 	content, err := os.ReadFile(schemaPath)
 	if err != nil {
 		t.Fatalf("read schema: %v", err)
@@ -58,6 +59,31 @@ func TestCurrentReportSchemaMatchesPublicModel(t *testing.T) {
 	}
 
 	definitions := object(t, schema["$defs"], "$defs")
+	configuration := object(t, definitions["configuration"], "configuration")
+	configurationRequired := stringSlice(t, configuration["required"], "configuration.required")
+	encodedConfiguration, err := json.Marshal(model.EffectiveConfig{})
+	if err != nil {
+		t.Fatalf("marshal configuration: %v", err)
+	}
+	var configurationValue map[string]any
+	if err := json.Unmarshal(encodedConfiguration, &configurationValue); err != nil {
+		t.Fatalf("decode configuration: %v", err)
+	}
+	configurationKeys := make([]string, 0, len(configurationValue))
+	for key := range configurationValue {
+		configurationKeys = append(configurationKeys, key)
+	}
+	sort.Strings(configurationRequired)
+	sort.Strings(configurationKeys)
+	if !reflect.DeepEqual(configurationRequired, configurationKeys) {
+		t.Fatalf("configuration required keys = %#v, model keys = %#v", configurationRequired, configurationKeys)
+	}
+	receipt := object(t, definitions["reviewReceipt"], "reviewReceipt")
+	receiptProperties := object(t, receipt["properties"], "reviewReceipt.properties")
+	receiptVersion := object(t, receiptProperties["schema_version"], "reviewReceipt.schema_version")
+	if got := int(receiptVersion["const"].(float64)); got != reviewreceipt.SchemaVersion {
+		t.Fatalf("receipt schema version = %d, model version = %d", got, reviewreceipt.SchemaVersion)
+	}
 	walkSchema(t, schema, func(reference string) {
 		const prefix = "#/$defs/"
 		if !strings.HasPrefix(reference, prefix) {

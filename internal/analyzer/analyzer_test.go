@@ -1039,6 +1039,112 @@ func TestCollectorPrioritizesFocusedGroupsBeforeRetention(t *testing.T) {
 	}
 }
 
+func TestFocusedLocationUsesChangedLineIntervals(t *testing.T) {
+	intervals := map[string][]model.LineInterval{
+		"changed.go": {{StartLine: 10, EndLine: 12}},
+	}
+	location := model.Location{Path: "changed.go", StartLine: 12, EndLine: 18}
+	if !focusedLocation(location, nil, intervals) {
+		t.Fatal("overlapping changed interval was not focused")
+	}
+	location.StartLine, location.EndLine = 13, 18
+	if focusedLocation(location, nil, intervals) {
+		t.Fatal("non-overlapping changed interval was focused")
+	}
+	if !focusedLocation(model.Location{Path: "new.go", StartLine: 30, EndLine: 40}, map[string]struct{}{"new.go": {}}, nil) {
+		t.Fatal("path-wide focus was not preserved")
+	}
+}
+
+func TestFocusedOnlyRequiresActiveFocus(t *testing.T) {
+	err := validateOptions(Options{Threshold: 0.5, MinTokens: 1, FocusedOnly: true})
+	if err == nil || !strings.Contains(err.Error(), "focused-only analysis requires active focus") {
+		t.Fatalf("FocusedOnly without active focus error = %v", err)
+	}
+	if err := validateOptions(Options{Threshold: 0.5, MinTokens: 1, FocusedOnly: true, FocusActive: true}); err != nil {
+		t.Fatalf("FocusedOnly with active focus: %v", err)
+	}
+}
+
+func TestCollectorFocusedOnlySkipsNonFocusedPairs(t *testing.T) {
+	report := model.Report{}
+	collector := matchCollector{
+		ctx: context.Background(),
+		options: Options{
+			Threshold: 0.5, MaxPairs: 10, FocusedOnly: true,
+			FocusIntervals: map[string][]model.LineInterval{"changed.go": {{StartLine: 5, EndLine: 5}}},
+		},
+		report:           &report,
+		groups:           make(map[string]*groupCandidate),
+		suppressedGroups: make(map[string]struct{}),
+	}
+	focused := groupingFragment("changed.go", 5)
+	focused.Fingerprint = "focused"
+	nonFocusedLeft := groupingFragment("left.go", 20)
+	nonFocusedLeft.Fingerprint = "left"
+	nonFocusedRight := groupingFragment("right.go", 20)
+	nonFocusedRight.Fingerprint = "right"
+	if err := collector.score(nonFocusedLeft, nonFocusedRight); err != nil {
+		t.Fatalf("score non-focused pair: %v", err)
+	}
+	if err := collector.score(focused, nonFocusedLeft); err != nil {
+		t.Fatalf("score focused pair: %v", err)
+	}
+	contentOccurrence := groupingFragment("other.go", 30)
+	contentOccurrence.Fingerprint = "focused"
+	if err := collector.score(contentOccurrence, nonFocusedRight); err != nil {
+		t.Fatalf("score non-focused duplicate-fingerprint pair: %v", err)
+	}
+	collector.finish()
+	if report.CandidatePairs != 1 || report.TotalLocationPairs != 1 || report.TotalMatchGroups != 1 {
+		t.Fatalf("focused-only report = %+v", report)
+	}
+}
+
+func TestFocusedComparatorsScoreEachEligiblePairOnce(t *testing.T) {
+	makeCollector := func(paths ...string) (*model.Report, *matchCollector) {
+		report := &model.Report{}
+		focus := make(map[string]struct{}, len(paths))
+		for _, path := range paths {
+			focus[path] = struct{}{}
+		}
+		return report, &matchCollector{
+			ctx: context.Background(),
+			options: Options{
+				Threshold: 0.5, MaxPairs: 10, FocusedOnly: true,
+				FocusPaths: focus,
+			},
+			report:           report,
+			groups:           make(map[string]*groupCandidate),
+			suppressedGroups: make(map[string]struct{}),
+		}
+	}
+	fragment := func(path string) model.Fragment {
+		item := groupingFragment(path, 1)
+		item.Fingerprint = path
+		return item
+	}
+
+	report, collector := makeCollector("a.go", "b.go")
+	within := []model.Fragment{fragment("a.go"), fragment("b.go"), fragment("c.go")}
+	if err := compareFocusedWithin(within, collector); err != nil {
+		t.Fatal(err)
+	}
+	if report.CandidatePairs != 3 {
+		t.Fatalf("within candidate pairs = %d, want 3", report.CandidatePairs)
+	}
+
+	report, collector = makeCollector("left-focused.go", "right-focused.py")
+	left := []model.Fragment{fragment("left-focused.go"), fragment("left-other.go")}
+	right := []model.Fragment{fragment("right-focused.py"), fragment("right-other.py")}
+	if err := compareFocusedLanguagePair(left, right, collector); err != nil {
+		t.Fatal(err)
+	}
+	if report.CandidatePairs != 3 {
+		t.Fatalf("cross-language candidate pairs = %d, want 3", report.CandidatePairs)
+	}
+}
+
 func TestCollectorSkipsOverlappingStatementBlockPairs(t *testing.T) {
 	t.Parallel()
 

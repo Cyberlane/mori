@@ -45,6 +45,12 @@ on that target or its native CI runner.
 9. Keep the repository self-contained. Do not add private planning-system
    references, workstation paths, credentials, personal operational history, or
    generated session logs.
+10. Changes to the embedded Agent Skill, canonical hook behavior, configuration,
+    report, receipt, baseline, or normalization contracts must be represented in
+    the desired project contract and covered by project-upgrade lifecycle tests.
+11. A project-contract schema bump must retain strict read and migration support
+    for supported prior official contracts. Known Mori-managed state must not
+    become `conflict/manual` merely because Mori itself advanced the schema.
 
 ## Required verification
 

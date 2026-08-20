@@ -36,17 +36,22 @@ type Options struct {
 	CrossLanguageOnly bool
 	LanguagePairs     []LanguagePair
 	FocusPaths        map[string]struct{}
+	FocusIntervals    map[string][]model.LineInterval
 	FocusActive       bool
-	Suppress          func(id string, left model.Location, right model.Location) bool
-	ExcludedCoverage  []model.FileCoverage
-	Unsupported       []model.UnsupportedExtension
-	Ranking           string
-	PriorityPaths     []model.PriorityPathRule
-	EmbeddedSQL       bool
-	SQLDialect        string
-	StatementBlocks   bool
-	BlockStatements   int
-	MaxBlocksPerFunc  int
+	// FocusedOnly limits scoring to pairs containing an exact focused
+	// occurrence. It is opt-in; default scans retain the historical full
+	// comparison universe.
+	FocusedOnly      bool
+	Suppress         func(id string, left model.Location, right model.Location) bool
+	ExcludedCoverage []model.FileCoverage
+	Unsupported      []model.UnsupportedExtension
+	Ranking          string
+	PriorityPaths    []model.PriorityPathRule
+	EmbeddedSQL      bool
+	SQLDialect       string
+	StatementBlocks  bool
+	BlockStatements  int
+	MaxBlocksPerFunc int
 }
 
 // LanguagePair selects one concrete grammar-ID pair for comparison.
@@ -423,6 +428,9 @@ func validateOptions(options Options) error {
 	if options.MaxGroups < 0 || options.MaxOccurrences < 0 || options.MaxPairs < 0 {
 		return errors.New("maximum values cannot be negative")
 	}
+	if options.FocusedOnly && !options.FocusActive {
+		return errors.New("focused-only analysis requires active focus")
+	}
 	if options.StatementBlocks && (options.BlockStatements < 2 || options.MaxBlocksPerFunc < 1) {
 		return errors.New("statement-block limits are invalid")
 	}
@@ -443,6 +451,9 @@ func validateOptions(options Options) error {
 }
 
 func compareAll(fragments []model.Fragment, collector *matchCollector) error {
+	if collector.options.FocusedOnly {
+		return compareFocusedWithin(fragments, collector)
+	}
 	for leftIndex := 0; leftIndex < len(fragments); leftIndex++ {
 		if err := collector.ctx.Err(); err != nil {
 			return err
@@ -458,6 +469,48 @@ func compareAll(fragments []model.Fragment, collector *matchCollector) error {
 			}
 			if sizeUpperBound(left.FeatureCount, right.FeatureCount) < collector.options.Threshold {
 				break
+			}
+			if err := collector.score(left, right); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func compareFocusedWithin(fragments []model.Fragment, collector *matchCollector) error {
+	for focusedIndex, focused := range fragments {
+		if !focusedLocation(focused.Location, collector.options.FocusPaths, collector.options.FocusIntervals) || focused.FeatureCount == 0 {
+			continue
+		}
+		if err := collector.ctx.Err(); err != nil {
+			return err
+		}
+		firstPossible := sort.Search(len(fragments), func(index int) bool {
+			return float64(fragments[index].FeatureCount)/float64(focused.FeatureCount) >=
+				collector.options.Threshold
+		})
+		for otherIndex := firstPossible; otherIndex < len(fragments); otherIndex++ {
+			other := fragments[otherIndex]
+			if otherIndex == focusedIndex || other.FeatureCount == 0 {
+				continue
+			}
+			// A pair with two focused occurrences is handled by the first
+			// occurrence encountered. Pairs with one focused occurrence are
+			// still scored regardless of their relative positions.
+			if otherIndex < focusedIndex && focusedLocation(other.Location, collector.options.FocusPaths, collector.options.FocusIntervals) {
+				continue
+			}
+			upperBound := sizeUpperBound(focused.FeatureCount, other.FeatureCount)
+			if upperBound < collector.options.Threshold {
+				if other.FeatureCount >= focused.FeatureCount {
+					break
+				}
+				continue
+			}
+			left, right := focused, other
+			if fragmentLess(right, left) {
+				left, right = right, left
 			}
 			if err := collector.score(left, right); err != nil {
 				return err
@@ -537,6 +590,9 @@ func compareLanguagePair(
 	rightFragments []model.Fragment,
 	collector *matchCollector,
 ) error {
+	if collector.options.FocusedOnly {
+		return compareFocusedLanguagePair(leftFragments, rightFragments, collector)
+	}
 	for _, left := range leftFragments {
 		if err := collector.ctx.Err(); err != nil {
 			return err
@@ -572,9 +628,67 @@ func compareLanguagePair(
 	return nil
 }
 
+func compareFocusedLanguagePair(
+	leftFragments []model.Fragment,
+	rightFragments []model.Fragment,
+	collector *matchCollector,
+) error {
+	compareSide := func(focusedFragments []model.Fragment, otherFragments []model.Fragment, focusedIsLeft bool) error {
+		for _, focused := range focusedFragments {
+			if !focusedLocation(focused.Location, collector.options.FocusPaths, collector.options.FocusIntervals) || focused.FeatureCount == 0 {
+				continue
+			}
+			if err := collector.ctx.Err(); err != nil {
+				return err
+			}
+			firstPossible := sort.Search(len(otherFragments), func(index int) bool {
+				return float64(otherFragments[index].FeatureCount)/float64(focused.FeatureCount) >=
+					collector.options.Threshold
+			})
+			for _, other := range otherFragments[firstPossible:] {
+				if other.FeatureCount == 0 {
+					continue
+				}
+				// The first pass already handled pairs where both sides are
+				// focused, so the reverse pass only needs untouched left sides.
+				if !focusedIsLeft && focusedLocation(other.Location, collector.options.FocusPaths, collector.options.FocusIntervals) {
+					continue
+				}
+				upperBound := sizeUpperBound(focused.FeatureCount, other.FeatureCount)
+				if upperBound < collector.options.Threshold {
+					if other.FeatureCount >= focused.FeatureCount {
+						break
+					}
+					continue
+				}
+				left, right := focused, other
+				if !focusedIsLeft {
+					left, right = other, focused
+				}
+				if fragmentLess(right, left) {
+					left, right = right, left
+				}
+				if err := collector.score(left, right); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	if err := compareSide(leftFragments, rightFragments, true); err != nil {
+		return err
+	}
+	return compareSide(rightFragments, leftFragments, false)
+}
+
 func (collector *matchCollector) score(left model.Fragment, right model.Fragment) error {
 	if err := collector.ctx.Err(); err != nil {
 		return err
+	}
+	if collector.options.FocusedOnly &&
+		!focusedLocation(left.Location, collector.options.FocusPaths, collector.options.FocusIntervals) &&
+		!focusedLocation(right.Location, collector.options.FocusPaths, collector.options.FocusIntervals) {
+		return nil
 	}
 	if overlappingStatementBlocks(left, right) {
 		return nil
@@ -623,9 +737,24 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 	}
 	collector.addProfileOccurrence(group, left)
 	collector.addProfileOccurrence(group, right)
-	group.addFocusedOccurrence(left.Location, collector.options.FocusPaths)
-	group.addFocusedOccurrence(right.Location, collector.options.FocusPaths)
+	group.addFocusedOccurrence(left.Location, collector.options.FocusPaths, collector.options.FocusIntervals)
+	group.addFocusedOccurrence(right.Location, collector.options.FocusPaths, collector.options.FocusIntervals)
 	return nil
+}
+
+func focusedLocation(location model.Location, paths map[string]struct{}, intervals map[string][]model.LineInterval) bool {
+	if _, focused := paths[location.Path]; focused {
+		return true
+	}
+	for _, interval := range intervals[location.Path] {
+		if interval.StartLine <= 0 || interval.EndLine <= 0 || interval.EndLine < interval.StartLine {
+			continue
+		}
+		if location.StartLine <= interval.EndLine && location.EndLine >= interval.StartLine {
+			return true
+		}
+	}
+	return false
 }
 
 func overlappingStatementBlocks(left model.Fragment, right model.Fragment) bool {
@@ -804,8 +933,8 @@ func distinctiveReviewName(name string) bool {
 	}
 }
 
-func (group *groupCandidate) addFocusedOccurrence(location model.Location, paths map[string]struct{}) {
-	if _, focused := paths[location.Path]; focused {
+func (group *groupCandidate) addFocusedOccurrence(location model.Location, paths map[string]struct{}, intervals map[string][]model.LineInterval) {
+	if focusedLocation(location, paths, intervals) {
 		group.focused[locationKey(location)] = struct{}{}
 	}
 }
