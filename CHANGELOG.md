@@ -32,6 +32,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Machine-readable reports advance to schema 20 for `focused_only` and exact
   changed-line evidence. Baseline schema remains 4 and normalization remains
   12.
+- The preferred release toolchain advances to Go 1.26.6 for the current
+  standard-library security fixes.
 
 ## [0.30.0] - 2026-08-13
 

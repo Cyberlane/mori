@@ -4,7 +4,7 @@
 
 | Component | Version | Copyright | License |
 | --- | --- | --- | --- |
-| Go runtime and standard library | release toolchain 1.26.5 | Copyright 2009 The Go Authors | BSD 3-Clause |
+| Go runtime and standard library | release toolchain 1.26.6 | Copyright 2009 The Go Authors | BSD 3-Clause |
 | `github.com/bmatcuk/doublestar/v4` | 4.10.0 | Copyright (c) 2014 Bob Matcuk | MIT |
 | `github.com/mattn/go-pointer` | 0.0.1 | Copyright (c) 2019 Yasuhiro Matsumoto | MIT |
 | `github.com/tree-sitter/go-tree-sitter` | 0.25.0 | Copyright (c) 2024 Amaan Qureshi | MIT |
