@@ -3249,8 +3249,14 @@ func displayCLIPath(path string) string {
 	if err != nil {
 		return filepath.ToSlash(path)
 	}
+	if canonical, canonicalErr := filepath.EvalSymlinks(absolute); canonicalErr == nil {
+		absolute = canonical
+	}
 	cwd, err := os.Getwd()
 	if err == nil {
+		if canonical, canonicalErr := filepath.EvalSymlinks(cwd); canonicalErr == nil {
+			cwd = canonical
+		}
 		relative, relErr := filepath.Rel(cwd, absolute)
 		if relErr == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			return filepath.ToSlash(relative)
