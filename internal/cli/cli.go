@@ -92,6 +92,8 @@ func RunWithInput(
 		return runBaseline(ctx, args[1:], stdout, stderr)
 	case "review":
 		return runReview(ctx, args[1:], stdout, stderr)
+	case "hook":
+		return runHook(ctx, args[1:], stdout, stderr)
 	case "languages":
 		return runLanguages(args[1:], stdout, stderr)
 	case "skill":
@@ -140,6 +142,7 @@ type scanOptions struct {
 	maxFileBytes       int64
 	workers            int
 	format             string
+	outputPath         string
 	color              string
 	redactPaths        bool
 	sameLanguageOnly   bool
@@ -176,6 +179,7 @@ type scanOptions struct {
 	stagedSnapshot     *vcs.IndexSnapshot
 	reviewReceiptPath  string
 	acceptFocused      bool
+	focusedOnly        bool
 }
 
 func defaultScanOptions() scanOptions {
@@ -199,7 +203,7 @@ func defaultScanOptions() scanOptions {
 	}
 }
 
-func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string) {
+func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string, allowReportOutput bool) {
 	flags.StringVar(&options.profile, "profile", options.profile, "scan profile: review, explore, or sql")
 	flags.StringVar(&options.scope, "scope", options.scope, "named project scope from .mori.json")
 	flags.Float64Var(&options.threshold, "threshold", options.threshold, "minimum weighted Jaccard score, from 0 to 1")
@@ -210,7 +214,10 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 	flags.IntVar(&options.maxPairs, "max-pairs", options.maxPairs, "comparison safety limit; 0 is unlimited")
 	flags.Int64Var(&options.maxFileBytes, "max-file-bytes", options.maxFileBytes, "maximum source file size; 0 is unlimited")
 	flags.IntVar(&options.workers, "workers", options.workers, "parallel parser workers")
-	flags.StringVar(&options.format, "format", options.format, "output format: text, compact, json, sarif, or html")
+	flags.StringVar(&options.format, "format", options.format, "output format: text, compact, agent, json, sarif, or html")
+	if allowReportOutput {
+		flags.StringVar(&options.outputPath, "output", options.outputPath, "write the complete bounded JSON evidence when --format agent is selected")
+	}
 	flags.StringVar(&options.color, "color", options.color, "terminal color: auto, always, or never")
 	flags.BoolVar(&options.redactPaths, "redact-paths", options.redactPaths, "replace source and configuration paths with stable placeholders in output")
 	if baselineAction == "" || baselineAction == "acknowledge" {
@@ -398,7 +405,7 @@ func parseScanOptions(
 	baselineAction string,
 ) (scanOptions, []string, int, bool) {
 	configArgs := args
-	if baselineAction == "staged-check" || baselineAction == "staged-acknowledge" {
+	if baselineAction == "staged-check" || baselineAction == "staged-acknowledge" || baselineAction == "hook-pre-commit" {
 		configArgs = append([]string{"--staged"}, args...)
 	}
 	options, err := configuredScanOptions(configArgs)
@@ -411,7 +418,12 @@ func parseScanOptions(
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	trackedStderr := &errorTrackingWriter{writer: stderr}
 	flags.SetOutput(trackedStderr)
-	options.bindFlags(flags, baselineAction)
+	contractMode := baselineAction
+	if contractMode == "hook-pre-commit" {
+		contractMode = "staged-check"
+	}
+	allowReportOutput := command == "scan" || command == "review staged check" || command == "hook pre-commit"
+	options.bindFlags(flags, contractMode, allowReportOutput)
 	flags.Usage = func() {
 		fmt.Fprintf(trackedStderr, "Usage: mori %s [options] [path ...]\n", command)
 		fmt.Fprintln(trackedStderr, "\nScan functions and top-level SQL queries for structural similarity.")
@@ -438,12 +450,13 @@ func parseScanOptions(
 	})
 	options.noteSet = visited["note"]
 	options.classificationSet = visited["classification"]
-	if baselineAction == "staged-check" || baselineAction == "staged-acknowledge" {
+	if contractMode == "staged-check" || contractMode == "staged-acknowledge" {
 		options.staged = true
 		options.includeFocused = true
 		options.requireFocus = true
 		options.failOnMatch = false
-		options.failOnFocusedMatch = baselineAction == "staged-check"
+		options.failOnFocusedMatch = contractMode == "staged-check"
+		options.focusedOnly = true
 	}
 	if !options.staged {
 		options.stagedSnapshot = nil
@@ -970,8 +983,11 @@ func validateScanOptions(options scanOptions) error {
 	if options.workers < 1 {
 		return errors.New("--workers must be at least 1")
 	}
-	if options.format != "text" && options.format != "compact" && options.format != "json" && options.format != "sarif" && options.format != "html" {
-		return errors.New("--format must be text, compact, json, sarif, or html")
+	if options.format != "text" && options.format != "compact" && options.format != "agent" && options.format != "json" && options.format != "sarif" && options.format != "html" {
+		return errors.New("--format must be text, compact, agent, json, sarif, or html")
+	}
+	if options.outputPath != "" && options.format != "agent" {
+		return errors.New("--output requires --format agent")
 	}
 	if options.color != "auto" && options.color != "always" && options.color != "never" {
 		return errors.New("--color must be auto, always, or never")
@@ -1079,6 +1095,25 @@ func runScanCommand(
 	if !ok {
 		return code
 	}
+	if mode == "hook-pre-commit" {
+		receiptRequest := os.Getenv("MORI_STAGED_REVIEW_RECEIPT")
+		if receiptRequest == "1" {
+			if options.reviewReceiptPath != "" {
+				return usageError(stderr, "MORI_STAGED_REVIEW_RECEIPT=1 cannot be combined with --review-receipt")
+			}
+			if options.stagedSnapshot == nil {
+				return commandError(stderr, "resolve review receipt", errors.New("canonical staged index was not resolved"))
+			}
+			receiptPath, err := vcs.LocalMetadataPath(ctx, *options.stagedSnapshot, "mori/staged-review.json")
+			if err != nil {
+				return commandError(stderr, "resolve review receipt", err)
+			}
+			options.reviewReceiptPath = receiptPath
+		}
+	}
+	if code := enforceProjectCompatibility(ctx, options, paths, stderr); code != exitSuccess {
+		return code
+	}
 	if options.stdinPath != "" {
 		content, err := readStdinOverlay(ctx, stdin, options.maxFileBytes)
 		if err != nil {
@@ -1145,6 +1180,24 @@ func runScanCommand(
 		}
 	}
 
+	if options.outputPath != "" {
+		redacted := options.redactPaths
+		if options.redactPaths {
+			redactReportPaths(&result)
+			options.redactPaths = false
+		}
+		if err := writeCompleteJSONReport(options.outputPath, result); err != nil {
+			fmt.Fprintf(stderr, "mori: write complete JSON report: %v\n", err)
+			return exitError
+		}
+		outputLabel := displayCLIPath(options.outputPath)
+		if redacted {
+			outputLabel = "<redacted output path>"
+		}
+		if _, err := fmt.Fprintf(stdout, "complete JSON evidence: %s\n", outputLabel); err != nil {
+			return exitError
+		}
+	}
 	err = renderScanReport(stdout, result, options)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: write report: %v\n", err)
@@ -1179,6 +1232,29 @@ func runReview(ctx context.Context, args []string, stdout io.Writer, stderr io.W
 		return exitError
 	}
 	return runReviewAcknowledge(ctx, args[1:], stdout, stderr)
+}
+
+func runHook(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) == 0 || args[0] != "pre-commit" {
+		return usageError(stderr, "hook requires pre-commit")
+	}
+	receiptRequest := os.Getenv("MORI_STAGED_REVIEW_RECEIPT")
+	if receiptRequest != "" && receiptRequest != "1" {
+		return usageError(stderr, "MORI_STAGED_REVIEW_RECEIPT must be unset, empty, or exactly 1")
+	}
+	canonicalArgs, err := canonicalStagedReviewArgs(args[1:], "check")
+	if err != nil {
+		return usageError(stderr, err.Error())
+	}
+	return runScanCommand(
+		ctx,
+		"hook pre-commit",
+		canonicalArgs,
+		"hook-pre-commit",
+		strings.NewReader(""),
+		stdout,
+		stderr,
+	)
 }
 
 func runCanonicalStagedReview(
@@ -1266,6 +1342,9 @@ func runReviewAcknowledgeCommand(
 			return commandError(stderr, "resolve review receipt", err)
 		}
 		options.reviewReceiptPath = path
+	}
+	if code := enforceProjectCompatibility(ctx, options, paths, stderr); code != exitSuccess {
+		return code
 	}
 	metadataDirectory, err := vcs.LocalMetadataPath(ctx, *options.stagedSnapshot, "mori")
 	if err != nil {
@@ -1374,6 +1453,8 @@ func renderScanReport(stdout io.Writer, result model.Report, options scanOptions
 		redactReportPaths(&result)
 	}
 	switch options.format {
+	case "agent":
+		return report.Agent(stdout, result)
 	case "compact":
 		return report.Compact(stdout, result)
 	case "json":
@@ -2243,7 +2324,10 @@ func executeScan(
 		if options.includeFocused {
 			discoveryPaths = append(discoveryPaths, options.focusPaths...)
 			for _, path := range options.stagedSnapshot.ChangedPaths {
-				discoveryPaths = append(discoveryPaths, filepath.Join(options.stagedSnapshot.Root, filepath.FromSlash(path)))
+				_, supported := language.DetectWithSQLDialect(path, sqlDialect)
+				if supported || filepath.Ext(path) == "" {
+					discoveryPaths = append(discoveryPaths, filepath.Join(options.stagedSnapshot.Root, filepath.FromSlash(path)))
+				}
 			}
 		}
 		base := filepath.Join(options.stagedSnapshot.Root, filepath.FromSlash(options.stagedSnapshot.Prefix))
@@ -2294,8 +2378,9 @@ func executeScan(
 	if options.stagedSnapshot != nil {
 		changes = []vcs.Changes{{
 			Root: options.stagedSnapshot.Root, HeadCommit: options.stagedSnapshot.HeadCommit,
-			ChangedPaths: append([]string{}, options.stagedSnapshot.ChangedPaths...),
-			DeletedPaths: append([]string{}, options.stagedSnapshot.DeletedPaths...),
+			ChangedPaths:         append([]string{}, options.stagedSnapshot.ChangedPaths...),
+			DeletedPaths:         append([]string{}, options.stagedSnapshot.DeletedPaths...),
+			ChangedLineIntervals: cloneLineIntervalMap(options.stagedSnapshot.ChangedLineIntervals),
 		}}
 	} else {
 		changes, worktreeMode, err = resolveChangedWorktrees(
@@ -2320,7 +2405,7 @@ func executeScan(
 			discovered = mergeDiscoveryResults(discovered, extra)
 		}
 	}
-	focus, focusSet, focusWarnings, err := resolveFocus(
+	focus, focusSet, focusIntervals, focusWarnings, err := resolveFocus(
 		options.focusPaths,
 		changes,
 		worktreeMode,
@@ -2364,7 +2449,9 @@ func executeScan(
 		CrossLanguageOnly: options.crossLanguageOnly,
 		LanguagePairs:     pairs,
 		FocusPaths:        focusSet,
+		FocusIntervals:    focusIntervals,
 		FocusActive:       focus != nil,
+		FocusedOnly:       options.focusedOnly,
 		Suppress:          suppress,
 		ExcludedCoverage:  discovered.Excluded,
 		Unsupported:       discovered.Unsupported,
@@ -2410,6 +2497,7 @@ func executeScan(
 		MaxZeroFiles:      options.maxZeroFiles,
 		FailOnWarning:     options.failOnWarning,
 		FailOnDiagnostic:  options.failOnDiagnostic,
+		FocusedOnly:       options.focusedOnly,
 		BaselinePath:      displayOptionalPath(options.baselinePath),
 		ScanProfileDigest: baseline.Digest(profile),
 		StdinPath:         displayOptionalPath(options.stdinPath),
@@ -2494,6 +2582,17 @@ func annotateFocusCoverage(
 	changes []vcs.Changes,
 	discovered source.Result,
 ) {
+	changedLines := make(map[string][]model.LineInterval)
+	for _, change := range changes {
+		for path, intervals := range change.ChangedLineIntervals {
+			absolute := filepath.Join(change.Root, filepath.FromSlash(path))
+			key := canonicalPath(absolute)
+			changedLines[key] = append(changedLines[key], intervals...)
+		}
+	}
+	for path, intervals := range changedLines {
+		changedLines[path] = compactLineIntervals(intervals)
+	}
 	analyzed := make(map[string]struct{}, len(discovered.Files))
 	for _, file := range discovered.Files {
 		analyzed[canonicalPath(file.Path)] = struct{}{}
@@ -2538,7 +2637,10 @@ func annotateFocusCoverage(
 	focus.PathEvidence = make([]model.FocusPathEvidence, 0, len(keys))
 	for _, key := range keys {
 		item := requested[key]
-		evidence := model.FocusPathEvidence{Path: displayCLIPath(item.path)}
+		evidence := model.FocusPathEvidence{
+			Path:         displayCLIPath(item.path),
+			ChangedLines: append([]model.LineInterval{}, changedLines[key]...),
+		}
 		if item.deleted {
 			evidence.Status = "deleted"
 			evidence.Reason = "deleted paths do not require analysis"
@@ -2776,21 +2878,23 @@ func resolveFocus(
 	changes []vcs.Changes,
 	worktreeMode bool,
 	files []source.File,
-) (*model.FocusConfig, map[string]struct{}, []model.Warning, error) {
+) (*model.FocusConfig, map[string]struct{}, map[string][]model.LineInterval, []model.Warning, error) {
 	if len(values) == 0 && len(changes) == 0 {
-		return nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 	fileByPath := make(map[string]source.File, len(files))
 	for _, file := range files {
 		fileByPath[canonicalPath(file.Path)] = file
 	}
 	explicit := make([]string, 0, len(values))
-	matched := make(map[string]struct{})
+	discoveredFocus := make(map[string]struct{})
+	pathWideFocus := make(map[string]struct{})
+	intervalFocus := make(map[string][]model.LineInterval)
 	missing := 0
 	for _, value := range values {
 		cwdAbsolute, err := filepath.Abs(value)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		candidates := []string{cwdAbsolute}
 		if len(changes) == 1 && !filepath.IsAbs(value) {
@@ -2799,7 +2903,8 @@ func resolveFocus(
 		found := false
 		for _, candidate := range candidates {
 			if file, ok := fileByPath[canonicalPath(candidate)]; ok {
-				matched[file.DisplayPath] = struct{}{}
+				discoveredFocus[file.DisplayPath] = struct{}{}
+				pathWideFocus[file.DisplayPath] = struct{}{}
 				found = true
 			}
 		}
@@ -2863,10 +2968,19 @@ func resolveFocus(
 			sort.Strings(config.DeletedPaths)
 		}
 		for _, change := range changes {
+			wholeFileFocus := make(map[string]struct{}, len(change.WholeFileFocusPaths))
+			for _, path := range change.WholeFileFocusPaths {
+				wholeFileFocus[path] = struct{}{}
+			}
 			for _, changedPath := range change.ChangedPaths {
 				file, ok := fileByPath[canonicalPath(filepath.Join(change.Root, filepath.FromSlash(changedPath)))]
 				if ok {
-					matched[file.DisplayPath] = struct{}{}
+					discoveredFocus[file.DisplayPath] = struct{}{}
+					if intervals := change.ChangedLineIntervals[changedPath]; len(intervals) > 0 {
+						intervalFocus[file.DisplayPath] = append(intervalFocus[file.DisplayPath], intervals...)
+					} else if _, wholeFile := wholeFileFocus[changedPath]; wholeFile {
+						pathWideFocus[file.DisplayPath] = struct{}{}
+					}
 				} else {
 					missing++
 				}
@@ -2880,8 +2994,46 @@ func resolveFocus(
 			Message: fmt.Sprintf("%d focused path(s) were excluded, unsupported, or not discovered", missing),
 		})
 	}
-	config.DiscoveredFocusFiles = len(matched)
-	return config, matched, warnings, nil
+	for path, intervals := range intervalFocus {
+		intervalFocus[path] = compactLineIntervals(intervals)
+	}
+	config.DiscoveredFocusFiles = len(discoveredFocus)
+	return config, pathWideFocus, intervalFocus, warnings, nil
+}
+
+func cloneLineIntervalMap(values map[string][]model.LineInterval) map[string][]model.LineInterval {
+	if len(values) == 0 {
+		return nil
+	}
+	cloned := make(map[string][]model.LineInterval, len(values))
+	for path, intervals := range values {
+		cloned[path] = append([]model.LineInterval{}, intervals...)
+	}
+	return cloned
+}
+
+func compactLineIntervals(intervals []model.LineInterval) []model.LineInterval {
+	intervals = append([]model.LineInterval{}, intervals...)
+	sort.Slice(intervals, func(left, right int) bool {
+		if intervals[left].StartLine != intervals[right].StartLine {
+			return intervals[left].StartLine < intervals[right].StartLine
+		}
+		return intervals[left].EndLine < intervals[right].EndLine
+	})
+	compacted := intervals[:0]
+	for _, interval := range intervals {
+		if interval.StartLine < 1 || interval.EndLine < interval.StartLine {
+			continue
+		}
+		if len(compacted) > 0 && interval.StartLine <= compacted[len(compacted)-1].EndLine+1 {
+			if interval.EndLine > compacted[len(compacted)-1].EndLine {
+				compacted[len(compacted)-1].EndLine = interval.EndLine
+			}
+			continue
+		}
+		compacted = append(compacted, interval)
+	}
+	return compacted
 }
 
 func canonicalPath(path string) string {
@@ -3071,6 +3223,7 @@ func writeRootUsage(writer io.Writer) error {
 		"  mori baseline prune --baseline <path> [options] [path ...]\n",
 		"  mori review staged check [options] [path ...]\n",
 		"  mori review staged acknowledge --accept-focused [options] [path ...]\n",
+		"  mori hook pre-commit [options] [path ...]\n",
 		"  mori review acknowledge --staged --include-focused --require-focused-coverage --accept-focused [options] [path ...]\n",
 		"  mori languages\n",
 		"  mori skill install (--project <path> | --global | --target <path>)\n",
@@ -3096,8 +3249,14 @@ func displayCLIPath(path string) string {
 	if err != nil {
 		return filepath.ToSlash(path)
 	}
+	if canonical, canonicalErr := filepath.EvalSymlinks(absolute); canonicalErr == nil {
+		absolute = canonical
+	}
 	cwd, err := os.Getwd()
 	if err == nil {
+		if canonical, canonicalErr := filepath.EvalSymlinks(cwd); canonicalErr == nil {
+			cwd = canonical
+		}
 		relative, relErr := filepath.Rel(cwd, absolute)
 		if relErr == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			return filepath.ToSlash(relative)

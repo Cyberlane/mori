@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/Cyberlane/mori/v0.29.0/schemas/mori-report-v19.schema.json",
-  "title": "Mori structural similarity report schema 19",
+  "$id": "https://raw.githubusercontent.com/Cyberlane/mori/v0.31.0/schemas/mori-report-v20.schema.json",
+  "title": "Mori structural similarity report schema 20",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,7 +12,7 @@
     "file_coverage", "coverage", "configuration"
   ],
   "properties": {
-    "schema_version": {"const": 19},
+    "schema_version": {"const": 20},
     "tool": {"$ref": "#/$defs/tool"},
     "threshold": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
     "files": {"$ref": "#/$defs/nonNegativeInteger"},
@@ -287,7 +287,17 @@
       "properties": {
         "path": {"type": "string"},
         "status": {"enum": ["analyzed", "deleted", "excluded_generated", "skipped_resource", "unsupported", "not_discovered"]},
+        "changed_lines": {"type": "array", "items": {"$ref": "#/$defs/lineInterval"}},
         "reason": {"type": "string"}
+      }
+    },
+    "lineInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_line", "end_line"],
+      "properties": {
+        "start_line": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1}
       }
     },
     "inputSnapshot": {
@@ -309,7 +319,7 @@
       "required": ["status", "schema_version", "digest", "focused_match_groups"],
       "properties": {
         "status": {"const": "compatible"},
-        "schema_version": {"const": 1},
+        "schema_version": {"const": 2},
         "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "focused_match_groups": {"type": "integer", "minimum": 1}
       }
@@ -317,7 +327,7 @@
     "configuration": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ignore_files", "ignore_file_evidence", "respect_ignore", "exclude_generated", "excludes", "min_tokens", "max_groups", "max_occurrences", "max_pairs", "max_file_bytes", "comparison_domain", "sql_dialect", "embedded_sql", "statement_blocks", "block_statements", "max_blocks_per_function", "ranking", "priority_paths", "same_language_only", "cross_language_only", "language_pairs", "require_coverage", "min_file_coverage", "max_zero_fragment_files", "fail_on_warning", "fail_on_parse_diagnostic", "scan_profile_digest"],
+      "required": ["ignore_files", "ignore_file_evidence", "respect_ignore", "exclude_generated", "excludes", "min_tokens", "max_groups", "max_occurrences", "max_pairs", "max_file_bytes", "comparison_domain", "sql_dialect", "embedded_sql", "statement_blocks", "block_statements", "max_blocks_per_function", "ranking", "priority_paths", "same_language_only", "cross_language_only", "language_pairs", "require_coverage", "min_file_coverage", "max_zero_fragment_files", "fail_on_warning", "fail_on_parse_diagnostic", "focused_only", "scan_profile_digest"],
       "properties": {
         "profile": {"enum": ["review", "explore", "sql"]},
         "scope": {"type": "string"},
@@ -349,6 +359,7 @@
         "max_zero_fragment_files": {"type": "integer", "minimum": -1},
         "fail_on_warning": {"type": "boolean"},
         "fail_on_parse_diagnostic": {"type": "boolean"},
+        "focused_only": {"type": "boolean"},
         "baseline_path": {"type": "string"},
         "scan_profile_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "baseline_profile_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},

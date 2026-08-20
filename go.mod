@@ -2,7 +2,7 @@ module github.com/Cyberlane/mori
 
 go 1.23.0
 
-toolchain go1.26.5
+toolchain go1.26.6
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0

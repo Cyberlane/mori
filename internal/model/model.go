@@ -4,10 +4,16 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 19
+const SchemaVersion = 20
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
+
+// LineInterval is an inclusive, one-based source line range.
+type LineInterval struct {
+	StartLine int `json:"start_line"`
+	EndLine   int `json:"end_line"`
+}
 
 // Location identifies one source fragment.
 type Location struct {
@@ -182,9 +188,10 @@ type FocusConfig struct {
 
 // FocusPathEvidence explains whether one requested review path was analyzed.
 type FocusPathEvidence struct {
-	Path   string `json:"path"`
-	Status string `json:"status"`
-	Reason string `json:"reason,omitempty"`
+	Path         string         `json:"path"`
+	Status       string         `json:"status"`
+	ChangedLines []LineInterval `json:"changed_lines,omitempty"`
+	Reason       string         `json:"reason,omitempty"`
 }
 
 // ParseDiagnostic identifies one bounded Tree-sitter error or missing node.
@@ -280,6 +287,7 @@ type EffectiveConfig struct {
 	MaxZeroFiles      int                    `json:"max_zero_fragment_files"`
 	FailOnWarning     bool                   `json:"fail_on_warning"`
 	FailOnDiagnostic  bool                   `json:"fail_on_parse_diagnostic"`
+	FocusedOnly       bool                   `json:"focused_only"`
 	BaselinePath      string                 `json:"baseline_path,omitempty"`
 	ScanProfileDigest string                 `json:"scan_profile_digest"`
 	BaselineDigest    string                 `json:"baseline_profile_digest,omitempty"`

@@ -14,8 +14,13 @@ func TestReviewSimilarityPackage(t *testing.T) {
 		t.Fatalf("ReviewSimilarity: %v", err)
 	}
 	wantFiles := map[string]bool{
-		"SKILL.md":           false,
-		"agents/openai.yaml": false,
+		"SKILL.md":                         false,
+		"agents/openai.yaml":               false,
+		"references/baselines-receipts.md": false,
+		"references/changed-code.md":       false,
+		"references/cross-language.md":     false,
+		"references/report-validation.md":  false,
+		"references/sql.md":                false,
 	}
 	if err := fs.WalkDir(packageFS, ".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -45,15 +50,26 @@ func TestReviewSimilarityPackage(t *testing.T) {
 	text := string(skill)
 	for _, expected := range []string{
 		"name: " + ReviewSimilarityName,
-		"schema_version",
-		"never as proof of equivalent behavior",
-		"do not reject a usable binary",
-		"Never combine",
-		"Before baselining a noisy repository",
-		"Do not refactor, delete, or consolidate code solely because Mori reported a",
+		"never proof of semantic or behavioral equivalence",
+		"mori project upgrade --check .",
+		"changed-code.md",
+		"Do not refactor, delete, consolidate, baseline, or suppress",
 	} {
 		if !strings.Contains(text, expected) {
 			t.Errorf("SKILL.md missing %q", expected)
+		}
+	}
+	for path, expected := range map[string]string{
+		"references/report-validation.md":  "schema_version",
+		"references/cross-language.md":     "Never combine",
+		"references/baselines-receipts.md": "Before baselining a noisy repository",
+	} {
+		content, err := fs.ReadFile(packageFS, path)
+		if err != nil {
+			t.Fatalf("ReadFile(%s): %v", path, err)
+		}
+		if !strings.Contains(string(content), expected) {
+			t.Errorf("%s missing %q", path, expected)
 		}
 	}
 	if strings.Contains(text, "TODO") {

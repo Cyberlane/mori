@@ -7,6 +7,34 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-08-20
+
+### Added
+
+- Added hunk-aware changed and staged focus, so canonical staged review parses
+  the full repository but scores only pairs that contain an exact changed-line
+  fragment. Untracked and explicitly focused files retain whole-file focus.
+- Added bounded `--format agent --output <report.json>` output, which keeps the
+  complete bounded JSON evidence outside agent context while presenting at
+  most 25 focused identities with provenance, coverage, warnings, and receipt
+  state.
+- Added a versioned `.mori-project.json` contract, deterministic schema-2
+  upgrade plans, safe managed-skill migration, and `mori hook pre-commit` as a
+  thin canonical staged-review adapter.
+
+### Changed
+
+- The embedded review skill is now a concise router with task-specific
+  references, one-scan evidence reuse, and local project-upgrade guidance.
+- Unsupported staged assets are recorded as focused path evidence without
+  creating an `other` warning solely because canonical staged review included
+  them for coverage accounting.
+- Machine-readable reports advance to schema 20 for `focused_only` and exact
+  changed-line evidence. Baseline schema remains 4 and normalization remains
+  12.
+- The preferred release toolchain advances to Go 1.26.6 for the current
+  standard-library security fixes.
+
 ## [0.30.0] - 2026-08-13
 
 ### Added

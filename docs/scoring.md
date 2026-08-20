@@ -212,7 +212,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 19,
+  "schema_version": 20,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -276,6 +276,7 @@ The top-level shape is:
     "max_zero_fragment_files": 2,
     "fail_on_warning": false,
     "fail_on_parse_diagnostic": true,
+    "focused_only": false,
     "scan_profile_digest": "<sha256>"
   }
 }
@@ -368,14 +369,25 @@ Schema 18 adds `configuration.input` for immutable Git-index provenance,
 focused-path evidence with required and covered totals. These report and
 candidate-surface changes leave normalization at version 12 and baseline
 schema at version 3. The selected scope and roots participate in the baseline
-scan-profile digest. The complete current contract is published as
-[`schemas/mori-report-v19.schema.json`](../schemas/mori-report-v19.schema.json).
+scan-profile digest.
 
 Schema 19 adds optional `configuration.review_receipt` evidence for a
 compatible local staged-review acknowledgment. The report still includes all
 focused findings; the receipt changes only `--fail-on-focused-match` policy.
 Any change to HEAD, index bytes, the scan profile, tool or normalization
 version, or the complete focused identity set invalidates it.
+
+Schema 20 adds inclusive changed-line intervals to each applicable focused-path
+evidence entry and records `configuration.focused_only`. Canonical staged
+review sets that flag and parses the full repository while scoring only pairs
+that contain an exact hunk-intersecting fragment. It also corrects the public
+receipt-evidence contract to the current receipt schema 2. Baseline schema
+remains 4 and normalization remains 12. The complete current contract is
+published as
+[`schemas/mori-report-v20.schema.json`](../schemas/mori-report-v20.schema.json).
+`focused_only` is recorded for report reproducibility but is not added to the
+schema-4 baseline profile digest: accepted scored identities remain valid when
+untouched-to-untouched pairs are omitted from a staged run.
 
 Normalization version 10 adds Java and C# function boundaries and canonical
 syntax mappings, makes redundant parentheses transparent, and adds the

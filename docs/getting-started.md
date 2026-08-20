@@ -148,6 +148,7 @@ mori project upgrade --check .
 
 After installing a newer Mori binary, preview coordinated project maintenance
 with `mori project upgrade --dry-run .`, then use `--apply` to update the
-version pin and embedded Agent Skill with backups. Configuration, baselines,
-and conventional automation are inspected; ambiguous project policy is never
-rewritten automatically.
+version pin, tracked project contract, and a missing or recognized official
+Agent Skill with backups. Unknown skill changes fail closed. Configuration,
+baselines, and conventional automation are inspected; project-owned policy is
+never rewritten automatically.

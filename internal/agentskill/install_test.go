@@ -65,6 +65,16 @@ func TestInspectIsReadOnlyAndReportsDrift(t *testing.T) {
 	}
 }
 
+func TestKnownPriorPackageDigestIsExact(t *testing.T) {
+	t.Parallel()
+	if !IsKnownPriorPackageDigest(v030PackageDigest) {
+		t.Fatal("official v0.30.0 package digest was not recognized")
+	}
+	if IsKnownPriorPackageDigest(v030PackageDigest[:63]+"0") || IsKnownPriorPackageDigest("") {
+		t.Fatal("unknown package digest was recognized")
+	}
+}
+
 func TestInstallRejectsDifferentContentAndPreservesBackup(t *testing.T) {
 	t.Parallel()
 

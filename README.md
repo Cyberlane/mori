@@ -82,7 +82,8 @@ effects, types, external calls, permissions, transactions, or error behavior.
 | Explore across languages | `mori scan --profile explore --cross-language-only .` |
 | Review one language pair | `mori scan --language-pair go,typescript .` |
 | Review SQL queries | `mori scan --profile sql path/to/sql` |
-| Produce CI or agent evidence | `mori scan --profile review --format json .` |
+| Produce CI evidence | `mori scan --profile review --format json .` |
+| Keep JSON while bounding agent context | `mori scan --profile review --format agent --output /tmp/mori-review.json .` |
 | Enforce the canonical staged review | `mori review staged check .` |
 | Acknowledge one exact staged review | `mori review staged acknowledge --accept-focused .` |
 | Produce a concise terminal shortlist | `mori scan --profile review --format compact .` |
@@ -137,9 +138,10 @@ mori project upgrade --dry-run .
 mori project upgrade --apply .
 ```
 
-Apply mode updates `.mori-version` and the project Agent Skill with backups.
-It does not install the CLI, invent configuration policy, rewrite hooks or CI,
-commit, push, or release anything.
+Apply mode updates `.mori-version`, the tracked `.mori-project.json` contract,
+and only a missing or recognized Mori-managed Agent Skill, with backups.
+Unknown skill changes fail closed. It does not install the CLI, invent
+configuration policy, rewrite hooks or CI, commit, push, or release anything.
 
 To let a project agent configure Mori without granting hidden write access:
 
@@ -158,6 +160,7 @@ before an explicit `--apply`. See [Editors and coding agents](docs/guides/editor
 - [SQL and embedded SQL](docs/guides/sql.md)
 - [Automation and baselines](docs/guides/automation-and-baselines.md)
 - [Editors and coding agents](docs/guides/editors-and-agents.md)
+- [Project contract and upgrades](docs/guides/project-upgrade.md)
 - [Project configuration](docs/configuration.md)
 - [Scoring](docs/scoring.md)
 - [Machine integration](docs/machine-integration.md)

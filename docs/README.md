@@ -21,6 +21,8 @@ Start with the guide that matches what you are trying to do.
   policy, changed-file focus, CI exits, and reviewed suppression.
 - [Editors and coding agents](guides/editors-and-agents.md) — SARIF,
   unsaved-buffer overlays, VS Code, and the bundled Agent Skill.
+- [Project contract and upgrades](guides/project-upgrade.md) — managed-asset
+  compatibility, safe migration, and the stable pre-commit adapter.
 
 ## Reference and development
 

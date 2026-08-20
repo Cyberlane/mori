@@ -1,9 +1,14 @@
 # Machine and editor integration
 
-Mori exposes two deterministic machine formats for different consumers:
+Mori exposes deterministic complete evidence and bounded projections for
+different consumers:
 
 - `--format json` is the complete schema-versioned report for automation,
   baselines, audits, and custom clients.
+- `--format agent --output <path>` writes that complete bounded JSON report to
+  an owner-only local file and emits a bounded context summary with at most 25
+  relevant identities. Prefer a private temporary or Git-metadata path outside
+  the tracked checkout unless the report is intentionally retained.
 - `--format sarif` is a SARIF 2.1.0 projection for editors and code-scanning
   systems. It preserves review locations and bounded explanations but is not a
   replacement for the complete JSON report.
@@ -16,7 +21,7 @@ human review. It is deliberately not a machine contract and has no schema
 version. Paths and report text are HTML-escaped, source bodies are not embedded,
 and no external scripts, fonts, images, or network requests are used.
 
-`--format compact` is a bounded human/agent shortlist with one line per group,
+`--format compact` is a bounded human shortlist with one line per group,
 focus coverage, warning totals, and the behavioral-equivalence disclaimer. It
 is not a versioned machine contract; use JSON when fields must be parsed.
 
@@ -29,14 +34,16 @@ presentation only, not scores, fingerprints, counts, or schema version.
 
 ## Versioned JSON contract
 
-Schema 19 is described by the Draft 2020-12 artifact at
-[`schemas/mori-report-v19.schema.json`](../schemas/mori-report-v19.schema.json).
+Schema 20 is described by the Draft 2020-12 artifact at
+[`schemas/mori-report-v20.schema.json`](../schemas/mori-report-v20.schema.json).
 Official releases include the same file and its SHA-256 checksum.
 Consumers should select a validator that supports Draft 2020-12, require
-`schema_version` to equal `19`, and reject or explicitly handle unknown report
+`schema_version` to equal `20`, and reject or explicitly handle unknown report
 versions.
 
-Schema 19 adds optional compatible staged-review receipt evidence. Schema 18
+Schema 20 adds exact changed-line intervals to focused path evidence and an
+explicit `configuration.focused_only` comparison-universe flag. Schema 19 adds
+optional compatible staged-review receipt evidence. Schema 18
 added immutable Git-index input provenance, named project scopes, and per-path
 focused coverage. Schema 17 added the optional stdin overlay field.
 The current normalization version is 12 and the baseline contract is schema 4.
@@ -79,8 +86,9 @@ exit policy. Clients may therefore consume valid output with these exit codes:
 - `4`: at least one configured coverage gate failed.
 
 Project-maintenance clients may also receive exit `5` from
-`mori project upgrade --check` when project-managed Mori assets drift. That
-command emits its own versioned plan rather than a scan report.
+`mori project upgrade --check` or from the implicit local compatibility gate
+before `scan` and `review`. The upgrade command emits its own versioned plan;
+the implicit gate emits a diagnostic and no scan report.
 
 Exit `1` is an operational failure and exit `2` is invalid usage. A client
 should reject empty, malformed, or wrong-version output regardless of exit
