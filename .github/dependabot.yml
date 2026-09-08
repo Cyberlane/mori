@@ -23,3 +23,7 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(actions)"
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
