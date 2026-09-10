@@ -28,11 +28,18 @@ gh attestation verify path/to/archive --repo Cyberlane/mori
 
 ## Run a first review
 
-From the project root:
+From the project root, inspect the inventory first:
 
 ```sh
-mori scan --profile review .
+mori inspect .
+mori scan --profile review path/to/source
 ```
+
+Replace `path/to/source` with a real source root from your project, such as
+`src`, `packages/core/src`, or `django`. Use `.` when the whole repository is
+an intentional review surface. This choice matters in monorepositories: tests,
+stories, fixtures, and repeated framework callbacks can dominate a broad scan.
+The review profile does not remove those categories automatically.
 
 The `review` profile selects same-language code, an `0.85` threshold, a
 40-token floor, review-oriented ordering, generated-source exclusion, and a
@@ -44,13 +51,24 @@ setup:
 
 ```sh
 mori setup
-mori scan .
+# Run the exact scan command printed after applying setup.
 ```
 
 Setup inventories supported and unsupported source, asks about the primary
 workflow, comparison mode, coverage policy, generated source, and exclusions,
-then previews the exact file before asking to write it. Use `mori configure` to
-change an existing configuration and `mori doctor` to check it.
+then previews the exact file before asking to write it. It offers named
+`library`, `application`, `tests`, and `all` scopes based on observed path conventions;
+`keep` preserves the current scope policy. Review the suggested roots,
+exclusions, counts, and examples, and edit them before applying. A chosen scope
+is opt-in with `mori scan --scope application`; it does not become the default
+or narrow the base staged gate. Existing top-level exclusions still apply.
+Use `mori configure` to change an existing configuration and `mori doctor` to
+check it. Application and library exclusions generalize observed test/story
+conventions, such as `**/*.test.*`, so new matching files remain excluded. These
+are editable naming rules, not proof of a file's purpose. Library roots cover
+observed conventional source directories and may omit custom layouts. Oversized
+root suggestions are omitted rather than silently truncated. See
+[Choose a useful first review](guides/first-review.md) for examples and limits.
 
 The lower-level `mori init` command remains available for scripts. It refuses
 to replace an existing `.mori.json` unless `--force` is explicit, while
@@ -60,7 +78,7 @@ to replace an existing `.mori.json` unless `--force` is explicit, while
 
 | Profile | Intended use |
 | --- | --- |
-| `review` | Low-noise same-language production review at `0.85`/40 tokens. |
+| `review` | Same-language review at `0.85`/40 tokens; tests remain eligible. |
 | `explore` | Broad structural discovery at `0.70`/12 tokens. |
 | `sql` | Top-level SQL-query review at `0.70`/12 tokens. |
 
@@ -74,6 +92,33 @@ migration, generated-router, vendor, or framework exclusions.
 For a monorepository, define named `scopes` with relative roots in
 `.mori.json`, then run `mori scan --scope backend`. The scope name and roots
 are recorded and participate in baseline compatibility.
+
+## Make the first shortlist useful
+
+Keep a bounded summary and the full retained report outside tracked source:
+
+```sh
+mori scan --profile review --format agent --output /tmp/mori-review.json path/to/source
+```
+
+Read both source ranges in the first groups and check coverage before changing
+policy. A source directory can still contain colocated tests. For a deliberately
+production-focused trial, add only globs you have checked against your tree:
+
+```sh
+mori scan --profile review --exclude '**/*.test.ts' --exclude '**/*.stories.tsx' packages/core/src
+```
+
+These are examples, not universal exclusions. File globs cannot separate Rust
+inline tests from production functions in the same file. Preserve a separate
+inclusive policy for staged review: a supported staged file excluded from a
+scan must remain visible as unanalyzed, and strict focused coverage can fail.
+Do not copy exploratory exclusions into a commit gate without reviewing that
+consequence.
+
+If Mori reaches its candidate-pair limit, the scan has not completed. Select a
+smaller source root or reviewed scope and rerun; increasing output limits does
+not reduce comparison work. Do not treat an absent report as a clean result.
 
 ## Review exactly what is staged
 
@@ -130,6 +175,11 @@ mori scan --format json \
   --fail-on-parse-diagnostic \
   .
 ```
+
+The `0.95` value is an example policy, not a universal target. Declaration-only
+and barrel files may legitimately contain no comparison fragments. Unsupported
+extensions do not enter the supported-file coverage denominator, so that ratio
+alone cannot establish whole-repository coverage.
 
 Inspect unsupported extensions, generated exclusions, every zero-fragment
 file, parser diagnostics, warnings, and report truncation. Continue with

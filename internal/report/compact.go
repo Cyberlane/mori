@@ -39,6 +39,9 @@ func Compact(writer io.Writer, report model.Report) error {
 			return err
 		}
 	}
+	if err := sourceCoverageSummary(writer, report); err != nil {
+		return err
+	}
 	for index, group := range report.Groups {
 		locations := compactGroupLocations(group)
 		focus := ""

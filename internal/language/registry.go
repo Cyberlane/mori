@@ -10,9 +10,13 @@ import (
 	tree_sitter_c "github.com/Cyberlane/mori/internal/grammar/c"
 	tree_sitter_gdscript "github.com/Cyberlane/mori/internal/grammar/gdscript"
 	tree_sitter_hack "github.com/Cyberlane/mori/internal/grammar/hack"
+	tree_sitter_java "github.com/Cyberlane/mori/internal/grammar/java"
+	tree_sitter_javascript "github.com/Cyberlane/mori/internal/grammar/javascript"
 	tree_sitter_postgresql "github.com/Cyberlane/mori/internal/grammar/postgresql"
 	tree_sitter_sql "github.com/Cyberlane/mori/internal/grammar/sql"
 	tree_sitter_swift "github.com/Cyberlane/mori/internal/grammar/swift"
+	tree_sitter_tsx "github.com/Cyberlane/mori/internal/grammar/typescript/tsx"
+	tree_sitter_typescript "github.com/Cyberlane/mori/internal/grammar/typescript/typescript"
 	tree_sitter_dart "github.com/UserNobody14/tree-sitter-dart/bindings/go"
 	tree_sitter_kotlin "github.com/tree-sitter-grammars/tree-sitter-kotlin/bindings/go"
 	tree_sitter_lua "github.com/tree-sitter-grammars/tree-sitter-lua/bindings/go"
@@ -22,13 +26,10 @@ import (
 	tree_sitter_c_sharp "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
 	tree_sitter_cpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
 	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
-	tree_sitter_java "github.com/tree-sitter/tree-sitter-java/bindings/go"
-	tree_sitter_javascript "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
 	tree_sitter_php "github.com/tree-sitter/tree-sitter-php/bindings/go"
 	tree_sitter_python "github.com/tree-sitter/tree-sitter-python/bindings/go"
 	tree_sitter_ruby "github.com/tree-sitter/tree-sitter-ruby/bindings/go"
 	tree_sitter_rust "github.com/tree-sitter/tree-sitter-rust/bindings/go"
-	tree_sitter_typescript "github.com/tree-sitter/tree-sitter-typescript/bindings/go"
 	tree_sitter_zsh "github.com/tree-sitter/tree-sitter-zsh/bindings/go"
 	tree_sitter_powershell "github.com/wharflab/tree-sitter-powershell/bindings/go"
 )
@@ -346,7 +347,7 @@ var specs = []Spec{
 		DisplayName:      "TypeScript",
 		Extensions:       []string{".cts", ".mts", ".ts"},
 		newLanguage: func() *tree_sitter.Language {
-			return tree_sitter.NewLanguage(tree_sitter_typescript.LanguageTypescript())
+			return tree_sitter.NewLanguage(tree_sitter_typescript.Language())
 		},
 		fragmentKinds:           javascriptFunctions,
 		excludeNestedBoundaries: true,
@@ -359,7 +360,7 @@ var specs = []Spec{
 		DisplayName:      "TypeScript / TSX",
 		Extensions:       []string{".tsx"},
 		newLanguage: func() *tree_sitter.Language {
-			return tree_sitter.NewLanguage(tree_sitter_typescript.LanguageTSX())
+			return tree_sitter.NewLanguage(tree_sitter_tsx.Language())
 		},
 		fragmentKinds:           javascriptFunctions,
 		excludeNestedBoundaries: true,

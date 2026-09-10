@@ -36,6 +36,27 @@ synthetic grouping changes profiles of expressions previously repaired that way.
 Review those identities again using the project upgrade and baseline workflow;
 do not copy old fingerprints into a new baseline to bypass the change.
 
+## JavaScript and TypeScript
+
+The bundled JavaScript, TypeScript, and TSX grammars retain keyword-named export
+aliases. TypeScript/TSX also support semicolonless generic interface overloads,
+including intervening comments and CRLF, `import('module').Type` in array and
+nested-generic types, and `typeof import(...)` in generic call arguments.
+These are grammar corrections that preserve the original syntax tree and byte
+locations; Mori does not erase types with text substitution. Malformed nearby
+forms remain diagnosed and affected fragments remain excluded.
+
+## Java
+
+Annotations before the varargs ellipsis, such as `String @Marker ... values`,
+are retained as syntax. Annotations misplaced after the ellipsis remain
+invalid. This does not validate annotation targets, overload resolution, or
+Java compilation.
+
+Normalization version 14 records these grammar corrections. Prior acceptance
+from normalization 12 or 13 requires an explicit reviewed migration; automatic
+loading does not reinterpret old accepted identities as current evidence.
+
 ## SQL
 
 See [SQL and embedded SQL](sql.md) for bounded SQLite compatibility and why a

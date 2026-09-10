@@ -66,6 +66,8 @@ func RunWithInput(
 	}
 
 	switch args[0] {
+	case "support":
+		return runSupport(args[1:], stdout, stderr)
 	case "feedback":
 		return runFeedback(args[1:], stdout, stderr)
 	case "scan":
@@ -120,6 +122,8 @@ func RunWithInput(
 }
 
 type scanOptions struct {
+	diagnosticsPath    string
+	diagnostics        *scanDiagnostics
 	profile            string
 	scope              string
 	scopeRoots         []string
@@ -129,6 +133,7 @@ type scanOptions struct {
 	comparisonDomain   string
 	sqlDialect         string
 	embeddedSQL        bool
+	fragmentSelection  string
 	statementBlocks    bool
 	blockStatements    int
 	maxBlocksPerFunc   int
@@ -210,6 +215,7 @@ func defaultScanOptions() scanOptions {
 
 func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string, allowReportOutput bool) {
 	flags.StringVar(&options.profile, "profile", options.profile, "scan profile: review, explore, or sql")
+	flags.StringVar(&options.fragmentSelection, "fragment-selection", options.fragmentSelection, "fragment selection: all, production, or tests (conventional test paths and Rust test attributes)")
 	flags.StringVar(&options.scope, "scope", options.scope, "named project scope from .mori.json")
 	flags.Float64Var(&options.threshold, "threshold", options.threshold, "minimum weighted Jaccard score, from 0 to 1")
 	flags.IntVar(&options.minTokens, "min-tokens", options.minTokens, "minimum normalized AST tokens per fragment")
@@ -412,18 +418,9 @@ func parseScanOptions(
 	args []string,
 	stderr io.Writer,
 	baselineAction string,
+	captures ...*scanDiagnostics,
 ) (scanOptions, []string, int, bool) {
-	configArgs := args
-	if baselineAction == "staged-check" || baselineAction == "staged-acknowledge" || baselineAction == "hook-pre-commit" {
-		configArgs = append([]string{"--staged"}, args...)
-	}
-	options, err := configuredScanOptions(configArgs)
-	if err != nil {
-		if _, writeErr := fmt.Fprintf(stderr, "mori: load config: %s\n", diagnostic.Message(err)); writeErr != nil {
-			return scanOptions{}, nil, exitError, false
-		}
-		return scanOptions{}, nil, exitError, false
-	}
+	options := defaultScanOptions()
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	trackedStderr := &errorTrackingWriter{writer: stderr}
 	flags.SetOutput(trackedStderr)
@@ -433,6 +430,9 @@ func parseScanOptions(
 	}
 	allowReportOutput := command == "scan" || command == "review staged check" || command == "hook pre-commit"
 	options.bindFlags(flags, contractMode, allowReportOutput)
+	if command == "scan" {
+		flags.StringVar(&options.diagnosticsPath, "diagnostics", "", "write a local minimized diagnostic session (place before other options to capture early errors)")
+	}
 	flags.Usage = func() {
 		fmt.Fprintf(trackedStderr, "Usage: mori %s [options] [path ...]\n", command)
 		fmt.Fprintln(trackedStderr, "\nScan functions and top-level SQL queries for structural similarity.")
@@ -441,8 +441,21 @@ func parseScanOptions(
 		flags.PrintDefaults()
 	}
 
-	if err := flags.Parse(args); err != nil {
+	var capture *scanDiagnostics
+	if len(captures) > 0 {
+		capture = captures[0]
+	}
+	parseErr := flags.Parse(args)
+	if capture != nil {
+		capture.path = options.diagnosticsPath
+		capture.requested = options
+		capture.paths = flags.Args()
+	}
+	if err := parseErr; err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			if capture != nil {
+				capture.path = ""
+			}
 			if trackedStderr.err != nil {
 				return scanOptions{}, nil, exitError, false
 			}
@@ -451,6 +464,31 @@ func parseScanOptions(
 		if trackedStderr.err != nil {
 			return scanOptions{}, nil, exitError, false
 		}
+		return scanOptions{}, nil, exitUsage, false
+	}
+	// Validate the command grammar before loading configuration or resolving Git.
+	// The same FlagSet parses selectors and final overrides, so values and literal
+	// paths cannot be mistaken for a second, independent stream of options.
+	if err := validateOptionPlacement(args, flags.Args(), flags); err != nil {
+		return scanOptions{}, nil, usageError(stderr, err.Error()), false
+	}
+	requested := options
+	if contractMode == "staged-check" || contractMode == "staged-acknowledge" {
+		requested.staged = true
+	}
+	if capture != nil {
+		capture.stage = "configuration"
+	}
+	configured, err := configuredScanOptions(requested)
+	if err != nil {
+		fmt.Fprintf(stderr, "mori: load config: %s\n", diagnostic.Message(err))
+		return scanOptions{}, nil, exitError, false
+	}
+	options = configured
+	options.reviewPolicy = requested.reviewPolicy
+	// Reapply explicit CLI values over config/profile defaults. Flag values hold
+	// pointers to options fields, whose addresses are unchanged by assignment.
+	if err := flags.Parse(args); err != nil {
 		return scanOptions{}, nil, exitUsage, false
 	}
 	visited := make(map[string]bool)
@@ -475,22 +513,54 @@ func parseScanOptions(
 	}
 	reconcileCLISelection(&options, visited)
 	options.respectIgnore = !options.noIgnore
+	if capture != nil {
+		capture.stage = "validation"
+	}
 	if err := validateScanOptions(options); err != nil {
 		return scanOptions{}, nil, usageError(stderr, err.Error()), false
+	}
+	if capture != nil {
+		capture.effective = &options
+		capture.paths = flags.Args()
+		if capture.path != "" {
+			options.diagnostics = capture
+		}
 	}
 	return options, flags.Args(), exitSuccess, true
 }
 
-func configuredScanOptions(args []string) (scanOptions, error) {
-	request, err := findConfigRequest(args)
-	if err != nil {
-		return scanOptions{}, err
+// validateOptionPlacement preserves the documented options-before-path grammar.
+// Only a consumed -- permits option-looking literal paths.
+func validateOptionPlacement(args, paths []string, flags *flag.FlagSet) error {
+	consumed := len(args) - len(paths)
+	for index := 0; index < consumed; index++ {
+		argument := args[index]
+		if argument == "--" {
+			return nil
+		}
+		name, _, hasValue := strings.Cut(strings.TrimLeft(argument, "-"), "=")
+		if option := flags.Lookup(name); option != nil && !hasValue {
+			boolean, isBoolean := option.Value.(interface{ IsBoolFlag() bool })
+			if !isBoolean || !boolean.IsBoolFlag() {
+				index++ // The next word is a value, even if it is --.
+			}
+		}
+	}
+	for _, path := range paths {
+		if len(path) > 1 && strings.HasPrefix(path, "-") {
+			return fmt.Errorf("options must precede paths; move %q before the first path, or use -- before all paths for literal filenames", path)
+		}
+	}
+	return nil
+}
+
+func configuredScanOptions(requested scanOptions) (scanOptions, error) {
+	request := configRequest{path: requested.requestedConfig, disabled: requested.noConfig}
+	if request.disabled && request.path != "" {
+		return scanOptions{}, errors.New("--config and --no-config cannot be used together")
 	}
 	options := defaultScanOptions()
-	staged, err := findStagedRequest(args)
-	if err != nil {
-		return scanOptions{}, err
-	}
+	staged := requested.staged
 	if staged {
 		snapshot, err := vcs.ResolveIndex(context.Background(), ".")
 		if err != nil {
@@ -501,13 +571,10 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 	}
 	options.noConfig = request.disabled
 	options.requestedConfig = request.path
-	requestedProfile, err := findProfileRequest(args)
-	if err != nil {
-		return scanOptions{}, err
-	}
-	requestedScope, err := findScopeRequest(args)
-	if err != nil {
-		return scanOptions{}, err
+	requestedProfile := requested.profile
+	requestedScope := requested.scope
+	if strings.TrimSpace(requestedScope) == "" && requestedScope != "" {
+		return scanOptions{}, errors.New("--scope cannot be empty")
 	}
 	options.scope = requestedScope
 	if request.disabled {
@@ -616,26 +683,6 @@ func configuredScanOptions(args []string) (scanOptions, error) {
 	return options, nil
 }
 
-func findStagedRequest(args []string) (bool, error) {
-	staged := false
-	for _, argument := range args {
-		if argument == "--" {
-			break
-		}
-		switch {
-		case argument == "--staged":
-			staged = true
-		case strings.HasPrefix(argument, "--staged="):
-			value, err := strconv.ParseBool(strings.TrimPrefix(argument, "--staged="))
-			if err != nil {
-				return false, fmt.Errorf("invalid value for --staged: %w", err)
-			}
-			staged = value
-		}
-	}
-	return staged, nil
-}
-
 func loadStagedConfig(
 	ctx context.Context,
 	snapshot vcs.IndexSnapshot,
@@ -693,52 +740,6 @@ func loadStagedConfig(
 	return config.Settings{}, "", false, nil
 }
 
-func findProfileRequest(args []string) (string, error) {
-	var profile string
-	for index := 0; index < len(args); index++ {
-		argument := args[index]
-		switch {
-		case argument == "--profile":
-			if index+1 >= len(args) {
-				return "", errors.New("--profile requires a value")
-			}
-			index++
-			profile = args[index]
-		case strings.HasPrefix(argument, "--profile="):
-			profile = strings.TrimPrefix(argument, "--profile=")
-		}
-	}
-	if profile == "" {
-		return "", nil
-	}
-	resolved, err := resolveScanProfile(profile)
-	if err != nil {
-		return "", err
-	}
-	return resolved.name, nil
-}
-
-func findScopeRequest(args []string) (string, error) {
-	var scope string
-	for index := 0; index < len(args); index++ {
-		argument := args[index]
-		switch {
-		case argument == "--scope":
-			if index+1 >= len(args) {
-				return "", errors.New("--scope requires a value")
-			}
-			index++
-			scope = args[index]
-		case strings.HasPrefix(argument, "--scope="):
-			scope = strings.TrimPrefix(argument, "--scope=")
-		}
-	}
-	if strings.TrimSpace(scope) == "" && scope != "" {
-		return "", errors.New("--scope cannot be empty")
-	}
-	return scope, nil
-}
-
 func selectConfigScope(settings config.Settings, name string) (*config.ScopeSettings, error) {
 	if name == "" {
 		return nil, nil
@@ -780,31 +781,6 @@ func applyConfigScope(options *scanOptions, scope config.ScopeSettings, base str
 type configRequest struct {
 	path     string
 	disabled bool
-}
-
-func findConfigRequest(args []string) (configRequest, error) {
-	request := configRequest{}
-	for index := 0; index < len(args); index++ {
-		argument := args[index]
-		switch {
-		case argument == "--no-config" || argument == "--no-config=true":
-			request.disabled = true
-		case argument == "--no-config=false":
-			request.disabled = false
-		case argument == "--config":
-			if index+1 >= len(args) {
-				return configRequest{}, errors.New("--config requires a path")
-			}
-			index++
-			request.path = args[index]
-		case strings.HasPrefix(argument, "--config="):
-			request.path = strings.TrimPrefix(argument, "--config=")
-		}
-	}
-	if request.disabled && request.path != "" {
-		return configRequest{}, errors.New("--config and --no-config cannot be used together")
-	}
-	return request, nil
 }
 
 func applyConfig(options *scanOptions, settings config.Settings, base string) {
@@ -874,6 +850,9 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	}
 	if settings.EmbeddedSQL != nil {
 		options.embeddedSQL = *settings.EmbeddedSQL
+	}
+	if settings.FragmentSelection != "" {
+		options.fragmentSelection = settings.FragmentSelection
 	}
 	if settings.StatementBlocks != nil {
 		options.statementBlocks = *settings.StatementBlocks
@@ -956,6 +935,11 @@ func resolveConfigPath(base string, path string) string {
 }
 
 func validateScanOptions(options scanOptions) error {
+	switch options.fragmentSelection {
+	case "", "all", "production", "tests":
+	default:
+		return errors.New("--fragment-selection must be all, production, or tests")
+	}
 	if options.profile != "" {
 		if _, err := resolveScanProfile(options.profile); err != nil {
 			return err
@@ -1104,7 +1088,9 @@ func runScanCommand(
 	stderr io.Writer,
 ) (exitCode int) {
 	started := time.Now()
-	options, paths, code, ok := parseScanOptions(command, args, stderr, mode)
+	capture := &scanDiagnostics{ctx: ctx, started: started, stage: "arguments"}
+	defer func() { capture.finish(exitCode, stderr) }()
+	options, paths, code, ok := parseScanOptions(command, args, stderr, mode, capture)
 	if !ok {
 		return code
 	}
@@ -1127,10 +1113,12 @@ func runScanCommand(
 			options.reviewReceiptPath = receiptPath
 		}
 	}
+	capture.stage = "project"
 	if code := enforceProjectCompatibility(ctx, options, paths, stderr); code != exitSuccess {
 		return code
 	}
 	if options.stdinPath != "" {
+		capture.stage = "discovery"
 		content, err := readStdinOverlay(ctx, stdin, options.maxFileBytes)
 		if err != nil {
 			fmt.Fprintf(stderr, "mori: read --stdin-path overlay: %v\n", err)
@@ -1139,6 +1127,7 @@ func runScanCommand(
 		options.stdinContent = content
 		options.focusPaths = append(options.focusPaths, options.stdinPath)
 	}
+	capture.stage = "baseline"
 	suppress, baselineWarnings, baselineStatus, baselineDigest, err := loadSuppression(
 		ctx,
 		options.baselinePath,
@@ -1157,6 +1146,7 @@ func runScanCommand(
 	cacheState := "bypassed"
 	var cache *stagedAnalysisCache
 	var result model.Report
+	capture.result = &result
 	cacheHit := false
 	if options.stagedCache {
 		cache, _ = openStagedAnalysisCache(ctx, paths, scanOptions, baselineDigest, baselineWarnings)
@@ -1171,8 +1161,13 @@ func runScanCommand(
 	if !cacheHit {
 		result, err = executeScan(ctx, paths, scanOptions, suppress, baselineWarnings)
 		if err != nil {
-			fmt.Fprintf(stderr, "mori: %v\n", err)
-			return exitError
+			var limit *analyzer.CandidateLimitError
+			if errors.As(err, &limit) {
+				capture.reason = "candidate_limit"
+			} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				capture.reason = "cancelled"
+			}
+			return renderScanFailure(stdout, stderr, result, options, paths, err)
 		}
 		if cache != nil {
 			_ = cache.Save(result)
@@ -1184,6 +1179,7 @@ func runScanCommand(
 			captureLocalFeedback(feedbackRoot, result, time.Since(started), feedbackOutcome(exitCode), cacheState)
 		}
 	}()
+	capture.stage = "baseline"
 	if baselineStatus == "loaded" {
 		if baselineDigest != result.Configuration.ScanProfileDigest {
 			fmt.Fprintf(
@@ -1196,6 +1192,7 @@ func runScanCommand(
 		}
 		baselineStatus = "compatible"
 	}
+	capture.stage = "receipt"
 	result.Configuration.BaselineStatus = baselineStatus
 	result.Configuration.BaselineDigest = baselineDigest
 	if options.reviewReceiptPath != "" {
@@ -1225,6 +1222,7 @@ func runScanCommand(
 		result.Review = stagedReviewOutcome(options, result)
 	}
 
+	capture.stage = "output"
 	if options.outputPath != "" {
 		redacted := options.redactPaths
 		if options.redactPaths {
@@ -1248,6 +1246,7 @@ func runScanCommand(
 		fmt.Fprintf(stderr, "mori: write report: %v\n", err)
 		return exitError
 	}
+	capture.stage = "coverage"
 	if code := enforceCoveragePolicies(stderr, options, result); code != exitSuccess {
 		return code
 	}
@@ -1329,26 +1328,39 @@ func runCanonicalStagedReview(
 	return runReviewAcknowledgeCommand(ctx, canonicalArgs, "staged-acknowledge", stdout, stderr)
 }
 
-func canonicalStagedReviewArgs(args []string, _ string) ([]string, error) {
-	reserved := []string{
-		"staged",
-		"include-focused",
-		"require-focused-coverage",
-		"fail-on-match",
-		"fail-on-focused-match",
-		"focus-path",
-		"changed-since",
-		"changed-worktree",
+func canonicalStagedReviewArgs(args []string, action string) ([]string, error) {
+	options := defaultScanOptions()
+	flags := flag.NewFlagSet("review staged "+action, flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	options.bindFlags(flags, "staged-"+action, action == "check")
+	for _, name := range []string{"staged", "include-focused", "require-focused-coverage", "fail-on-match", "fail-on-focused-match"} {
+		flags.Bool(name, false, "reserved by canonical review")
 	}
-	for _, argument := range args {
-		if argument == "--" {
-			break
+	for _, name := range []string{"focus-path", "changed-since", "changed-worktree"} {
+		flags.String(name, "", "reserved by canonical review")
+	}
+	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return append([]string{}, args...), nil
 		}
-		for _, name := range reserved {
-			if argument == "--"+name || strings.HasPrefix(argument, "--"+name+"=") {
-				return nil, fmt.Errorf("--%s is fixed by the canonical staged review contract", name)
-			}
+		return nil, err
+	}
+	if err := validateOptionPlacement(args, flags.Args(), flags); err != nil {
+		return nil, err
+	}
+	reserved := map[string]bool{
+		"staged": true, "include-focused": true, "require-focused-coverage": true,
+		"fail-on-match": true, "fail-on-focused-match": true, "focus-path": true,
+		"changed-since": true, "changed-worktree": true,
+	}
+	var reservedName string
+	flags.Visit(func(value *flag.Flag) {
+		if reservedName == "" && reserved[value.Name] {
+			reservedName = value.Name
 		}
+	})
+	if reservedName != "" {
+		return nil, fmt.Errorf("--%s is fixed by the canonical staged review contract", reservedName)
 	}
 	return append([]string{}, args...), nil
 }
@@ -2246,6 +2258,7 @@ func baselineScanProfile(
 		ComparisonDomain:  domain,
 		SQLDialect:        dialect,
 		EmbeddedSQL:       options.embeddedSQL,
+		FragmentSelection: options.fragmentSelection,
 		StatementBlocks:   options.statementBlocks,
 		BlockStatements:   options.blockStatements,
 		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
@@ -2363,6 +2376,18 @@ func executeScan(
 		SQLDialect:        sqlDialect,
 		EmbeddedSQL:       options.embeddedSQL,
 		ExcludeGenerated:  options.excludeGenerated,
+	}
+	var discoveryStarted time.Time
+	if options.diagnostics != nil {
+		discoveryStarted = time.Now()
+	}
+	defer func() {
+		if options.diagnostics != nil && options.diagnostics.stage == "discovery" {
+			options.diagnostics.discovery = time.Since(discoveryStarted)
+		}
+	}()
+	if options.diagnostics != nil {
+		options.diagnostics.stage = "discovery"
 	}
 	var discovered source.Result
 	if options.stagedSnapshot != nil {
@@ -2488,7 +2513,14 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, err
 	}
+	var timings *analyzer.PhaseTimings
+	if options.diagnostics != nil {
+		options.diagnostics.discovery = time.Since(discoveryStarted)
+		options.diagnostics.stage = "analysis"
+		timings = &options.diagnostics.timings
+	}
 	result, err := analyzer.Analyze(ctx, discovered.Files, discovered.Warnings, analyzer.Options{
+		Timings:           timings,
 		Threshold:         options.threshold,
 		MinTokens:         options.minTokens,
 		MaxGroups:         options.maxGroups,
@@ -2509,13 +2541,11 @@ func executeScan(
 		PriorityPaths:     priorityPaths,
 		EmbeddedSQL:       options.embeddedSQL,
 		SQLDialect:        sqlDialect,
+		FragmentSelection: options.fragmentSelection,
 		StatementBlocks:   options.statementBlocks,
 		BlockStatements:   options.blockStatements,
 		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
 	})
-	if err != nil {
-		return result, err
-	}
 	result.Configuration = model.EffectiveConfig{
 		Profile:           options.profile,
 		Scope:             options.scope,
@@ -2534,6 +2564,7 @@ func executeScan(
 		ComparisonDomain:  domain,
 		SQLDialect:        sqlDialect,
 		EmbeddedSQL:       options.embeddedSQL,
+		FragmentSelection: options.fragmentSelection,
 		StatementBlocks:   options.statementBlocks,
 		BlockStatements:   options.blockStatements,
 		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
@@ -2564,7 +2595,7 @@ func executeScan(
 	result.Tool.NormalizationVersion = normalize.Version
 	sort.Strings(result.Configuration.Excludes)
 	sort.Strings(result.Configuration.LanguagePairs)
-	return result, nil
+	return result, err
 }
 
 func stagedSourceEntries(
@@ -3277,6 +3308,8 @@ func writeRootUsage(writer io.Writer) error {
 		"  mori review staged acknowledge --accept-focused [options] [path ...]\n",
 		"  mori hook pre-commit [options] [path ...]\n",
 		"  mori review acknowledge --staged --include-focused --require-focused-coverage --accept-focused [options] [path ...]\n",
+		"  mori support bundle --session <session.json> --output <new.zip>\n",
+		"  mori support inspect <session.json|support.zip>\n",
 		"  mori languages\n",
 		"  mori skill install (--project <path> | --global | --target <path>)\n",
 		"  mori skill --help\n",

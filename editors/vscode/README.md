@@ -23,14 +23,25 @@ download the Mori executable.
 
 ## Run from source
 
-1. Open this directory in VS Code.
-2. Press F5 to launch an Extension Development Host.
-3. Open a workspace containing a supported source file.
+From this directory, launch an Extension Development Host:
+
+```sh
+code --extensionDevelopmentPath "$PWD"
+```
+
+Open a workspace containing a supported source file in that window.
 
 Use **Mori: Refresh Structural Diagnostics** for an immediate scan. The
 extension otherwise debounces edits for 750 milliseconds by default. It kills
 an older per-document process when a newer edit supersedes it and ignores stale
 results.
+
+Locationless `MORI002` warnings appear at the start of the edited document,
+labeled **Scan-level warning**. Warnings attached only to another file are not
+presented as problems in the edited file. If Mori cannot run, refuses the scan,
+or returns invalid output, stale findings are replaced with **Mori analysis
+unavailable**. Use **Mori: Show Diagnostic Output** for details, then refresh
+after resolving the problem. Superseded scans are canceled silently.
 
 Settings:
 
@@ -40,8 +51,8 @@ Settings:
 - `mori.debounceMilliseconds`: 100 through 10,000 milliseconds.
 
 The reference client supports VS Code language IDs for C#, GDScript, Go, Hack,
-Java, JavaScript, Lua, Luau, PHP, TypeScript, JSX, TSX, Python, Rust, shell,
-Swift, and SQL. Mori
+Dart, Java, JavaScript, Kotlin, Lua, Luau, PHP, PowerShell, TypeScript, JSX,
+TSX, Python, Ruby, Rust, shell, Swift, and SQL. Mori
 still decides support from the discovered file path and selected dialect. A
 scan covers the containing workspace root so the unsaved buffer can be
 compared with existing repository source, then filters diagnostics back to the
@@ -53,3 +64,18 @@ equivalence, defects, or a safe refactoring. Inspect the related source and any
 
 See [Machine and editor integration](../../docs/machine-integration.md) for the
 wire contract, bounds, exit codes, and suppression semantics.
+
+## Verification
+
+Run `npm run check` for syntax validation and the dependency-free behavior
+harness. On macOS or Linux, run `npm run smoke` with VS Code installed for an isolated
+real Extension Host test of findings, scan-level warnings, missing executable,
+recovery and Ruby eligibility. The smoke test uses a controlled local SARIF
+producer, temporary workspace, and isolated user settings; it does not test the
+Mori binary or publish/install the extension into your normal profile. Set
+`VSCODE_EXECUTABLE` to the editor executable when it is not discoverable.
+
+To test the same five cases through a locally built Mori CLI, use
+`MORI_SMOKE_BINARY=/absolute/path/to/mori npm run smoke`. This mode scans original
+duplicate TypeScript/Ruby fixtures and changes a temporary configuration to
+exercise no-fragment warnings, while retaining the isolated editor profile.

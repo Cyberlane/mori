@@ -102,7 +102,7 @@ func stagedAnalysisCacheKey(paths []string, options scanOptions, baselineDigest 
 	reflected := reflect.ValueOf(options)
 	for i := 0; i < reflected.NumField(); i++ {
 		name := reflected.Type().Field(i).Name
-		if name == "stagedSnapshot" || name == "stagedCache" || name == "outputPath" || name == "format" || name == "color" || name == "redactPaths" || name == "reviewReceiptPath" {
+		if name == "diagnostics" || name == "diagnosticsPath" || name == "stagedSnapshot" || name == "stagedCache" || name == "outputPath" || name == "format" || name == "color" || name == "redactPaths" || name == "reviewReceiptPath" {
 			continue
 		}
 		field := reflected.Field(i)

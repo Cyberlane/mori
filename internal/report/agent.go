@@ -113,6 +113,9 @@ func Agent(writer io.Writer, value model.Report) error {
 	); err != nil {
 		return err
 	}
+	if err := sourceCoverageSummary(writer, value); err != nil {
+		return err
+	}
 	if review := value.Review; review != nil {
 		if _, err := fmt.Fprintf(writer,
 			"review: policy %s; status %s; analysis %s; coverage policy met %t; %d finding(s); acknowledged %t\n",
@@ -348,7 +351,7 @@ func agentCoverageDetails(writer io.Writer, value model.Report) error {
 		}
 		reason := coverage.ZeroReason
 		switch reason {
-		case "no_boundaries", "below_token_floor", "invalid_fragments", "resource_limit":
+		case "no_boundaries", "below_token_floor", "invalid_fragments", "resource_limit", "fragment_selection", "opaque_syntax":
 		default:
 			reason = "unspecified"
 		}
@@ -359,6 +362,8 @@ func agentCoverageDetails(writer io.Writer, value model.Report) error {
 		{"below_token_floor", "all candidates below token floor"},
 		{"invalid_fragments", "parser diagnostics or invalid fragments"},
 		{"resource_limit", "resource or read limitation"},
+		{"fragment_selection", "all comparable fragments excluded by explicit selection"},
+		{"opaque_syntax", "opaque syntax contains no extractable comparison units"},
 		{"unspecified", "reason unavailable"},
 	} {
 		if count := reasons[reason.code]; count > 0 {

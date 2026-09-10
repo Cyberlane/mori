@@ -2,6 +2,7 @@ package schemas_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -20,7 +21,7 @@ func TestCurrentReportSchemaMatchesPublicModel(t *testing.T) {
 	if !ok {
 		t.Fatal("resolve schema test path")
 	}
-	schemaPath := filepath.Join(filepath.Dir(currentFile), "mori-report-v21.schema.json")
+	schemaPath := filepath.Join(filepath.Dir(currentFile), fmt.Sprintf("mori-report-v%d.schema.json", model.SchemaVersion))
 	content, err := os.ReadFile(schemaPath)
 	if err != nil {
 		t.Fatalf("read schema: %v", err)

@@ -81,6 +81,9 @@ error is skipped with explicit diagnostic and coverage counts.
 
 Mori has bounded, byte-preserving compatibility adaptations for several
 recognized Swift forms and the upstream raw-ampersand JSX-text grammar issue.
+Additional bounded grammar corrections cover JavaScript/TypeScript import types,
+semicolonless generic interface overloads, keyword export aliases, and Java
+annotated varargs; see [parser compatibility](../guides/parser-compatibility.md).
 Other unsupported syntax remains visibly incomplete. The pinned Zsh grammar
 requires `:` for several glob-qualifier forms.
 
@@ -99,3 +102,39 @@ or runtime contents.
 
 Statement blocks are fixed-size syntax windows, not semantic regions. Low
 token floors can make them noisy.
+
+## Test selection
+
+`--fragment-selection all` keeps the default comparison universe. Opt-in
+`production` and `tests` classify fragments using these explicit conventions:
+
+- A path directory named `test`, `tests`, or `__tests__`.
+- File suffixes `_test.go`, `_test.rs`, `_test.py`, `.test.js`, `.test.jsx`,
+  `.test.ts`, `.test.tsx`, `.spec.js`, `.spec.jsx`, `.spec.ts`, or `.spec.tsx`;
+  and Python files named `test_*.py`.
+- Rust `#[test]`, `#[tokio::test]`, and `#[async_std::test]` attributes, including
+  arguments for the asynchronous test attributes.
+- Rust `#[cfg(test)]` and compound predicates that necessarily require `test`,
+  such as `all(test, not(loom))`. Every branch of an `any(...)` must require
+  `test` before it is classified as test-only.
+
+`cfg(any(test, feature = "production"))`, `cfg(not(test))`, and a function name
+merely containing `test` do not prove test-only membership. Unclassified units
+remain on the production side. Path conventions apply to every fragment in the
+file, including test helpers; this is a disclosed policy, not semantic inference.
+Stories are not automatically classified as tests by fragment selection; setup
+may separately suggest story-path scopes and exclusions.
+
+Per-file exclusion counts remain distinct from parse failures and token-floor
+counts. Files with no retained units show the `fragment_selection` zero-fragment
+reason when selection (possibly combined with the token floor) explains the
+omission. Review that evidence before asserting coverage or migrating a baseline.
+
+Rust item macro token trees produce an explicit coverage warning; an otherwise
+empty file reports `opaque_syntax`. They are not expanded into arbitrary function
+bodies. Conventional path classification uses the current/selected root (the
+repository root for index snapshots); a standalone external file has filename
+and attribute evidence, not an inferred project directory. Component
+files such as `.vue` and `.svelte`, and Zig source, remain outside the registered
+parser set; inspect unsupported-extension counts separately from supported-file
+coverage. A high supported-file coverage ratio does not measure those files.

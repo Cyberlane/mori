@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 21
+const SchemaVersion = 22
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -217,19 +217,21 @@ type Warning struct {
 // FileCoverage records how much comparison evidence one supported source file
 // contributed at the configured token floor.
 type FileCoverage struct {
-	Path             string `json:"path"`
-	Language         string `json:"language"`
-	LanguageFamily   string `json:"language_family"`
-	ComparisonDomain string `json:"comparison_domain"`
-	Status           string `json:"status"`
-	Generated        bool   `json:"generated"`
-	GeneratedMarker  string `json:"generated_marker,omitempty"`
-	FragmentCount    int    `json:"fragment_count"`
-	CandidateCount   int    `json:"candidate_fragment_count"`
-	BelowTokenFloor  int    `json:"below_token_floor_count"`
-	ZeroReason       string `json:"zero_fragment_reason,omitempty"`
-	SkippedFragments int    `json:"skipped_fragments"`
-	ParseDiagnostics int    `json:"parse_diagnostics"`
+	ExcludedTestFragments       int    `json:"excluded_test_fragment_count"`
+	ExcludedProductionFragments int    `json:"excluded_production_fragment_count"`
+	Path                        string `json:"path"`
+	Language                    string `json:"language"`
+	LanguageFamily              string `json:"language_family"`
+	ComparisonDomain            string `json:"comparison_domain"`
+	Status                      string `json:"status"`
+	Generated                   bool   `json:"generated"`
+	GeneratedMarker             string `json:"generated_marker,omitempty"`
+	FragmentCount               int    `json:"fragment_count"`
+	CandidateCount              int    `json:"candidate_fragment_count"`
+	BelowTokenFloor             int    `json:"below_token_floor_count"`
+	ZeroReason                  string `json:"zero_fragment_reason,omitempty"`
+	SkippedFragments            int    `json:"skipped_fragments"`
+	ParseDiagnostics            int    `json:"parse_diagnostics"`
 }
 
 // UnsupportedExtension records an aggregate discovery count without exposing
@@ -274,6 +276,7 @@ type EffectiveConfig struct {
 	ComparisonDomain  string                 `json:"comparison_domain"`
 	SQLDialect        string                 `json:"sql_dialect"`
 	EmbeddedSQL       bool                   `json:"embedded_sql"`
+	FragmentSelection string                 `json:"fragment_selection,omitempty"`
 	StatementBlocks   bool                   `json:"statement_blocks"`
 	BlockStatements   int                    `json:"block_statements"`
 	MaxBlocksPerFunc  int                    `json:"max_blocks_per_function"`

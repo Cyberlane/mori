@@ -76,6 +76,21 @@ misleading empty report:
 mori scan --comparison-domain sql-query --language-pair go,go .
 ```
 
+## Fragment selection
+
+`--fragment-selection all|production|tests` selects fragments after parsing.
+The default `all` preserves the existing comparison universe. Test selection
+recognizes conventional test paths, explicit Rust test attributes, and
+unambiguously test-only conditional modules; unclassified fragments remain on
+the production side. See the [exact conventions](reference/languages-and-parser-limits.md#test-selection). This is syntax classification, not proof of application
+ownership. File exclusions remain separate and cannot isolate inline tests.
+
+The report records the selection and per-file excluded test/production fragment
+counts. Fragment selection does not turn intentionally excluded fragments into
+analyzed coverage. It participates in baseline and receipt compatibility;
+keep staged-gate policy inclusive unless the consequences are explicitly
+reviewed. See [configuration](configuration.md) for named scope overrides.
+
 ## Project configuration
 
 `.mori.json` supports the equivalent fields:
@@ -129,7 +144,7 @@ source constructs that are not comparison units, such as SQL DDL.
 
 ## Report and compatibility contract
 
-Schema version 13 retains the effective parser and selection fields under
+Schema version 22 retains the effective parser and selection fields under
 `configuration`, including every opt-in extraction bound:
 
 ```json
@@ -151,11 +166,9 @@ to reject or explicitly handle unknown report schema versions.
 
 Domain and family selection do not change fragment features. SQL dialect
 selection chooses a different parser and is therefore recorded explicitly.
-The current normalization version is 13. It records the corrected Swift
-optional-type/nil-coalescing grammar and includes the established opt-in
-embedded-query and statement-block units, ordered evidence, and Java/C#
-and PHP/Hack function boundaries, plus the Lua/Luau and GDScript comparison
-units and mappings. Baselines created with an older normalization version must
+The current normalization version is 14. It includes the established parser
+and fragment contracts; see [parser compatibility](guides/parser-compatibility.md)
+for the current repairs and boundaries. Baselines created with an older normalization version must
 be reviewed and regenerated. Changing a selection profile still requires the
 ordinary human review expected for any baseline scope change.
 

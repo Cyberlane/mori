@@ -180,3 +180,18 @@ local analysis reuse. It binds the complete immutable index, options, tool and
 contracts; changed inputs or unverifiable cache data cause fresh analysis.
 Baseline, receipt and coverage checks still run after reuse. It does not enable
 feedback or add a network operation. Do not edit cache files to accept findings.
+
+## First-review scope
+
+Use `mori setup --agent .` (or `configure --agent` for an existing config) to
+inspect editable named scope suggestions. An application scope belongs in
+`scopes`, leaving base configuration inclusive when the canonical staged
+gate should review tests too. Run exploratory review with `--scope application`;
+run that inclusive gate without the narrower scope. Existing base exclusions
+still apply, and explicitly excluded staged files still fail strict focused
+coverage, including advisory mode. Never call excluded files analyzed.
+
+`--fragment-selection production` or `tests` is opt-in and classifies conventional
+test paths plus positively evidenced Rust tests/test-only ancestors. Unrecognized
+code remains in production selection; this is not test-framework inference.
+Inspect excluded fragment counts and use `all` when both categories matter.

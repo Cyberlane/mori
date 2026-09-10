@@ -1,3 +1,5 @@
+**/*.test.js
+smoke-test.js
 .vscode/**
 .gitignore
 *.vsix

@@ -32,19 +32,22 @@ func File(
 // applied. It lets callers distinguish files with no boundaries from files
 // whose boundaries were all too small.
 type Coverage struct {
-	CandidateFragments int
-	BelowTokenFloor    int
+	CandidateFragments          int
+	ExcludedTestFragments       int
+	ExcludedProductionFragments int
+	BelowTokenFloor             int
 }
 
 // Options controls opt-in fragment extraction. Defaults preserve the
 // function- and query-level comparison contract used by earlier releases.
 type Options struct {
-	MinTokens        int
-	EmbeddedSQL      bool
-	SQLDialect       string
-	StatementBlocks  bool
-	BlockStatements  int
-	MaxBlocksPerFunc int
+	MinTokens         int
+	FragmentSelection string
+	EmbeddedSQL       bool
+	SQLDialect        string
+	StatementBlocks   bool
+	BlockStatements   int
+	MaxBlocksPerFunc  int
 }
 
 // FileWithOptions parses one file using explicit bounded extraction options.
@@ -104,21 +107,6 @@ func FileWithCoverage(
 			}
 		}
 	}
-	if file.Language.ID == "typescript" || file.Language.ID == "tsx" {
-		if repaired := repairTypeScriptImportTypes(tree.RootNode(), parserInput); repaired != nil {
-			repairedTree := treeParser.ParseCtx(ctx, repaired, nil)
-			if repairedTree != nil {
-				_, originalDiagnostics := parseDiagnostics(tree.RootNode(), 0)
-				_, repairedDiagnostics := parseDiagnostics(repairedTree.RootNode(), 0)
-				if repairedDiagnostics < originalDiagnostics {
-					tree.Close()
-					tree = repairedTree
-				} else {
-					repairedTree.Close()
-				}
-			}
-		}
-	}
 	if file.Language.ID == "swift" && tree.RootNode().HasError() {
 		if repaired := repairSwiftParserInput(parserInput); repaired != nil {
 			repairedTree := treeParser.ParseCtx(ctx, repaired, nil)
@@ -142,12 +130,17 @@ func FileWithCoverage(
 	}
 	coverage := Coverage{}
 	warnings := make([]model.Warning, 0, 1)
+	if file.Language.ID == "rust" && hasOpaqueRustItemMacro(root) {
+		warnings = append(warnings, model.Warning{Kind: "coverage", Path: file.DisplayPath, Language: file.Language.ID, Message: "Rust item macro token trees are opaque; macro-generated function boundaries are not analyzed"})
+	}
 	fragments := make([]model.Fragment, 0)
 	skippedFragments := 0
 	if fragmentKind := file.Language.TopLevelFragmentKind(root); fragmentKind != "" {
 		coverage.CandidateFragments++
 		if root.HasError() {
 			skippedFragments++
+		} else if excludeSelectedFragment(root, content, file, options.FragmentSelection, &coverage) {
+			// Selection exclusions are counted separately from invalid and undersized fragments.
 		} else if included, err := appendFragment(
 			ctx,
 			root,
@@ -228,7 +221,7 @@ func collect(
 		if accepted &&
 			(current.HasError() || hasInvalidAncestor(current)) {
 			(*skippedFragments)++
-		} else if accepted {
+		} else if accepted && !excludeSelectedFragment(current, content, file, options.FragmentSelection, coverage) {
 			included, err := appendFragment(
 				ctx,
 				current,

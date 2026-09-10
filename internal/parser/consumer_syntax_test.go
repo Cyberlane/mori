@@ -8,7 +8,6 @@ import (
 
 	"github.com/Cyberlane/mori/internal/language"
 	"github.com/Cyberlane/mori/internal/source"
-	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
 func TestAmbientImportTypeCompatibility(t *testing.T) {
@@ -34,31 +33,6 @@ func TestAmbientImportTypeCompatibility(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-func TestImportTypeRepairKeepsInvalidAndRuntimeSyntaxVisible(t *testing.T) {
-	t.Parallel()
-	spec, _ := language.Detect("input.ts")
-	for name, content := range map[string]string{
-		"missing_module":      `declare namespace Example { interface Env { ITEMS: import().Record[]; } }`,
-		"multiple_arguments":  `declare namespace Example { interface Env { ITEMS: import("x", "y").Record[]; } }`,
-		"missing_member":      `declare namespace Example { interface Env { ITEMS: import("x").[]; } }`,
-		"runtime":             `function load() { return import("x").Record[]; }`,
-		"function_annotation": `function load(value: import("x").Record[]) { return value; }`,
-	} {
-		t.Run(name, func(t *testing.T) {
-			p := tree_sitter.NewParser()
-			defer p.Close()
-			if err := p.SetLanguage(spec.NewLanguage()); err != nil {
-				t.Fatal(err)
-			}
-			tree := p.Parse([]byte(content), nil)
-			defer tree.Close()
-			if repaired := repairTypeScriptImportTypes(tree.RootNode(), []byte(content)); repaired != nil {
-				t.Fatalf("unexpected repair: %s", repaired)
-			}
-		})
 	}
 }
 

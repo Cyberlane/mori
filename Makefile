@@ -15,12 +15,13 @@ dogfood: build
 
 corpus:
 	$(GO) run ./internal/cmd/corpuseval >/dev/null
+	$(GO) run ./internal/cmd/corpuseval corpus/actionability >/dev/null
 
 fmt:
-	gofmt -w cmd internal examples corpus/code
+	gofmt -w cmd internal examples corpus/code corpus/actionability/code
 
 fmt-check:
-	@files="$$(gofmt -l cmd internal examples corpus/code)"; \
+	@files="$$(gofmt -l cmd internal examples corpus/code corpus/actionability/code)"; \
 	if [ -n "$$files" ]; then \
 		echo "$$files"; \
 		exit 1; \
@@ -46,6 +47,7 @@ actionlint:
 
 editors-check:
 	node --check editors/vscode/extension.js
+	node --test editors/vscode/extension.test.js
 
 policy-test:
 	bash scripts/test-policies.sh

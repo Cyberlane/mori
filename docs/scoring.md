@@ -212,7 +212,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 21,
+  "schema_version": 22,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -222,7 +222,7 @@ The top-level shape is:
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 13
+    "normalization_version": 14
   },
   "threshold": 0.85,
   "files": 4,
@@ -516,6 +516,17 @@ alter similarity or fingerprints. Separately, normalization 13 records corrected
 Swift optional-type/nil-coalescing grammar; formerly repaired expressions can
 change fingerprints when synthetic grouping nodes disappear. Baseline schema 4
 remains unchanged, but prior normalization acceptance needs review. See
-[the current schema](../schemas/mori-report-v21.schema.json) and
+[the schema-21 artifact](../schemas/mori-report-v21.schema.json) and
 [review policies](guides/review-policy.md). Timing and feedback are separate
 opt-in local records and never affect deterministic analysis or acceptance.
+
+
+### Schema 22: explicit fragment selection
+
+The report records `configuration.fragment_selection` and per-file
+`excluded_test_fragment_count` and `excluded_production_fragment_count`.
+Default selection remains `all`; opt-in test/production selection changes the
+comparison universe and its compatibility evidence, not the meaning of a
+similarity score. Current normalization is 14; prior accepted identities need
+review before migration. See [the current schema](../schemas/mori-report-v22.schema.json)
+and [parser compatibility](guides/parser-compatibility.md).

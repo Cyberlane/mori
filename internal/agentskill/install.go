@@ -72,7 +72,7 @@ func PackageDigest() (string, error) {
 // pre-contract Mori skill that can be upgraded without treating it as local
 // customization.
 func IsKnownPriorPackageDigest(digest string) bool {
-	return digest == v030PackageDigest || digest == "32c52f73c7a1d5bf7a60ff610152a6f2121ecf49392856742092721a0076ebf0"
+	return digest == "a8a89c5d0e9b6c091f65ae090dbdac46b44ac4fb59065e05553cf438453a6aa5" || digest == v030PackageDigest || digest == "32c52f73c7a1d5bf7a60ff610152a6f2121ecf49392856742092721a0076ebf0"
 }
 
 // Inspect compares a project skill with the embedded package without writing.

@@ -160,7 +160,7 @@ jobs:
             -timestamp "$timestamp"
 
       - name: Stage versioned JSON Schemas
-        run: cp schemas/mori-report-v21.schema.json schemas/mori-feedback-v1.schema.json dist/
+        run: cp schemas/mori-report-v22.schema.json schemas/mori-feedback-v1.schema.json schemas/mori-scan-failure-v1.schema.json schemas/mori-support-session-v1.schema.json dist/
 
       - name: Package VS Code extension
         env:
@@ -274,8 +274,10 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --pattern "$archive" \
             --pattern "mori-vscode_*.vsix" \
-            --pattern mori-report-v21.schema.json \
+            --pattern mori-report-v22.schema.json \
+            --pattern mori-scan-failure-v1.schema.json \
             --pattern mori-feedback-v1.schema.json \
+            --pattern mori-support-session-v1.schema.json \
             --pattern checksums.txt \
             --dir dist
 
@@ -295,7 +297,7 @@ jobs:
             ../skills/mori-review-similarity \
             extracted/mori-review-similarity
 
-          for schema in mori-report-v21.schema.json mori-feedback-v1.schema.json; do
+          for schema in mori-report-v22.schema.json mori-feedback-v1.schema.json mori-scan-failure-v1.schema.json mori-support-session-v1.schema.json; do
             expected="$(awk -v name="$schema" '$2 == name || $2 == "./" name { print $1 }' checksums.txt)"
             if [[ -z "$expected" ]]; then
               echo "No checksum found for $schema." >&2
@@ -408,6 +410,23 @@ jobs:
           fi
           "$binary" version
           "$binary" languages
+          # Exercise support capture/export with the actual downloaded native binary.
+          support_project="$PWD/support-project"
+          mkdir -p "$support_project"
+          cat > "$support_project/main.go" <<'GO'
+          package example
+          func total(values []int) int {
+            sum := 0
+            for _, value := range values {
+              if value > 0 { sum += value }
+            }
+            return sum
+          }
+          GO
+          "$binary" scan --diagnostics "$PWD/support-session.json" --profile review --min-tokens 12 "$support_project"
+          "$binary" support bundle --session "$PWD/support-session.json" --output "$PWD/mori-support.zip"
+          "$binary" support inspect "$PWD/mori-support.zip" > "$PWD/support-preview.json"
+          test -s "$PWD/support-preview.json"
           skill_parent="$PWD/installed-skills"
           "$binary" skill install --target "$skill_parent"
           test -f "$skill_parent/mori-review-similarity/SKILL.md"

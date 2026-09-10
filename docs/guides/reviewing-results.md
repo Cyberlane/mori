@@ -37,6 +37,10 @@ mori scan --exclude '**/*_test.go' --exclude '**/*.test.ts' .
 
 Use `--exclude-generated` for conservatively recognized generated headers.
 Those files remain visible as `excluded_generated` in JSON coverage evidence.
+Keep exploratory exclusions separate from an inclusive staged gate: excluding a
+supported staged file does not count as analyzing it, and can fail focused
+coverage. A source root may still include colocated tests; review paths and both
+function bodies before narrowing further.
 
 ## Use review ranking
 

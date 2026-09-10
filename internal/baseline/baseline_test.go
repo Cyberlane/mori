@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -52,7 +53,7 @@ func TestLoadSchemaOneAsContentScopeAndToleratesUnknownFields(t *testing.T) {
 	writeFixture(t, path, `{
   "schema_version": 1,
   "mori_version": "0.3.0",
-  "normalization_version": 13,
+  "normalization_version": {{normalization}},
   "threshold": 0.7,
   "future_field": true,
   "entries": [{
@@ -245,7 +246,7 @@ func TestLoadRejectsDuplicateIdentities(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "duplicate.json")
-	writeFixture(t, path, `{"schema_version":2,"identity_scope":"content","normalization_version":13,"entries":[{"id":"same"},{"id":"same"}]}`)
+	writeFixture(t, path, `{"schema_version":2,"identity_scope":"content","normalization_version":{{normalization}},"entries":[{"id":"same"},{"id":"same"}]}`)
 	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "duplicate identity") {
 		t.Fatalf("duplicate Load error = %v", err)
 	}
@@ -414,10 +415,8 @@ func testProfile(threshold float64) ScanProfile {
 
 func writeFixture(t *testing.T, path string, content string) {
 	t.Helper()
+	content = strings.ReplaceAll(content, "{{normalization}}", strconv.Itoa(normalize.Version))
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
-	}
-	if normalize.Version != 13 {
-		t.Fatalf("test fixture version = %d, want 13", normalize.Version)
 	}
 }
