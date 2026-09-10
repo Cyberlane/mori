@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mori opt-in feedback bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "samples"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "samples": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "duration",
+          "files",
+          "fragments",
+          "candidate_pairs",
+          "findings",
+          "diagnostics",
+          "outcome",
+          "truncated",
+          "tool_version",
+          "cache",
+          "policy",
+          "analysis",
+          "findings_scope"
+        ],
+        "properties": {
+          "duration": {
+            "enum": [
+              "under-1s",
+              "1-9s",
+              "10-59s",
+              "1-5m",
+              "5m+"
+            ]
+          },
+          "files": {
+            "$ref": "#/$defs/count"
+          },
+          "fragments": {
+            "$ref": "#/$defs/count"
+          },
+          "candidate_pairs": {
+            "$ref": "#/$defs/count"
+          },
+          "findings": {
+            "$ref": "#/$defs/count"
+          },
+          "diagnostics": {
+            "$ref": "#/$defs/count"
+          },
+          "outcome": {
+            "enum": [
+              "completed",
+              "findings",
+              "coverage",
+              "error",
+              "unknown"
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "tool_version": {
+            "type": "string",
+            "pattern": "^(dev|(0|[1-9][0-9]{0,5})\\.(0|[1-9][0-9]{0,5})\\.(0|[1-9][0-9]{0,5}))$"
+          },
+          "cache": {
+            "enum": [
+              "hit",
+              "miss",
+              "bypassed"
+            ]
+          },
+          "classification": {
+            "enum": [
+              "useful",
+              "intentional",
+              "false-positive",
+              "uncertain"
+            ]
+          },
+          "effort": {
+            "enum": [
+              "under-1m",
+              "1-5m",
+              "5-15m",
+              "15m+"
+            ]
+          },
+          "reviewed_rank": {
+            "enum": [
+              "1-5",
+              "6-10",
+              "11-25",
+              "26+"
+            ]
+          },
+          "languages": {
+            "type": "object",
+            "propertyNames": {
+              "enum": [
+                "bash",
+                "c",
+                "cpp",
+                "csharp",
+                "dart",
+                "go",
+                "java",
+                "javascript",
+                "typescript",
+                "tsx",
+                "kotlin",
+                "lua",
+                "luau",
+                "php",
+                "powershell",
+                "python",
+                "ruby",
+                "rust",
+                "sql",
+                "swift",
+                "zsh",
+                "other"
+              ]
+            },
+            "additionalProperties": {
+              "$ref": "#/$defs/count"
+            }
+          },
+          "policy": {
+            "enum": [
+              "strict",
+              "advisory",
+              "scan"
+            ]
+          },
+          "analysis": {
+            "enum": [
+              "complete",
+              "incomplete",
+              "no-comparable-source",
+              "unknown"
+            ]
+          },
+          "findings_scope": {
+            "enum": [
+              "focused",
+              "all"
+            ]
+          },
+          "warning_categories": {
+            "type": "object",
+            "propertyNames": {
+              "enum": [
+                "parse",
+                "coverage",
+                "baseline",
+                "focus",
+                "other"
+              ]
+            },
+            "additionalProperties": {
+              "$ref": "#/$defs/count"
+            }
+          }
+        },
+        "dependentRequired": {
+          "effort": [
+            "classification"
+          ],
+          "reviewed_rank": [
+            "classification"
+          ]
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "classification"
+              ]
+            },
+            "then": {
+              "properties": {
+                "findings": {
+                  "not": {
+                    "const": "0"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "count": {
+      "enum": [
+        "0",
+        "1-9",
+        "10-99",
+        "100-999",
+        "1000+"
+      ]
+    }
+  }
+}

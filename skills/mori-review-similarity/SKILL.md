@@ -95,8 +95,21 @@ an ordinary code review into a full audit merely because a JSON report exists.
 
 For implementation work, do one final scan after the implementation and one
 canonical staged check at commit. Save/query one report rather than rerunning.
-Direct commit authorization need not be re-requested; ask again only for
-unresolved findings or warnings, or for authorization to create/use a receipt.
+Direct commit authorization need not be re-requested. Honor explicit standing
+project authorization for reviewed classifications and receipts; do not ask
+again for the same authorized action. Otherwise ask only when an unresolved
+finding requires an owner decision or receipt authorization is absent.
+
+For new integrations, propose advisory staged review (`--policy advisory`)
+first. Existing hooks default to strict; never change their enforcement
+without project authorization. Advisory review preserves configured coverage
+gates and keeps findings visible. Inspect `review.analysis` independently of
+`review.status`; a passed gate is not proof of complete comparison coverage.
+
+Feedback is off by default. Collection requires the user to enable local
+feedback for that project; CI needs separate consent. Export is a separate
+explicit action with a minimized payload. Do not enable it on behalf of a
+project merely because feedback would be useful.
 
 ## Staged and changed snapshots
 

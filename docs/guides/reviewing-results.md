@@ -3,8 +3,20 @@
 Mori produces a shortlist for source review. A high score means two normalized
 feature multisets overlap strongly; it does not establish equivalent behavior.
 
-To isolate one retained match after a broad scan, copy its content-pair ID and
-rerun with the same scan settings:
+Keep a complete report while showing a bounded review summary:
+
+```sh
+mori scan --profile review --format agent --output /private/report.json .
+```
+
+Choose a private report path outside tracked source. Inspect retained JSON
+identities and source ranges without repeating analysis. The agent summary shows
+at most 25 groups; an unreviewed remainder is still unreviewed, even when the
+command succeeds. Repetitive initializers and UI shapes can be intentional;
+review their effects and ownership before suggesting consolidation.
+
+If a report was not retained, copy a content-pair ID and rescan explicitly with
+the same scan settings:
 
 ```sh
 mori explain aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb --profile review .
@@ -54,10 +66,11 @@ The revision must already exist locally. Mori compares changed and unchanged
 source together, then moves groups touching changed files forward. It includes
 staged, unstaged, and untracked non-ignored files and never fetches a remote.
 
-Use `--staged` when that broader working-tree behavior is undesirable. Staged
-mode reads the repository index only; combine `--include-focused` with
-`--require-focused-coverage` and inspect every `path_evidence` status before
-calling the pre-commit review complete.
+Use `mori review staged check` for a commit decision. This canonical command
+reads the repository index only and enforces focused inclusion and coverage.
+Inspect `path_evidence` and the separate policy/analysis outcome before calling
+the review complete. [Review policy](review-policy.md) describes explicitly
+opting into advisory enforcement; existing gates stay strict by default.
 
 Use repeated `--focus-path` for explicit paths. For nested worktrees, give each
 root its own locally available revision with repeated

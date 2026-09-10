@@ -114,6 +114,14 @@ type document struct {
 // contract is not compatible with the current binary. Schema 1 is interpreted
 // using its original content-addressed behavior.
 func Load(path string) (Set, error) {
+	return load(path, false)
+}
+
+// LoadForMigration permits the specifically supported normalization-12 to -13
+// transition only for explicit migration. It must never supply scan suppression.
+func LoadForMigration(path string) (Set, error) { return load(path, true) }
+
+func load(path string, migration bool) (Set, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return Set{}, fmt.Errorf("read baseline: %w", err)
@@ -123,12 +131,14 @@ func Load(path string) (Set, error) {
 	if err != nil {
 		return Set{}, fmt.Errorf("read baseline: %w", err)
 	}
-	return Decode(content)
+	return decode(content, migration)
 }
 
 // Decode validates and loads one bounded baseline document from trusted input
 // bytes such as a stage-zero Git index blob.
-func Decode(content []byte) (Set, error) {
+func Decode(content []byte) (Set, error) { return decode(content, false) }
+
+func decode(content []byte, migration bool) (Set, error) {
 	if int64(len(content)) > MaxDocumentBytes {
 		return Set{}, fmt.Errorf("read baseline: document exceeds %d bytes", MaxDocumentBytes)
 	}
@@ -144,7 +154,7 @@ func Decode(content []byte) (Set, error) {
 			SchemaVersion,
 		)
 	}
-	if stored.NormalizationVersion != normalize.Version {
+	if stored.NormalizationVersion != normalize.Version && !(migration && normalize.Version == 13 && stored.NormalizationVersion == 12) {
 		return Set{}, fmt.Errorf(
 			"baseline normalization version %d does not match current version %d; migrate or regenerate the baseline",
 			stored.NormalizationVersion,

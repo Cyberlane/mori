@@ -29,7 +29,7 @@ undiscovered. A successful aggregate does not excuse an empty supported file.
 
 ## Required report fields
 
-Require `schema_version` to equal `20`. Validate the mandatory `tool` object:
+Require `schema_version` to equal `21`. Validate the mandatory `tool` object:
 version, revision, source date, modified flag, platform, Go version, and
 normalization version. Official release binaries provide full revision and
 source date. A version-pinned source build may report its version while

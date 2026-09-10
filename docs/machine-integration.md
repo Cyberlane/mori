@@ -34,19 +34,28 @@ presentation only, not scores, fingerprints, counts, or schema version.
 
 ## Versioned JSON contract
 
-Schema 20 is described by the Draft 2020-12 artifact at
-[`schemas/mori-report-v20.schema.json`](../schemas/mori-report-v20.schema.json).
+Schema 21 is described by the Draft 2020-12 artifact at
+[`schemas/mori-report-v21.schema.json`](../schemas/mori-report-v21.schema.json).
 Official releases include the same file and its SHA-256 checksum.
 Consumers should select a validator that supports Draft 2020-12, require
-`schema_version` to equal `20`, and reject or explicitly handle unknown report
+`schema_version` to equal `21`, and reject or explicitly handle unknown report
 versions.
+
+Schema 21 adds the optional canonical staged `review` outcome: selected policy,
+policy status, analysis completeness, coverage-policy result, focused finding
+count and validated acknowledgement. Policy success is not a complete-analysis
+or human-review claim. See [review policies](guides/review-policy.md). Timing and
+opt-in feedback remain outside this deterministic report contract.
 
 Schema 20 adds exact changed-line intervals to focused path evidence and an
 explicit `configuration.focused_only` comparison-universe flag. Schema 19 adds
 optional compatible staged-review receipt evidence. Schema 18
 added immutable Git-index input provenance, named project scopes, and per-path
 focused coverage. Schema 17 added the optional stdin overlay field.
-The current normalization version is 12 and the baseline contract is schema 4.
+The current normalization version is 13 and the baseline contract is schema 4.
+Version 13 records corrected Swift optional-type/nil-coalescing grammar. Previously
+repaired expressions can lose synthetic grouping nodes and change fingerprints;
+review existing acceptance before migrating it to this contract.
 Schema 4 adds the `false-positive` review classification without changing
 matching or suppression semantics. Under `--staged`, the index digest covers the exact tracked baseline
 blob as well as source, ignore, and configuration inputs; there is no separate

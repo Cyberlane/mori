@@ -3,8 +3,8 @@ package language
 import (
 	"testing"
 
+	tree_sitter_sql "github.com/Cyberlane/mori/internal/grammar/sql"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
-	tree_sitter_sql "github.com/wippyai/tree-sitter-sql/bindings/go"
 )
 
 func TestSQLDependencyParsesRepresentativeQueries(t *testing.T) {

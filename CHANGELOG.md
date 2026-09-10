@@ -7,6 +7,49 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-09-10
+
+### Added
+
+- Opt-in authenticated staged analysis reuse for unchanged snapshots, with
+  private bounded cache storage and unchanged receipt/coverage enforcement.
+- Explicit advisory staged review and hook policy, with strict behaviour retained
+  by default and coverage requirements preserved in both modes.
+- Opt-in, project-specific local feedback with separate CI consent, bounded
+  storage and a minimized export preview. No feedback submission or network
+  service is included.
+- Actionable upgrade diagnostics for obsolete latest-release prerequisites,
+  exhaustive review instructions and custom partial-staging restrictions.
+- Offline summaries of explicitly exported feedback, with separate scan and
+  selected-finding counts and no automatic ranking changes or submission.
+
+### Changed
+
+- Report schema advances to 21 to distinguish staged policy outcomes from
+  analysis completeness. Hook contract advances to v2; configuration schema 1,
+  project-contract schema 1, receipt schema 2 and baseline schema 4 remain unchanged.
+  Normalization advances to 13 for corrected Swift optional-type/nil-coalescing
+  grammar; affected fingerprints and prior acceptance require review. Supported
+  prior project contracts remain upgradeable.
+- Agent summaries explain ranking, distinguish focused-file and background
+  diagnostics, and summarize reasons for files without comparison fragments.
+- Embedded guidance preserves standing authorization and describes advisory
+  adoption without silently changing existing enforcement.
+- Staged caching uses a bounded shared-location dictionary for larger reports
+  and protected user-only Windows ACLs. CI covers all five release targets.
+
+### Fixed
+
+- Narrow TypeScript/TSX ambient-interface import-type compatibility repair,
+  preserving source offsets and malformed-function exclusion.
+- SQLite PRAGMA, STRICT, CHECK expressions, GLOB and trigger syntax; C conditional
+  initializer branches and bounded framework macro forms; Swift cast/coalescing
+  parsing. Grammar sources include reproducible generation provenance.
+- Explicit normalization 12-to-13 baseline migration preserves decisions after
+  complete current analysis; ordinary scans still reject incompatible acceptance.
+- Feedback consent cannot spill into expanded changed-code scopes, and scans
+  without findings cannot be annotated as reviewed findings.
+
 ## [0.31.0] - 2026-08-20
 
 ### Added
@@ -673,7 +716,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.28.1...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.32.0...HEAD
+[0.32.0]: https://github.com/Cyberlane/mori/compare/v0.31.0...v0.32.0
+[0.31.0]: https://github.com/Cyberlane/mori/compare/v0.30.0...v0.31.0
+[0.30.0]: https://github.com/Cyberlane/mori/compare/v0.29.0...v0.30.0
+[0.29.0]: https://github.com/Cyberlane/mori/compare/v0.28.1...v0.29.0
 [0.28.1]: https://github.com/Cyberlane/mori/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/Cyberlane/mori/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/Cyberlane/mori/compare/v0.26.0...v0.27.0

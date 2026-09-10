@@ -212,7 +212,7 @@ The top-level shape is:
 
 ```json
 {
-  "schema_version": 20,
+  "schema_version": 21,
   "tool": {
     "name": "mori",
     "version": "<version>",
@@ -222,7 +222,7 @@ The top-level shape is:
     "go_version": "<Go version>",
     "goos": "<target OS>",
     "goarch": "<target architecture>",
-    "normalization_version": 12
+    "normalization_version": 13
   },
   "threshold": 0.85,
   "files": 4,
@@ -382,7 +382,7 @@ evidence entry and records `configuration.focused_only`. Canonical staged
 review sets that flag and parses the full repository while scoring only pairs
 that contain an exact hunk-intersecting fragment. It also corrects the public
 receipt-evidence contract to the current receipt schema 2. Baseline schema
-remains 4 and normalization remains 12. The complete current contract is
+remained 4 and normalization remained 12. The schema-20 contract is
 published as
 [`schemas/mori-report-v20.schema.json`](../schemas/mori-report-v20.schema.json).
 `focused_only` is recorded for report reproducibility but is not added to the
@@ -506,3 +506,16 @@ ignored focused-file inclusion, and complete focused-file coverage by
 construction. Receipt schema 2 records that contract and reports field-level
 drift without source content. The lower-level commands remain available for
 deliberately custom staged policies.
+
+
+### Schema 21: staged review policy
+
+Canonical staged checks add an optional `review` outcome separating the selected
+strict/advisory gate result from analysis completeness. Policy selection does not
+alter similarity or fingerprints. Separately, normalization 13 records corrected
+Swift optional-type/nil-coalescing grammar; formerly repaired expressions can
+change fingerprints when synthetic grouping nodes disappear. Baseline schema 4
+remains unchanged, but prior normalization acceptance needs review. See
+[the current schema](../schemas/mori-report-v21.schema.json) and
+[review policies](guides/review-policy.md). Timing and feedback are separate
+opt-in local records and never affect deterministic analysis or acceptance.

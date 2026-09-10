@@ -100,10 +100,28 @@ Use `baseline edit` to update a note or classification and `baseline remove` to
 revoke acceptance. `baseline update` is preview-only unless `--accept-all` is
 explicit.
 
-Schema-3 baselines bind acceptance to a digest of the effective selection,
+Schema-4 baselines bind acceptance to a digest of the effective selection,
 threshold, dialect, fragment, exclusion, ignore-content, resource, and coverage
 policy. Profile mismatches fail closed. Legacy baselines remain readable but
-must be explicitly migrated before mutation.
+must be explicitly migrated before mutation. Schema 3 remains readable and
+requires migration before mutation; schema 4 also supports `false-positive`
+classification. Migration changes the recorded contract, so review the reported
+profile differences before explicitly accepting it.
+
+For normalization 12 to 13, ordinary scans continue to reject old acceptance.
+After reviewing the normalization change, `baseline migrate --accept-profile`
+can read that specific prior version, perform a complete unsuppressed scan, and
+write the current contract. It preserves existing decisions and metadata and
+reports how many retained entries are currently stale; it does not accept new
+identities. Failed coverage or mutation-completeness checks leave the file intact.
+Other unsupported normalization versions require separate review/regeneration.
+
+Baseline decisions apply only to matching content identities and their recorded
+scope. Changed code can produce a new identity and require fresh review; an old
+acceptance must not silently follow it. Use `baseline prune --check` to inspect
+stale entries and `baseline update` to preview candidate additions. These commands
+do not authorize accepting every new finding. Keep intentional UI symmetry
+classified separately from source-verified duplication.
 
 Baseline mutation refuses failed coverage policy, truncated reports, and
 warnings unless every reviewed warning kind is explicitly allowed. Never use a

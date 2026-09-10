@@ -1088,7 +1088,7 @@ func TestSQLDDLParseWarningDoesNotClaimFragmentsWereSkipped(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "schema.sql")
-	content := `PRAGMA foreign_keys = ON;
+	content := `PRAGMA foreign_keys = ;
 CREATE TABLE documents (
   metadata TEXT CHECK(json_valid(metadata))
 );

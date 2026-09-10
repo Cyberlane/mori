@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 20
+const SchemaVersion = 21
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -325,7 +325,19 @@ type IgnoreFileEvidence struct {
 }
 
 // Report is the stable JSON and text reporting model.
+// ReviewOutcome separates a staged gate decision from analysis coverage.
+// It never asserts that findings have been reviewed by a person.
+type ReviewOutcome struct {
+	Policy            string `json:"policy"`
+	Status            string `json:"status"`
+	Analysis          string `json:"analysis"`
+	CoveragePolicyMet bool   `json:"coverage_policy_met"`
+	Findings          int    `json:"findings"`
+	Acknowledged      bool   `json:"acknowledged"`
+}
+
 type Report struct {
+	Review                  *ReviewOutcome  `json:"review,omitempty"`
 	SchemaVersion           int             `json:"schema_version"`
 	Tool                    buildinfo.Info  `json:"tool"`
 	Threshold               float64         `json:"threshold"`

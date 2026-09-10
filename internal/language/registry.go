@@ -7,9 +7,11 @@ import (
 	"sort"
 	"strings"
 
+	tree_sitter_c "github.com/Cyberlane/mori/internal/grammar/c"
 	tree_sitter_gdscript "github.com/Cyberlane/mori/internal/grammar/gdscript"
 	tree_sitter_hack "github.com/Cyberlane/mori/internal/grammar/hack"
 	tree_sitter_postgresql "github.com/Cyberlane/mori/internal/grammar/postgresql"
+	tree_sitter_sql "github.com/Cyberlane/mori/internal/grammar/sql"
 	tree_sitter_swift "github.com/Cyberlane/mori/internal/grammar/swift"
 	tree_sitter_dart "github.com/UserNobody14/tree-sitter-dart/bindings/go"
 	tree_sitter_kotlin "github.com/tree-sitter-grammars/tree-sitter-kotlin/bindings/go"
@@ -18,7 +20,6 @@ import (
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tree_sitter_bash "github.com/tree-sitter/tree-sitter-bash/bindings/go"
 	tree_sitter_c_sharp "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
-	tree_sitter_c "github.com/tree-sitter/tree-sitter-c/bindings/go"
 	tree_sitter_cpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
 	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
 	tree_sitter_java "github.com/tree-sitter/tree-sitter-java/bindings/go"
@@ -30,7 +31,6 @@ import (
 	tree_sitter_typescript "github.com/tree-sitter/tree-sitter-typescript/bindings/go"
 	tree_sitter_zsh "github.com/tree-sitter/tree-sitter-zsh/bindings/go"
 	tree_sitter_powershell "github.com/wharflab/tree-sitter-powershell/bindings/go"
-	tree_sitter_sql "github.com/wippyai/tree-sitter-sql/bindings/go"
 )
 
 // Spec describes a parser grammar and the nodes that form comparison units.

@@ -151,7 +151,8 @@ to reject or explicitly handle unknown report schema versions.
 
 Domain and family selection do not change fragment features. SQL dialect
 selection chooses a different parser and is therefore recorded explicitly.
-The current normalization version is 12. It includes the established opt-in
+The current normalization version is 13. It records the corrected Swift
+optional-type/nil-coalescing grammar and includes the established opt-in
 embedded-query and statement-block units, ordered evidence, and Java/C#
 and PHP/Hack function boundaries, plus the Lua/Luau and GDScript comparison
 units and mappings. Baselines created with an older normalization version must

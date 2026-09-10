@@ -1,27 +1,44 @@
 # Tree-sitter Swift generated-source provenance
 
-Mori vendors only the generated C sources and required headers needed to build
-the Swift grammar reproducibly from a clean checkout.
+Mori vendors the grammar source, generated C parser, scanner, and required headers
+so builds do not download or regenerate grammar code.
 
 - Upstream: `https://github.com/alex-pinkus/tree-sitter-swift`
 - Source commit: `8d02b7ff390a17a43ce90c4e987c49315cfc4be6`
 - Source package version: `0.7.3`
-- Upstream workflow: `https://github.com/alex-pinkus/tree-sitter-swift/actions/runs/30769290474`
-- Artifact: `generated-parser-src`
-- Tree-sitter CLI pinned by the upstream lockfile: `0.23.0`
+- Tree-sitter CLI for local regeneration: `0.25.10`
 - Grammar ABI: `14`
 - License: MIT, reproduced in `LICENSE`
+
+Mori's grammar change replaces the external nil-coalescing token in
+`optional_type` with an immediate double-question-mark token. Adjacent `T??`
+remains a nested optional type; whitespace-separated `as? T ?? fallback` remains
+a cast followed by nil coalescing. No expression precedence was changed. This
+also permits casts inside call arguments without adding synthetic parentheses.
+The scanner is unchanged from the original pinned artifact.
+
+To regenerate in a temporary directory, copy `grammar.js` and run:
+
+```sh
+npx --yes tree-sitter-cli@0.25.10 generate --abi 14
+```
+
+Copy `src/parser.c` and `src/tree_sitter/{parser,alloc,array}.h` back beside the
+unchanged scanner, then verify these hashes and run `make check`. Ordinary builds
+and releases use the committed generated sources directly.
 
 SHA-256:
 
 ```text
-9df63e0b6680f0b6cf1f1df613aaff2a7a4a3d9c9eb573b28b5d5c33fdaf7494  parser.c
+396a01dc8e8d3e911dbcfacc7adcb1aedcea921f1f7152dd30d7cb9406a80444  grammar.js
+ae59d95b8b4f1b4fd35b7e26def91344db9f7de24111618b26269a5cd7d31037  parser.c
 380edc27e2020e5ba2d6415c9f6c0065965771d60138ae53372858e7b1f92e3b  scanner.c
-a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a  tree_sitter/parser.h
-4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1  tree_sitter/array.h
-253b44a7b4313a7afd0c505c2fc6e7ce4b8e78955ebf4be3ea000532ec060673  tree_sitter/alloc.h
+180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2  tree_sitter/parser.h
+5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94  tree_sitter/array.h
+b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea  tree_sitter/alloc.h
 ```
 
-The upstream project intentionally omits `parser.c` from its main branch and
-publishes it as a workflow artifact. Mori does not download or regenerate this
-source during ordinary builds or releases.
+The former parser came from upstream workflow
+`https://github.com/alex-pinkus/tree-sitter-swift/actions/runs/30769290474`, artifact
+`generated-parser-src`, generated using CLI `0.23.0`. This local regeneration
+supersedes that parser while retaining the exact upstream scanner.

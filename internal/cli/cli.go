@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Cyberlane/mori/internal/analyzer"
 	"github.com/Cyberlane/mori/internal/baseline"
@@ -65,6 +66,8 @@ func RunWithInput(
 	}
 
 	switch args[0] {
+	case "feedback":
+		return runFeedback(args[1:], stdout, stderr)
 	case "scan":
 		return runScan(ctx, args[1:], stdin, stdout, stderr)
 	case "explain":
@@ -180,6 +183,8 @@ type scanOptions struct {
 	reviewReceiptPath  string
 	acceptFocused      bool
 	focusedOnly        bool
+	reviewPolicy       string
+	stagedCache        bool
 }
 
 func defaultScanOptions() scanOptions {
@@ -228,6 +233,10 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 			"analyze bounded stdin as the unsaved content of one discovered source path",
 		)
 		flags.BoolVar(&options.staged, "staged", options.staged, "analyze the immutable Git index instead of working-tree files")
+	}
+	if baselineAction == "staged-check" {
+		flags.BoolVar(&options.stagedCache, "cache", false, "reuse authenticated analysis for an unchanged staged snapshot; private local storage")
+		flags.StringVar(&options.reviewPolicy, "policy", "strict", "staged review policy: strict or advisory; coverage requirements still apply")
 	}
 	if baselineAction == "" || baselineAction == "staged-check" {
 		flags.StringVar(&options.reviewReceiptPath, "review-receipt", options.reviewReceiptPath, "local receipt that acknowledges the exact staged focused findings")
@@ -455,8 +464,11 @@ func parseScanOptions(
 		options.includeFocused = true
 		options.requireFocus = true
 		options.failOnMatch = false
-		options.failOnFocusedMatch = contractMode == "staged-check"
+		options.failOnFocusedMatch = contractMode == "staged-check" && options.reviewPolicy != "advisory"
 		options.focusedOnly = true
+	}
+	if options.reviewPolicy != "" && options.reviewPolicy != "strict" && options.reviewPolicy != "advisory" {
+		return scanOptions{}, nil, usageError(stderr, "--policy must be strict or advisory"), false
 	}
 	if !options.staged {
 		options.stagedSnapshot = nil
@@ -1090,7 +1102,8 @@ func runScanCommand(
 	stdin io.Reader,
 	stdout io.Writer,
 	stderr io.Writer,
-) int {
+) (exitCode int) {
+	started := time.Now()
 	options, paths, code, ok := parseScanOptions(command, args, stderr, mode)
 	if !ok {
 		return code
@@ -1098,6 +1111,9 @@ func runScanCommand(
 	if mode == "hook-pre-commit" {
 		receiptRequest := os.Getenv("MORI_STAGED_REVIEW_RECEIPT")
 		if receiptRequest == "1" {
+			if options.reviewPolicy == "advisory" {
+				return usageError(stderr, "advisory review does not use a focused-match receipt")
+			}
 			if options.reviewReceiptPath != "" {
 				return usageError(stderr, "MORI_STAGED_REVIEW_RECEIPT=1 cannot be combined with --review-receipt")
 			}
@@ -1138,11 +1154,36 @@ func runScanCommand(
 		// retention is bounded.
 		scanOptions.maxGroups = 0
 	}
-	result, err := executeScan(ctx, paths, scanOptions, suppress, baselineWarnings)
-	if err != nil {
-		fmt.Fprintf(stderr, "mori: %v\n", err)
-		return exitError
+	cacheState := "bypassed"
+	var cache *stagedAnalysisCache
+	var result model.Report
+	cacheHit := false
+	if options.stagedCache {
+		cache, _ = openStagedAnalysisCache(ctx, paths, scanOptions, baselineDigest, baselineWarnings)
+		if cache != nil {
+			cacheState = "miss"
+			result, cacheHit = cache.Load()
+			if cacheHit {
+				cacheState = "hit"
+			}
+		}
 	}
+	if !cacheHit {
+		result, err = executeScan(ctx, paths, scanOptions, suppress, baselineWarnings)
+		if err != nil {
+			fmt.Fprintf(stderr, "mori: %v\n", err)
+			return exitError
+		}
+		if cache != nil {
+			_ = cache.Save(result)
+		}
+	}
+	feedbackRoot := scanFeedbackRoot(options, paths)
+	defer func() {
+		if feedbackRoot != "" {
+			captureLocalFeedback(feedbackRoot, result, time.Since(started), feedbackOutcome(exitCode), cacheState)
+		}
+	}()
 	if baselineStatus == "loaded" {
 		if baselineDigest != result.Configuration.ScanProfileDigest {
 			fmt.Fprintf(
@@ -1178,6 +1219,10 @@ func runScanCommand(
 			result.Groups = result.Groups[:options.maxGroups]
 			result.Truncated = true
 		}
+	}
+
+	if options.reviewPolicy != "" {
+		result.Review = stagedReviewOutcome(options, result)
 	}
 
 	if options.outputPath != "" {
@@ -1451,6 +1496,11 @@ func receiptEvidence(result model.Report, options scanOptions) reviewreceipt.Evi
 func renderScanReport(stdout io.Writer, result model.Report, options scanOptions) error {
 	if options.redactPaths {
 		redactReportPaths(&result)
+	}
+	if result.Review != nil && (options.format == "text" || options.format == "compact") {
+		if _, err := fmt.Fprintf(stdout, "review: %s; policy %s; analysis %s; coverage policy met %t; %d focused group(s)\n", result.Review.Status, result.Review.Policy, result.Review.Analysis, result.Review.CoveragePolicyMet, result.Review.Findings); err != nil {
+			return err
+		}
 	}
 	switch options.format {
 	case "agent":
@@ -1759,7 +1809,7 @@ func runBaselineMigrate(ctx context.Context, args []string, stdout io.Writer, st
 	if err := rejectBaselineFocus(options, "migrate"); err != nil {
 		return usageError(stderr, err.Error())
 	}
-	set, err := baseline.Load(options.baselinePath)
+	set, err := baseline.LoadForMigration(options.baselinePath)
 	if err != nil {
 		return commandError(stderr, "load baseline", err)
 	}
@@ -3221,7 +3271,9 @@ func writeRootUsage(writer io.Writer) error {
 		"  mori baseline migrate --baseline <path> --accept-profile [options] [path ...]\n",
 		"  mori baseline update --baseline <path> [options] [path ...]\n",
 		"  mori baseline prune --baseline <path> [options] [path ...]\n",
-		"  mori review staged check [options] [path ...]\n",
+		"  mori review staged check [--policy strict|advisory] [options] [path ...]\n",
+		"  mori feedback enable|status|disable|clear|export|classify --root <project>\n",
+		"  mori feedback summarize EXPORT.json [EXPORT.json ...]\n",
 		"  mori review staged acknowledge --accept-focused [options] [path ...]\n",
 		"  mori hook pre-commit [options] [path ...]\n",
 		"  mori review acknowledge --staged --include-focused --require-focused-coverage --accept-focused [options] [path ...]\n",

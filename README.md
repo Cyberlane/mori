@@ -158,6 +158,7 @@ before an explicit `--apply`. See [Editors and coding agents](docs/guides/editor
 - [Getting started](docs/getting-started.md)
 - [Reviewing results](docs/guides/reviewing-results.md)
 - [SQL and embedded SQL](docs/guides/sql.md)
+- [Parser compatibility](docs/guides/parser-compatibility.md)
 - [Automation and baselines](docs/guides/automation-and-baselines.md)
 - [Editors and coding agents](docs/guides/editors-and-agents.md)
 - [Project contract and upgrades](docs/guides/project-upgrade.md)
@@ -166,6 +167,24 @@ before an explicit `--apply`. See [Editors and coding agents](docs/guides/editor
 - [Machine integration](docs/machine-integration.md)
 - [Architecture](docs/architecture.md)
 - [Adding a language](docs/adding-a-language.md)
+
+## Smooth project reviews
+
+Start a new integration with [advisory staged review](docs/guides/review-policy.md)
+to see structural leads without blocking on similarity alone. Existing hooks
+remain strict. Both policies retain configured coverage requirements; the report
+separates policy success from analysis completeness. Trust the project version
+pin and schedule upgrades separately. [Upgrade diagnostics](docs/guides/project-upgrade.md)
+identify obsolete workflow instructions without rewriting project policy.
+
+[Rollout guidance](docs/guides/usability-rollout.md) covers native verification,
+reviewed project migration and opt-in pilot evaluation.
+
+[Local feedback](docs/guides/feedback.md) is off by default. Explicit per-project
+consent enables bounded measurements; export previews a separate minimized
+bundle. Mori does not upload feedback. Collection never accepts findings or
+changes a baseline. `mori feedback summarize` compares explicitly exported bundles
+offline without counting exports as distinct projects.
 
 ## Development
 
