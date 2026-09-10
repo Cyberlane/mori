@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Editors and coding agents · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html" aria-current="page">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/editors-and-agents.md">Markdown source ↗</a></div>
+<h1 id="editors-and-coding-agents">Editors and coding agents</h1>
+<p>Mori keeps source local. Editor and agent integrations invoke the local binary
+and consume deterministic SARIF or JSON.</p>
+<h2 id="vs-code">VS Code</h2>
+<p>The repository contains a dependency-free
+<a href="../../editors/vscode/index.html">reference extension</a>. It debounces edits,
+cancels superseded scans, rejects stale results, and displays findings as
+informational diagnostics and incomplete-analysis conditions as warnings.
+Locationless warnings are labeled <strong>Scan-level warning</strong> at the start of the
+edited document. A failed process or invalid response replaces stale findings
+with <strong>Mori analysis unavailable</strong>; <strong>Mori: Show Diagnostic Output</strong> opens the
+detail. Warnings specific only to another file remain outside the edited file's
+diagnostics. The runtime language list comes directly from extension activation
+capabilities, including Dart, Kotlin, PowerShell, and Ruby.</p>
+<p>The extension does not download Mori, upload source, write temporary source
+files, or send telemetry. Install an official binary separately and place it
+on <code>PATH</code>, or configure an explicit executable path.</p>
+<h2 id="other-editors">Other editors</h2>
+<p>Editors with Language Server Protocol support can launch:</p>
+<pre><code class="language-sh">mori lsp
+</code></pre>
+<p>The server accepts full-document synchronization and publishes informational
+structural-review leads with related source locations. It debounces edits,
+cancels stale work, and emits incomplete-analysis warnings instead of silently
+turning parser or coverage gaps into an empty result.</p>
+<h2 id="unsaved-buffers">Unsaved buffers</h2>
+<p>Editors can overlay one already-discovered source path through standard input:</p>
+<pre><code class="language-sh">mori scan --profile review --format sarif \
+  --stdin-path src/example.go . &lt; src/example.go
+</code></pre>
+<p>Mori reads at most 16 MiB from standard input, applies a lower configured file
+limit when present, and automatically focuses results touching the overlaid
+file. The path must already be a supported discovered file; the overlay does
+not create a new discovery route.</p>
+<p>See <a href="../machine-integration.html">Machine and editor integration</a> for stable rule
+IDs, source regions, limits, suppression semantics, exit behavior, and the
+versioned JSON Schema.</p>
+<h2 id="coding-agent-skill">Coding-agent skill</h2>
+<p>Install the embedded review skill into the current project:</p>
+<pre><code class="language-sh">mori skill install --project .
+</code></pre>
+<p>Or install it for the current user:</p>
+<pre><code class="language-sh">mori skill install --global
+</code></pre>
+<p>The skill requires the agent to verify the binary, inventory supported and
+unsupported source, inspect exact coverage, use bounded structured output,
+open both source locations, and classify matches before recommending changes.
+It explicitly prohibits treating a score as proof of equivalent behavior.</p>
+<p>Agent installation, project configuration, refactoring, baselining, CI,
+committing, pushing, and releasing are separate permissions. Installing the
+skill alone does not authorize any of the others.</p>
+<h2 id="coordinated-project-upgrades">Coordinated project upgrades</h2>
+<p>An updated CLI can inspect every project-managed Mori surface in one local,
+versioned plan:</p>
+<pre><code class="language-sh">mori project upgrade --check --format json .
+mori project upgrade --dry-run .
+mori project upgrade --apply .
+</code></pre>
+<p>Check mode exits <code>5</code> when required Mori-managed migration remains or a managed
+conflict blocks compatibility. Apply mode
+updates the pin and tracked project contract, replaces only a missing,
+contract-recorded, or known official prior skill with a recoverable backup,
+and then rechecks the project. Unknown skill changes are preserved and marked
+as a manual conflict. Configuration, protected baseline evidence, hooks,
+scripts, and CI remain project-owned; they are inventoried but never rewritten.
+The command also never installs a CLI, creates a baseline, commits, pushes, or
+releases.</p>
+<h2 id="agent-guided-project-setup">Agent-guided project setup</h2>
+<p>Ask Mori for a deterministic, read-only project inventory and question plan:</p>
+<pre><code class="language-sh">mori setup --agent --format json . &gt; mori-setup-plan.json
+</code></pre>
+<p>The plan uses project-relative paths and describes the supported-language
+inventory, unsupported extensions, current configuration state, editable scope
+suggestions, questions, and next commands. Setup-plan schema 2 adds those
+suggestions; the strict answers document remains backward-compatible and has
+no version field. A project agent can write a small answers document such as:</p>
+<pre><code class="language-json">{
+  &quot;profile&quot;: &quot;review&quot;,
+  &quot;comparison_mode&quot;: &quot;cross-language&quot;,
+  &quot;strictness&quot;: &quot;standard&quot;,
+  &quot;exclude_generated&quot;: true,
+  &quot;review_intent&quot;: &quot;application&quot;,
+  &quot;scope_name&quot;: &quot;application&quot;,
+  &quot;roots&quot;: [&quot;src&quot;],
+  &quot;scope_exclude&quot;: [&quot;**/*.test.ts&quot;]
+}
+</code></pre>
+<p><code>review_intent</code> accepts <code>keep</code>, <code>application</code>, <code>tests</code>, or <code>all</code>. Omit <code>roots</code>
+and <code>scope_exclude</code> to use a suggested policy; an explicit empty
+<code>scope_exclude</code> removes the suggested exclusions, but cannot remove existing
+base exclusions. Existing named scopes are never overwritten: choose a new
+<code>scope_name</code> or edit the old policy deliberately. Test/story path conventions
+are suggestions, not proof of ownership or complete inline-test classification.</p>
+<p>The example creates an opt-in application scope. Use <code>mori scan --scope
+application</code> for that exploratory surface and keep the base policy inclusive
+for <code>mori review staged check</code>. Setting top-level <code>exclude</code> still affects every
+scope and can make supported staged paths unanalyzed.</p>
+<p>Preview the exact <code>.mori.json</code> without writing:</p>
+<pre><code class="language-sh">mori setup --answers mori-answers.json --dry-run .
+</code></pre>
+<p>Apply only after review:</p>
+<pre><code class="language-sh">mori setup --answers mori-answers.json --apply .
+mori doctor .
+</code></pre>
+<p>Use <code>mori configure --agent</code> and the corresponding <code>configure --answers</code>
+commands for an existing file. Answer files are strict JSON, symlinks are
+refused, and configuration replacement is atomic. These commands do not create
+a baseline, install a hook or skill, edit CI, refactor source, commit, push, or
+release anything.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#vs-code">VS Code</a></li>
+<li><a href="#other-editors">Other editors</a></li>
+<li><a href="#unsaved-buffers">Unsaved buffers</a></li>
+<li><a href="#coding-agent-skill">Coding-agent skill</a></li>
+<li><a href="#coordinated-project-upgrades">Coordinated project upgrades</a></li>
+<li><a href="#agent-guided-project-setup">Agent-guided project setup</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

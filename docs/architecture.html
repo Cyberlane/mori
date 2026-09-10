@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Architecture · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html" aria-current="page">Architecture</a><a href="configuration.html">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../source/docs/architecture.md">Markdown source ↗</a></div>
+<h1 id="architecture">Architecture</h1>
+<p>森 (<em>mori</em>) is a local CLI with a deliberately narrow pipeline:</p>
+<pre><code class="language-mermaid">flowchart LR
+    A[Paths and options] --&gt; B[Bounded discovery]
+    B --&gt; C[Language registry]
+    C --&gt; D[Native Tree-sitter parsers]
+    D --&gt; E[Comparison fragments]
+    E --&gt; F[Canonical feature bags]
+    F --&gt; G[Size-bound pruning]
+    G --&gt; H[Weighted Jaccard]
+    H --&gt; I[Deterministic text or JSON]
+</code></pre>
+<p>Each stage owns one kind of uncertainty. Discovery decides what can be read,
+grammar adapters decide where comparison fragments begin and end,
+normalization decides which syntax distinctions matter, and scoring reports
+overlap without claiming behavioral equivalence.</p>
+<h2 id="package-responsibilities">Package responsibilities</h2>
+<h3 id="internalsource"><code>internal/source</code></h3>
+<ul>
+<li>Expands explicit files and directories.</li>
+<li>Detects supported extensions through the language registry.</li>
+<li>Reads only a bounded first line to recognize supported interpreters in
+  extensionless scripts; it never executes an interpreter.</li>
+<li>Skips dependency, VCS, and build-output directories.</li>
+<li>Loads nested <code>.gitignore</code> and <code>.moriignore</code> rules for directory scans.</li>
+<li>Applies repeatable doublestar exclude globs.</li>
+<li>Applies selected comparison domains before file-size checks and parsing.</li>
+<li>Conservatively classifies generated-source comment markers in a bounded
+  header read and optionally excludes those files while retaining coverage
+  evidence.</li>
+<li>Rejects discovered symlinks and symlinked components below trusted scan
+  roots.</li>
+<li>Enforces a file-size limit before and during reads.</li>
+<li>Stops directory walking when the scan context is canceled.</li>
+<li>Returns recoverable warnings instead of hiding explicit-input failures.</li>
+</ul>
+<p>Paths are sorted before parsing so worker scheduling cannot alter output.</p>
+<h3 id="internalconfig"><code>internal/config</code></h3>
+<p>Loads a strict, size-bounded <code>.mori.json</code> discovered upward from the current
+working directory or selected with <code>--config</code>. Unknown fields and non-regular
+files fail closed. Command-line flags override configured scalar values, while
+repeatable exclusions and language pairs are additive.</p>
+<h3 id="internalcli-staged-review-contract"><code>internal/cli</code> staged review contract</h3>
+<p><code>mori review staged check</code> and <code>mori review staged acknowledge</code> resolve one
+canonical immutable-index contract before analysis. Staged paths are the only
+focus set, otherwise ignored focused source is included, and every supported
+non-deleted focused path must be analyzed. The check applies focused-match
+policy; acknowledgment records an explicit owner decision without hiding the
+findings. Lower-level scan options cannot override those fixed dimensions.</p>
+<p>Receipt schema 2 binds the contract, HEAD, Git-index digest, scan-profile
+digest, tool and normalization versions, focused coverage totals, and complete
+focused identity set. Any drift fails closed with source-free field-level
+diagnostics. Report schema and baseline compatibility remain independent.</p>
+<h3 id="internallanguage"><code>internal/language</code></h3>
+<p>The registry binds:</p>
+<ul>
+<li>a stable language ID, review family, comparison domain, and fragment kind;</li>
+<li>display name, extensions, and optional shebang interpreter names;</li>
+<li>one generated Tree-sitter grammar; and</li>
+<li>grammar node predicates that identify comparison units.</li>
+</ul>
+<p>Grammar versions are pinned as a compatible ABI set. Swift's upstream project
+publishes generated C sources as a workflow artifact, while the PostgreSQL
+module publishes its generated parser through Git LFS and a release archive.
+The only substantial Hack grammar upstream is archived, so Mori pins its exact
+generated source commit and documents that maintenance boundary.
+Mori vendors the minimum generated sources and required headers under
+<code>internal/grammar/swift</code>, <code>internal/grammar/postgresql</code>, and
+<code>internal/grammar/hack</code>. Those packages
+record exact source commits, artifacts, licenses, ABIs, and SHA-256 digests;
+ordinary builds never download or regenerate them. A
+table-driven test calls <code>Parser.SetLanguage</code> for every entry; compilation alone
+does not detect grammar ABI mismatches.</p>
+<h3 id="internalparser"><code>internal/parser</code></h3>
+<p>Each worker:</p>
+<ol>
+<li>opens one regular file and verifies that its identity still matches
+   discovery;</li>
+<li>creates and closes its own Tree-sitter parser;</li>
+<li>installs the selected grammar;</li>
+<li>parses with cancellation support, applying bounded, byte-preserving
+   adaptations for recognized valid JSX, Swift, Hack shebangs, SQLite, and SQLC forms, and
+   closes the resulting tree;</li>
+<li>walks nodes iteratively to find fragment boundaries and any explicitly
+   enabled bounded embedded-SQL or statement-window units; and</li>
+<li>fingerprints valid fragments that meet <code>--min-tokens</code>.</li>
+</ol>
+<p>Tree-sitter can recover from malformed source. A root containing errors creates
+a structured warning with a bounded set of node ranges and the skipped-fragment
+count, while any comparison fragment containing an error or nested below an
+explicit error node is skipped.
+Adaptations never change byte offsets: normalization and report locations still
+refer to the original source. Nearby malformed forms remain parser errors.
+Swift adaptations are accepted only when a second parse reduces diagnostics.
+The optional-await binding adaptation retains the bound expression but cannot
+retain the unsupported <code>try? await</code> wrapper in the repaired syntax tree.</p>
+<p>Code languages extract function-like boundaries. Bash/POSIX shell and Zsh also
+extract a whole-file <code>script</code> boundary containing only top-level executable
+statements; named function bodies remain separate and are excluded from that
+script profile. Script fragments compare only with scripts, never functions.
+Java extracts implemented methods, constructors, compact constructors, and
+lambdas, while excluding bodyless methods. C# extracts implemented methods,
+constructors, destructors, operators, accessors, local functions, anonymous
+methods, and lambdas, while excluding bodyless members. Swift extracts implemented
+functions, initializers, deinitializers, and closures; bodyless protocol
+requirements, computed properties, accessors, and subscripts are not separate
+comparison units. PHP extracts implemented functions, methods, anonymous
+functions, and arrow functions. Hack extracts implemented functions, methods,
+anonymous functions, and lambdas. Bodyless PHP and Hack declarations are
+excluded. Generic SQL and explicitly selected PostgreSQL each extract
+only top-level
+<code>SELECT</code>/set-operation, <code>INSERT</code>, <code>UPDATE</code>, and <code>DELETE</code> statements. Exact,
+immediately adjacent SQLC name comments label query locations. DDL is ignored,
+and nested query structure remains inside its top-level query rather than
+becoming another occurrence.</p>
+<p>Embedded SQL is opt-in and limited to direct Go string arguments on a bounded
+set of database method names. The chosen SQL grammar parses decoded string
+content, while report ranges identify the enclosing host literal and retain
+the Go parent function. This is syntax extraction, not receiver-type, data-flow,
+or runtime-value analysis. A decoded query is capped at 256 KiB, a host file is
+capped at 1,000 recognized calls, and a multi-statement string becomes one
+query-batch comparison unit. Exceeding either cap is visible in coverage
+warnings.</p>
+<p>Statement-block extraction is also opt-in. It creates fixed-size windows in
+recognized statement containers inside each function, deduplicates identical
+source spans, links every block to its containing function, and emits no block
+windows for a function whose configured cap would be exceeded. Same-file
+overlapping block windows are excluded before candidate counting.</p>
+<p>Nested functions are discovered independently. Their bodies are represented by
+a single nested-function feature in the containing function, preventing a
+large outer function from absorbing every feature in an inner callback.
+Reports expose nesting depth, parent identity, and nested-function count so a
+parent score is visibly an outer-body comparison.</p>
+<h3 id="internalnormalize"><code>internal/normalize</code></h3>
+<p>Tree-sitter yields grammar-specific concrete syntax trees, not one universal
+AST. The normalizer creates a shared representation within each comparison
+domain with five feature classes:</p>
+<ol>
+<li>canonical nodes;</li>
+<li>coarse classes;</li>
+<li>parent-child edges;</li>
+<li>selected field roles; and</li>
+<li>lightly weighted semantic operation families.</li>
+</ol>
+<p>Names become placeholders, literals retain only their kind, and type-only
+syntax is excluded. Unknown nodes remain as namespaced syntax features instead
+of disappearing, preserving evidence while naturally reducing cross-language
+overlap.</p>
+<p>Operation families are intentionally small and curated. Bash/POSIX shell and
+Zsh additionally share canonical word, variable-reference, and glob aliases
+while retaining separate parsers. Java and C# map declarations, parameters,
+calls, member access, construction, expressions, and control transfers into
+the existing language-neutral families. Qualified Java calls use an anonymous
+member shape rather than preserving receiver or method names. Swift maps its declarations, expressions,
+arguments, identifiers, and control transfers into existing language-neutral
+families. PHP and Hack map function boundaries, parameters, blocks, bindings,
+calls, access, collections, expressions, and control transfers into the same
+families. Generic SQL and PostgreSQL additionally map
+query clauses, relational structure, and data-manipulation operations. All are
+score hints, not semantic facts.</p>
+<h3 id="internalanalyzer"><code>internal/analyzer</code></h3>
+<p>Files parse concurrently with independent parsers. Results are collected by
+input index and sorted by source location.</p>
+<p>Fragments are partitioned by comparison domain and fragment kind, then ordered
+by feature count. For a smaller bag (A) and larger
+bag (B), weighted Jaccard cannot exceed:</p>
+<p>[
+\frac{|A|}{|B|}
+]</p>
+<p>Pairs whose upper bound is below the threshold are never scored. SQL queries,
+code functions, shell scripts, and code blocks therefore never cross comparison-unit
+boundaries. Same-language scans score within each review family, while
+cross-language scans score across review families. TypeScript and TSX,
+Bash/POSIX shell and Zsh, and PHP and Hack in <code>php-hack</code> therefore remain same-family
+comparisons. Explicit language-pair selectors expand
+families into concrete grammar-ID pairs within one compatible domain without
+enumerating unrelated combinations. The <code>--max-pairs</code> cap bounds the remaining
+scored pairs and fails with an actionable error rather than returning an
+incomplete report.</p>
+<p>Qualifying location pairs are aggregated by their stable content-pair ID. The
+default report retains the best 100 distinct groups and at most 20 locations
+per fingerprint. Exact group and location-pair totals are maintained. Group
+aggregation remains bounded by the candidate-pair safety limit;
+<code>--max-groups 0</code> and <code>--max-occurrences 0</code> remove their respective output
+limits, while <code>--max-pairs 0</code> removes the scored-pair safety limit.</p>
+<p>Groups sort by score, shared evidence mass, represented location-pair count,
+and stable identity. Shared shape and raw feature explanations are computed
+after aggregation.</p>
+<p>Opt-in review ranking derives a small integer priority from disclosed source
+location relationships: same names across directories, cross-directory and
+cross-file occurrences, and repeated location pairs. It orders by that value
+before the established structural comparator. This heuristic never changes
+scores, fingerprints, group membership, or baseline identities, and the
+default remains structural ordering.</p>
+<p>When focus is active, groups with at least one exact focused occurrence sort
+before other groups, while the comparator within both buckets is unchanged.
+Ordinary focus only changes presentation. Explicit <code>--focused-only</code> and
+canonical staged review restrict comparisons to pairs touching focused source;
+unchanged source remains available as the other side. Focus does not alter
+fragment scores or fingerprints, but selection policy is recorded for baseline
+compatibility. Exact focused totals are computed before
+occurrence sampling and group retention.</p>
+<p>When a baseline is supplied, accepted identities are filtered after scoring but
+before group and location-pair accounting. This keeps suppressed candidates
+from consuming the report budget and makes <code>--fail-on-match</code> a usable
+regression gate. Baseline creation and pruning force complete group and
+occurrence retention so the review file cannot omit identities past display
+limits.</p>
+<h3 id="internalbaseline"><code>internal/baseline</code></h3>
+<p>Baseline files are versioned JSON review artifacts. Schema 4 stores an explicit
+<code>content</code> or <code>path</code> identity scope, stable content-pair IDs, the normalization
+version, the writing Mori version, a canonical scan profile and its SHA-256
+digest, exact loaded ignore-file content digests, durable classifications and
+notes, and locations for human context.
+Schemas 1 through 3 remain readable; older profile or normalization evidence
+requires explicit reviewed migration before mutation. Loading fails closed on a missing file, unsupported schema,
+normalization-version mismatch, tampered profile evidence, or an active profile
+mismatch. Writes are sorted and atomic; selective add/remove/edit operations
+preserve review metadata, preview-first replacement requires <code>--accept-all</code>,
+and pruning removes stale entries without accepting newly discovered ones.</p>
+<h3 id="internalvcs"><code>internal/vcs</code></h3>
+<p>Git focus invokes the local <code>git</code> executable directly with context timeouts,
+bounded NUL-delimited output, and no shell or network access. It resolves the
+requested commit, HEAD, and merge base, then combines tracked working-tree
+changes with untracked non-ignored paths. Renames use their destination;
+deletions remain report evidence but cannot create focused occurrences.
+Nested and sibling roots are opt-in through repeatable
+<code>--changed-worktree PATH=REVISION</code> values. Each path must resolve to the exact
+Git top level, contain discovered source, and resolve its own revision. Files
+are assigned to the deepest explicit root, so a parent worktree never supplies
+revision semantics for a nested repository. Any uncovered or ambiguous root is
+an error rather than silently unchanged. Multi-root focus is bounded to 64
+explicit worktrees and 100,000 combined changed and deleted paths.</p>
+<h3 id="internalsimilarity"><code>internal/similarity</code></h3>
+<p>The scorer computes multiset Jaccard using minimum counts for the intersection
+and maximum counts for the union. It also returns exact weighted totals, the
+highest-count shared features, and bounded directional differences sorted by
+count and feature name. Explanation fields do not alter scoring.</p>
+<h3 id="internalreport"><code>internal/report</code></h3>
+<p>Text output is compact and review-oriented. JSON output has an explicit
+<code>schema_version</code>; arrays are encoded as empty arrays rather than <code>null</code>.</p>
+<p>Schema-18 reports expose deterministic binary provenance, the selected scan
+profile and named scope, comparison selection, comparison domains, fragment
+kinds, immutable Git-index provenance, exact per-path focus metadata, grouped
+content-pair identities, fragment fingerprints, occurrence samples and exact
+counts, nesting metadata, structured parser
+diagnostics, effective configuration, ignore-source content evidence, and
+separate baseline suppression counts for identities and source-location pairs.
+Every retained group includes exact weighted intersection/union totals and
+bounded fingerprint-aligned directional feature differences.
+They also include a deterministic coverage summary and per-file inventory so
+supported files with no comparison fragments remain visible with an exact
+reason and pre-token-floor boundary counts.
+Multi-worktree focus adds a deterministic <code>configuration.focus.worktrees</code>
+array with a display root and full Git resolution for every worktree. The
+legacy scalar Git focus fields remain unchanged for a single
+<code>--changed-since</code> worktree.</p>
+<p>Staged discovery builds a bounded virtual tree from stage-zero index entries,
+reads source, ignore, configuration, and baseline blobs by object ID, and
+hashes the ordered mode/OID/path inventory. A baseline must resolve to a
+tracked regular file inside the same worktree and is bounded to 16 MiB. Staged
+analysis never writes Git objects and never falls back to working-tree,
+external, or untracked bytes. Named scope roots are resolved inside the
+configuration project and become part of baseline compatibility.</p>
+<p>When focus is active, focused groups form the first bucket. Within each bucket,
+and for every scan without focus, group ordering is:</p>
+<ol>
+<li>descending score;</li>
+<li>descending minimum feature count;</li>
+<li>descending represented location-pair count; and</li>
+<li>stable content-pair identity.</li>
+</ol>
+<h2 id="trust-boundaries">Trust boundaries</h2>
+<p>森 treats source as untrusted input:</p>
+<ul>
+<li>source is read, never executed;</li>
+<li>parsers are native dependencies and therefore part of the trusted computing
+  base;</li>
+<li>discovered symlinks and symlinked components below trusted scan roots are
+  rejected;</li>
+<li>file size and pair counts are bounded;</li>
+<li>no network request or telemetry exists in the scan path; and</li>
+<li>JSON output contains paths, fragment names, scores, and normalized features,
+  but never source bodies.</li>
+</ul>
+<p>Filesystem metadata can change between checks. 森 verifies regular-file type and
+file identity again after opening, but it does not claim protection against a
+hostile process racing path replacement at every system-call boundary.</p>
+<h2 id="release-architecture">Release architecture</h2>
+<p>Generated grammars and the Go binding use CGO. Cross-compiling from one host
+would require several target C toolchains, so releases build on native GitHub
+runners:</p>
+<ul>
+<li>Linux AMD64 and ARM64;</li>
+<li>macOS AMD64 and ARM64; and</li>
+<li>Windows AMD64.</li>
+</ul>
+<p>Each runner tests, builds, and creates one deterministic archive. A final job
+downloads the archives, writes SHA-256 checksums, creates or reuses a draft
+release, uploads the complete asset set, and then publishes. This ordering is
+compatible with GitHub immutable releases.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#package-responsibilities">Package responsibilities</a><ul>
+<li><a href="#internalsource">internal/source</a></li>
+<li><a href="#internalconfig">internal/config</a></li>
+<li><a href="#internalcli-staged-review-contract">internal/cli staged review contract</a></li>
+<li><a href="#internallanguage">internal/language</a></li>
+<li><a href="#internalparser">internal/parser</a></li>
+<li><a href="#internalnormalize">internal/normalize</a></li>
+<li><a href="#internalanalyzer">internal/analyzer</a></li>
+<li><a href="#internalbaseline">internal/baseline</a></li>
+<li><a href="#internalvcs">internal/vcs</a></li>
+<li><a href="#internalsimilarity">internal/similarity</a></li>
+<li><a href="#internalreport">internal/report</a></li>
+</ul>
+</li>
+<li><a href="#trust-boundaries">Trust boundaries</a></li>
+<li><a href="#release-architecture">Release architecture</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

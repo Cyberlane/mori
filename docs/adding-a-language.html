@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Adding a language · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html" aria-current="page">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../source/docs/adding-a-language.md">Markdown source ↗</a></div>
+<h1 id="adding-a-language">Adding a language</h1>
+<p>Language support is more than linking a grammar. A complete adapter needs a
+compatible parser, useful fragment boundaries, a deliberate comparison domain,
+normalization, fixtures, and a release-platform check.</p>
+<h2 id="1-choose-and-audit-a-grammar">1. Choose and audit a grammar</h2>
+<p>Prefer an official Tree-sitter grammar with:</p>
+<ul>
+<li>an active upstream;</li>
+<li>generated C sources and Go bindings;</li>
+<li>a license compatible with MIT distribution;</li>
+<li>a grammar ABI supported by the pinned Go binding; and</li>
+<li>representative coverage for the language version you intend to claim.</li>
+</ul>
+<p>Record the exact version and copyright in <code>THIRD_PARTY_NOTICES.md</code>. Do not
+upgrade one grammar independently if it changes the ABI expected by the shared
+binding.</p>
+<p>If an upstream does not distribute generated parser sources in its module or
+release, vendor only the generated files required for a clean offline build.
+Record the exact source commit, generator version, artifact or generation
+workflow, license, ABI, and file digests next to the adapter, and test those
+digests. Never download or regenerate a grammar during an ordinary build.</p>
+<h2 id="2-register-the-grammar">2. Register the grammar</h2>
+<p>Add a <code>language.Spec</code> in <code>internal/language/registry.go</code> with:</p>
+<ul>
+<li>stable lowercase ID, review family, comparison domain, and fragment kind;</li>
+<li>human-readable name;</li>
+<li>non-overlapping extensions;</li>
+<li>optional interpreter basenames for extensionless shebang discovery;</li>
+<li>language constructor; and</li>
+<li>a precise fragment-boundary predicate.</li>
+</ul>
+<p>For code, signatures, declarations without bodies, interfaces, and type
+members are usually poor comparison units. Non-code languages must define
+their own coherent comparison domain; incompatible domains are never compared.
+Two parsers that intentionally share an extension must have an explicit,
+validated selector and one documented default. Do not guess a SQL dialect from
+syntax or silently replace the established parser.</p>
+<p>The registry ABI test automatically calls <code>Parser.SetLanguage</code> for every spec.</p>
+<h2 id="3-inspect-real-trees">3. Inspect real trees</h2>
+<p>For function-like code, use small fixtures for:</p>
+<ul>
+<li>a free function;</li>
+<li>a method;</li>
+<li>an anonymous function or closure;</li>
+<li>async/generator syntax where applicable;</li>
+<li>nested functions;</li>
+<li>malformed source; and</li>
+<li>syntax unique to the language.</li>
+</ul>
+<p>Do not infer node names from another grammar. Tree-sitter grammars are concrete
+syntax trees and differ even when the source constructs look similar.
+Assign dialect grammars such as TypeScript and TSX to the same family when
+maintainers would not reasonably describe them as cross-language results. For
+other fragment kinds, test top-level versus nested boundaries and explicitly
+document constructs that remain unsupported.</p>
+<p>Shebang support is only for extensionless regular files. Detection must remain
+bounded, must not require an executable bit, and must never execute or resolve
+the named interpreter. A recognized extension remains authoritative.
+The exception must be an explicit documented shared-extension dialect selector,
+such as legacy Hack's exact bounded <code>&lt;?hh</code> header, with positive and
+nearby-negative detection tests.</p>
+<h2 id="4-extend-normalization-deliberately">4. Extend normalization deliberately</h2>
+<p>Add the smallest mappings that improve a demonstrated comparison pair within
+one domain.</p>
+<p>For each broadening rule, include:</p>
+<ul>
+<li>a positive fixture that should score more closely;</li>
+<li>a nearby negative fixture that should remain below the chosen threshold; and</li>
+<li>a note in <code>docs/scoring.md</code> if the public scoring contract changes.</li>
+</ul>
+<p>Add redistributable reviewed cases to <code>corpus/manifest.json</code> when the language
+participates in cross-language calibration. Record the language pair, fragment
+sizes, classification, threshold, expected score range and rank, and a pinned
+reference when measuring ranking movement. Corpus evidence remains scoped to
+its labeled cases and does not establish a universal threshold.</p>
+<p>Do not map user-defined APIs to semantic families without a strong,
+language-independent reason. Never preserve raw identifier or literal text just
+to make one fixture pass.</p>
+<h2 id="5-verify-end-to-end">5. Verify end to end</h2>
+<p>Run:</p>
+<pre><code class="language-sh">make check
+go run ./cmd/mori languages
+go run ./cmd/mori scan --threshold 0.70 path/to/fixtures
+</code></pre>
+<p>Because grammar bindings use CGO, a local build proves only the current OS and
+architecture. Confirm the native CI matrix before documenting release support.</p>
+<h2 id="pull-request-evidence">Pull request evidence</h2>
+<p>A language-support pull request should include:</p>
+<ul>
+<li>upstream grammar and license links;</li>
+<li>pinned version and ABI evidence;</li>
+<li>supported extensions, comparison domain, fragment kind, and boundaries;</li>
+<li>positive and nearby negative fixtures;</li>
+<li>score changes at a stated threshold;</li>
+<li>parse-error behavior; and</li>
+<li>native platform results.</li>
+</ul>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#1-choose-and-audit-a-grammar">1. Choose and audit a grammar</a></li>
+<li><a href="#2-register-the-grammar">2. Register the grammar</a></li>
+<li><a href="#3-inspect-real-trees">3. Inspect real trees</a></li>
+<li><a href="#4-extend-normalization-deliberately">4. Extend normalization deliberately</a></li>
+<li><a href="#5-verify-end-to-end">5. Verify end to end</a></li>
+<li><a href="#pull-request-evidence">Pull request evidence</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

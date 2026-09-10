@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Opt-in staged analysis cache · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html" aria-current="page">Opt-in staged analysis cache</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/staged-cache.md">Markdown source ↗</a></div>
+<h1 id="opt-in-staged-analysis-cache">Opt-in staged analysis cache</h1>
+<p><code>mori review staged check --cache .</code> can reuse the analysis of an unchanged
+immutable Git index. Caching is off by default and available only for canonical
+staged checks. It does not collect feedback or make network requests.</p>
+<p>Compatibility and baseline loading still run first. A hit replaces only the
+analysis step; coverage policy, baseline compatibility, receipt validation, and
+exit decisions run normally. Findings do not become accepted because analysis
+came from a cache. Missing, unsafe, corrupt, or unavailable cache state falls
+back to normal analysis.</p>
+<p>The key binds the complete resolved snapshot (repository, prefix, HEAD, index
+entries, changed paths and line intervals), requested paths, effective analysis scan
+options, baseline digest, initial warnings, report/normalization/hook revisions,
+and the SHA-256 digest of the actual executable. Render format, color, path
+redaction, report destination, and receipt pathname are excluded; they are applied
+after analysis. Receipt-driven unlimited group retention remains part of the key. Thus locally modified binaries
+also invalidate cache entries. New unsupported option types disable caching
+rather than silently omitting an input. Unstaged edits are intentionally outside
+the input and do not invalidate staged analysis.</p>
+<p>The cache stores a report and its internal exact location pairs, not source-file
+contents or syntax trees. Reports contain local paths, symbol names, structural
+features, and diagnostics, so the cache remains private local evidence. It is
+not a feedback bundle and must not be submitted as one.</p>
+<p>A random 32-byte HMAC key lives in the user's configuration directory under
+<code>mori/analysis-cache-v1/key</code>, outside the checkout. Cache payloads are authenticated
+against that key and the exact input key before decoding. A copied or edited
+repository cache cannot authorize a false analysis result. This protects against
+repository-controlled cache contents; it does not defend against software
+already able to read the user's private key. Symlinked paths or permissive cache
+files/directories disable caching rather than being repaired automatically. On
+Windows, new objects receive a protected DACL granting only the current user full
+access. Reads require the same owner and a single matching allow entry; null,
+inherited, broadened, or otherwise unsupported ACLs and reparse points cause a
+cache miss. Existing ACLs are never rewritten. Native Windows tests remain the
+acceptance gate for that platform.</p>
+<p>Per-worktree Git metadata holds <code>mori/analysis-cache-v1/report</code>. One report is
+retained, at most 16 MiB plus its signature. Repeated locations are stored once
+in a deterministic dictionary; exact pair order and multiplicity are retained
+as indices. Decoding also limits reconstruction to one million location pairs.
+Reports above either bound skip saving and use normal analysis. A single exclusive <code>report.pending</code>
+file bounds concurrent writes to one additional report of the same maximum size.
+Competing writers skip saving. A process killed during a save may leave that
+pending file. A later save can recover a private regular pending file older than
+ten minutes after checking its identity, size, and modification time. Recent
+files and symlinks are preserved, and a failed recovery simply skips saving. No growing history or automatic eviction of unrelated files exists.</p>
+<p>Omit <code>--cache</code> to disable use without deleting anything. To discard retained
+analysis, remove the dedicated cache directory from that worktree's Git metadata.
+Deleting the user-local key invalidates all previously signed caches; the next
+explicit cached check creates a new key. No installation or project configuration
+change is needed.</p>
+<h2 id="measuring-reuse">Measuring reuse</h2>
+<p>Run <code>go test ./internal/cli -run '^$' -bench 'BenchmarkStagedAnalysisReuse|BenchmarkStagedCacheExecutableHash' -benchtime=1x</code>.
+The fixed fixtures exercise 80 and 400 repeated functions. Measure the separate
+executable hash as well: each fresh process pays that cost, which the in-process
+reuse benchmark amortizes. Small scans may break even; larger reports benefit
+from the location dictionary. These benchmarks do not establish performance for
+a particular adopter's project.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#measuring-reuse">Measuring reuse</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

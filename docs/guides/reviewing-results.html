@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reviewing Mori results · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html" aria-current="page">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/reviewing-results.md">Markdown source ↗</a></div>
+<h1 id="reviewing-mori-results">Reviewing Mori results</h1>
+<p>Mori produces a shortlist for source review. A high score means two normalized
+feature multisets overlap strongly; it does not establish equivalent behavior.</p>
+<p>Keep a complete report while showing a bounded review summary:</p>
+<pre><code class="language-sh">mori scan --profile review --format agent --output /private/report.json .
+</code></pre>
+<p>Choose a private report path outside tracked source. Inspect retained JSON
+identities and source ranges without repeating analysis. The agent summary shows
+at most 25 groups; an unreviewed remainder is still unreviewed, even when the
+command succeeds. Repetitive initializers and UI shapes can be intentional;
+review their effects and ownership before suggesting consolidation.</p>
+<p>If a report was not retained, copy a content-pair ID and rescan explicitly with
+the same scan settings:</p>
+<pre><code class="language-sh">mori explain aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb --profile review .
+</code></pre>
+<p><code>explain</code> repeats the scan without the presentation limit, then renders only
+the selected identity and its structural evidence. It does not infer behavior
+or retrieve a result from a remote service.</p>
+<h2 id="narrow-the-source-policy">Narrow the source policy</h2>
+<p>Mori honors nested <code>.gitignore</code> and <code>.moriignore</code> files. Add explicit exclusions
+only for reviewed project policy:</p>
+<pre><code class="language-sh">mori scan --exclude '**/*_test.go' --exclude '**/*.test.ts' .
+</code></pre>
+<p>Use <code>--exclude-generated</code> for conservatively recognized generated headers.
+Those files remain visible as <code>excluded_generated</code> in JSON coverage evidence.
+Keep exploratory exclusions separate from an inclusive staged gate: excluding a
+supported staged file does not count as analyzing it, and can fail focused
+coverage. A source root may still include colocated tests; review paths and both
+function bodies before narrowing further.</p>
+<h2 id="use-review-ranking">Use review ranking</h2>
+<pre><code class="language-sh">mori scan --ranking review .
+</code></pre>
+<p>Review ranking prioritizes disclosed source-location signals before ordinary
+structural ordering. It does not change scores, fingerprints, or eligibility.</p>
+<p>Projects can add deterministic presentation-only path priority:</p>
+<pre><code class="language-sh">mori scan --profile review --priority-path '**/auth/**=25' .
+</code></pre>
+<p>A priority path says where reviewers want to look first. It is not evidence
+that a finding is risky or actionable.</p>
+<h2 id="focus-change-review-without-narrowing-comparison-coverage">Focus change review without narrowing comparison coverage</h2>
+<pre><code class="language-sh">mori scan --changed-since origin/main --threshold 0.85 .
+</code></pre>
+<p>The revision must already exist locally. Mori compares changed and unchanged
+source together, then moves groups touching changed files forward. It includes
+staged, unstaged, and untracked non-ignored files and never fetches a remote.</p>
+<p>Use <code>mori review staged check</code> for a commit decision. This canonical command
+reads the repository index only and enforces focused inclusion and coverage.
+Inspect <code>path_evidence</code> and the separate policy/analysis outcome before calling
+the review complete. <a href="review-policy.html">Review policy</a> describes explicitly
+opting into advisory enforcement; existing gates stay strict by default.</p>
+<p>Use repeated <code>--focus-path</code> for explicit paths. For nested worktrees, give each
+root its own locally available revision with repeated
+<code>--changed-worktree PATH=REVISION</code>; one parent revision cannot describe several
+Git histories safely.</p>
+<h2 id="investigate-partial-duplication-deliberately">Investigate partial duplication deliberately</h2>
+<pre><code class="language-sh">mori scan --statement-blocks --block-statements 3 .
+</code></pre>
+<p>Statement blocks are fixed-size windows inside functions. They are a separate
+fragment kind, never compare with whole functions, and exclude overlapping
+same-file candidates. This mode is off by default because it increases
+candidate counts and can surface ordinary local symmetry.</p>
+<h2 id="read-the-evidence">Read the evidence</h2>
+<p>For every relevant group:</p>
+<ol>
+<li>Open both retained source ranges.</li>
+<li>Compare identifiers and literal values in context.</li>
+<li>Inspect types, control flow, data flow, side effects, callers, error paths,
+   transactions, permissions, schemas, and tests.</li>
+<li>Classify it as likely duplication, intentional structural similarity, or a
+   false positive.</li>
+<li>Refactor only when source and behavioral evidence justify it.</li>
+</ol>
+<p><code>100%</code> means normalized feature identity only. Nested functions are independent
+comparison units and are excluded from their parent function's score.</p>
+<p>Use JSON for the complete deterministic evidence contract and SARIF for editor
+or code-scanning consumers:</p>
+<pre><code class="language-sh">mori scan --format json .
+mori scan --format sarif .
+</code></pre>
+<p>See <a href="../scoring.html">How Mori scores fragments</a> and
+<a href="../scan-selection.html">Scan selection</a> for the detailed contracts.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#narrow-the-source-policy">Narrow the source policy</a></li>
+<li><a href="#use-review-ranking">Use review ranking</a></li>
+<li><a href="#focus-change-review-without-narrowing-comparison-coverage">Focus change review without narrowing comparison coverage</a></li>
+<li><a href="#investigate-partial-duplication-deliberately">Investigate partial duplication deliberately</a></li>
+<li><a href="#read-the-evidence">Read the evidence</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Contributing to 森 (mori) · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="docs/index.html">Mori documentation</a><a href="docs/guides/first-review.html">Choose a useful first review</a><a href="docs/getting-started.html">Getting started</a><a href="index.html">Overview</a><a href="CHANGELOG.html">Changelog</a><a href="CONTRIBUTING.html" aria-current="page">Contributing to 森 (mori)</a><a href="SECURITY.html">Security policy</a><a href="docs/adding-a-language.html">Adding a language</a><a href="docs/architecture.html">Architecture</a><a href="docs/configuration.html">Project configuration and ignore handling</a><a href="docs/guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="docs/guides/editors-and-agents.html">Editors and coding agents</a><a href="docs/guides/feedback.html">Opt-in local feedback</a><a href="docs/guides/parser-compatibility.html">Parser compatibility</a><a href="docs/guides/project-upgrade.html">Project contract and upgrade</a><a href="docs/guides/publishing-docs.html">Building and publishing documentation</a><a href="docs/guides/review-policy.html">Choose the review policy</a><a href="docs/guides/reviewing-results.html">Reviewing Mori results</a><a href="docs/guides/sql.html">SQL and embedded SQL</a><a href="docs/guides/staged-cache.html">Opt-in staged analysis cache</a><a href="docs/guides/usability-rollout.html">Roll out smoother reviews</a><a href="docs/machine-integration.html">Machine and editor integration</a><a href="docs/reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="docs/scan-selection.html">Scan selection controls</a><a href="docs/scoring.html">Scoring contract</a><a href="editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="source/CONTRIBUTING.md">Markdown source ↗</a></div>
+<h1 id="contributing-to-森-mori">Contributing to 森 (mori)</h1>
+<p>Thank you for helping make cross-language similarity more useful and honest.</p>
+<h2 id="before-opening-code">Before opening code</h2>
+<ul>
+<li>Search existing issues.</li>
+<li>Use a feature request for scoring behavior and a language request for a new
+  grammar.</li>
+<li>Never attach proprietary source. Reduce examples to a minimal,
+  non-confidential fixture.</li>
+<li>For security-sensitive behavior, follow <a href="SECURITY.html">SECURITY.md</a>.</li>
+</ul>
+<h2 id="local-setup">Local setup</h2>
+<p>You need:</p>
+<ul>
+<li>Go 1.23 or newer;</li>
+<li>a working C compiler for CGO; and</li>
+<li>Git.</li>
+</ul>
+<p>Go 1.23 is the minimum supported toolchain. Repository development and
+official releases use the preferred Go 1.26.6 toolchain declared in <code>go.mod</code>;
+CI separately verifies the minimum version with automatic switching disabled.</p>
+<pre><code class="language-sh">git clone https://github.com/Cyberlane/mori.git
+cd mori
+make check
+</code></pre>
+<h2 id="commit-subjects">Commit subjects</h2>
+<p>Every commit is one line and uses exactly one of these types:</p>
+<pre><code class="language-text">feat(optional-scope): imperative summary
+fix(optional-scope): imperative summary
+chore(optional-scope): imperative summary
+style(optional-scope): imperative summary
+</code></pre>
+<p>Use <code>chore(...)</code> for tests, docs, CI, builds, releases, and dependency updates.
+Do not add a body, co-author trailer, or automation attribution.</p>
+<p>Maintainers should squash pull requests to one commit, use the validated pull
+request title as the squash subject, and leave the squash body empty.
+Dependabot's generated commit bodies are allowed on its pull request branch;
+the final squash commit still follows the one-line rule.</p>
+<h2 id="pull-requests">Pull requests</h2>
+<p>Keep changes focused. A pull request should:</p>
+<ul>
+<li>explain the user problem and tradeoffs;</li>
+<li>include tests for changed behavior;</li>
+<li>update public documentation when flags, output, or scoring changes;</li>
+<li>preserve deterministic output;</li>
+<li>retain bounded file and comparison behavior;</li>
+<li>identify third-party licensing changes; and</li>
+<li>pass <code>make check</code>.</li>
+</ul>
+<p>Normalization changes need representative positives and nearby negatives.
+Include before/after scores and the exact options used.</p>
+<p>JSON changes require an explicit schema compatibility assessment. Changes to
+existing field meaning or shape require a schema-version increment.</p>
+<h2 id="adding-a-language">Adding a language</h2>
+<p>Follow <a href="docs/adding-a-language.html">Adding a language</a>. A grammar that compiles
+but lacks boundaries, normalization evidence, licensing, or native build proof
+is incomplete.</p>
+<h2 id="review">Review</h2>
+<p>Maintainers may decline a high-scoring rule if it produces misleading matches,
+depends on project-specific naming, or makes the output harder to explain.
+Accuracy and restraint take priority over the number of reported candidates.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#before-opening-code">Before opening code</a></li>
+<li><a href="#local-setup">Local setup</a></li>
+<li><a href="#commit-subjects">Commit subjects</a></li>
+<li><a href="#pull-requests">Pull requests</a></li>
+<li><a href="#adding-a-language">Adding a language</a></li>
+<li><a href="#review">Review</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Languages and parser limits · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="../guides/first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="../guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="../guides/editors-and-agents.html">Editors and coding agents</a><a href="../guides/feedback.html">Opt-in local feedback</a><a href="../guides/parser-compatibility.html">Parser compatibility</a><a href="../guides/project-upgrade.html">Project contract and upgrade</a><a href="../guides/publishing-docs.html">Building and publishing documentation</a><a href="../guides/review-policy.html">Choose the review policy</a><a href="../guides/reviewing-results.html">Reviewing Mori results</a><a href="../guides/sql.html">SQL and embedded SQL</a><a href="../guides/staged-cache.html">Opt-in staged analysis cache</a><a href="../guides/usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="languages-and-parser-limits.html" aria-current="page">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/reference/languages-and-parser-limits.md">Markdown source ↗</a></div>
+<h1 id="languages-and-parser-limits">Languages and parser limits</h1>
+<p>Run <code>mori languages</code> for the authoritative capabilities of the installed
+binary.</p>
+<table>
+<thead>
+<tr>
+<th>Parser language</th>
+<th>Review family</th>
+<th>Domain</th>
+<th>File types</th>
+<th>Shebangs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bash / POSIX shell</td>
+<td>shell</td>
+<td>code</td>
+<td><code>.sh</code>, <code>.bash</code></td>
+<td><code>sh</code>, <code>dash</code>, <code>bash</code></td>
+</tr>
+<tr>
+<td>C</td>
+<td>c-cpp</td>
+<td>code</td>
+<td><code>.c</code>, <code>.h</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>C++</td>
+<td>c-cpp</td>
+<td>code</td>
+<td><code>.cc</code>, <code>.cpp</code>, <code>.cxx</code>, <code>.hh</code>, <code>.hpp</code>, <code>.hxx</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>C#</td>
+<td>csharp</td>
+<td>code</td>
+<td><code>.cs</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Dart</td>
+<td>dart</td>
+<td>code</td>
+<td><code>.dart</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Go</td>
+<td>go</td>
+<td>code</td>
+<td><code>.go</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>GDScript</td>
+<td>gdscript</td>
+<td>code</td>
+<td><code>.gd</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Hack</td>
+<td>php-hack</td>
+<td>code</td>
+<td><code>.hack</code>, legacy marked <code>.php</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Java</td>
+<td>java</td>
+<td>code</td>
+<td><code>.java</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>JavaScript / JSX</td>
+<td>javascript</td>
+<td>code</td>
+<td><code>.js</code>, <code>.jsx</code>, <code>.mjs</code>, <code>.cjs</code></td>
+<td><code>node</code>, <code>nodejs</code></td>
+</tr>
+<tr>
+<td>Kotlin</td>
+<td>kotlin</td>
+<td>code</td>
+<td><code>.kt</code>, <code>.kts</code></td>
+<td><code>kotlin</code></td>
+</tr>
+<tr>
+<td>Lua</td>
+<td>lua-luau</td>
+<td>code</td>
+<td><code>.lua</code></td>
+<td><code>lua</code>, <code>lua5.1</code>–<code>lua5.4</code>, <code>luajit</code></td>
+</tr>
+<tr>
+<td>Luau</td>
+<td>lua-luau</td>
+<td>code</td>
+<td><code>.luau</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>PHP</td>
+<td>php-hack</td>
+<td>code</td>
+<td><code>.php</code>, <code>.phtml</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>PowerShell</td>
+<td>powershell</td>
+<td>code</td>
+<td><code>.ps1</code>, <code>.psd1</code>, <code>.psm1</code></td>
+<td><code>powershell</code>, <code>pwsh</code></td>
+</tr>
+<tr>
+<td>Python</td>
+<td>python</td>
+<td>code</td>
+<td><code>.py</code>, <code>.pyi</code></td>
+<td><code>python</code>, <code>python3</code></td>
+</tr>
+<tr>
+<td>Ruby</td>
+<td>ruby</td>
+<td>code</td>
+<td><code>.rb</code>, <code>.rake</code>, <code>.gemspec</code></td>
+<td><code>ruby</code></td>
+</tr>
+<tr>
+<td>Rust</td>
+<td>rust</td>
+<td>code</td>
+<td><code>.rs</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Swift</td>
+<td>swift</td>
+<td>code</td>
+<td><code>.swift</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>TypeScript / TSX</td>
+<td>typescript</td>
+<td>code</td>
+<td><code>.ts</code>, <code>.mts</code>, <code>.cts</code>, <code>.tsx</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Zsh</td>
+<td>shell</td>
+<td>code</td>
+<td><code>.zsh</code></td>
+<td><code>zsh</code></td>
+</tr>
+<tr>
+<td>SQL</td>
+<td>sql</td>
+<td>sql-query</td>
+<td><code>.sql</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>sql</td>
+<td>sql-query</td>
+<td><code>.sql</code> with explicit dialect</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>For extensionless files, Mori reads at most 256 bytes and recognizes bounded
+direct or <code>/usr/bin/env</code> shebangs without executing an interpreter. Extensions
+take precedence. Legacy Hack is the sole content-aware exception: <code>.php</code> is
+selected as Hack only when the first line, or the line after one optional
+shebang, begins with an exact <code>&lt;?hh</code> header.</p>
+<h2 id="comparison-units">Comparison units</h2>
+<p>Code parsers produce implemented function-like units. Nested functions are
+independent and excluded from their parent fingerprint. Bodyless declarations
+are not scored.</p>
+<p>Shell files additionally produce one top-level <code>script</code> unit whose function
+bodies are excluded. SQL parsers produce top-level query units. Functions,
+scripts, queries, and opt-in statement blocks never compare across fragment
+kinds or comparison domains.</p>
+<h2 id="language-specific-boundaries">Language-specific boundaries</h2>
+<ul>
+<li>Java: implemented methods, constructors, compact constructors, and lambdas.</li>
+<li>C: function definitions. <code>.h</code> defaults to C; use a C++-specific header suffix
+  when C++ parsing is required.</li>
+<li>C++: function definitions and lambdas.</li>
+<li>Lua and Luau: named/local function declarations and anonymous function
+  definitions. They share a review family but retain distinct concrete IDs.</li>
+<li>GDScript: function definitions and lambdas. C# files in Godot projects are
+  handled by the existing C# grammar; Mori does not parse Godot scenes or
+  resources as code.</li>
+<li>Kotlin: function declarations, anonymous functions, and lambdas.</li>
+<li>Ruby: instance methods, singleton methods, and lambdas.</li>
+<li>Dart: named function bodies, local functions, and anonymous function
+  expressions. The grammar exposes a named function's signature beside its
+  body, so the body is scored and named from that adjacent signature; parameter
+  declarations are not part of that fragment's fingerprint.</li>
+<li>PowerShell: functions and class methods. Script blocks passed as ordinary
+  command arguments are not independent units.</li>
+<li>C#: implemented methods, constructors, destructors, operators, accessors,
+  local functions, anonymous methods, and lambdas.</li>
+<li>Swift: implemented functions, initializers, deinitializers, and closures.
+  Protocol requirements, computed properties, accessors, and subscripts are
+  not independent units.</li>
+<li>PHP: implemented functions, methods, anonymous functions, and arrow
+  functions.</li>
+<li>Hack: implemented functions, methods, anonymous functions, and lambdas.</li>
+</ul>
+<h2 id="visible-incompleteness">Visible incompleteness</h2>
+<p>Tree-sitter recovery is reported as warnings. Any fragment containing a parse
+error is skipped with explicit diagnostic and coverage counts.</p>
+<p>Mori has bounded, byte-preserving compatibility adaptations for several
+recognized Swift forms and the upstream raw-ampersand JSX-text grammar issue.
+Additional bounded grammar corrections cover JavaScript/TypeScript import types,
+semicolonless generic interface overloads, keyword export aliases, and Java
+annotated varargs; see <a href="../guides/parser-compatibility.html">parser compatibility</a>.
+Other unsupported syntax remains visibly incomplete. The pinned Zsh grammar
+requires <code>:</code> for several glob-qualifier forms.</p>
+<p>The Hack parser is a checksum-pinned MIT snapshot from the archived
+<code>slackhq/tree-sitter-hack</code> repository. Newer Hack syntax may produce visible
+diagnostics until Mori deliberately maintains or replaces that grammar.</p>
+<p>The GDScript parser is a checksum-pinned MIT snapshot of upstream tag <code>v6.1.0</code>.
+Its generated C sources are kept in the repository so ordinary builds never
+download or regenerate a grammar.</p>
+<p>Generic SQL extensions can produce diagnostics. The PostgreSQL parser targets
+PostgreSQL 18.3 but does not extract PL/pgSQL bodies. Embedded SQL recognizes
+only bounded direct Go string arguments and does not establish receiver types
+or runtime contents.</p>
+<p>Statement blocks are fixed-size syntax windows, not semantic regions. Low
+token floors can make them noisy.</p>
+<h2 id="test-selection">Test selection</h2>
+<p><code>--fragment-selection all</code> keeps the default comparison universe. Opt-in
+<code>production</code> and <code>tests</code> classify fragments using these explicit conventions:</p>
+<ul>
+<li>A path directory named <code>test</code>, <code>tests</code>, or <code>__tests__</code>.</li>
+<li>File suffixes <code>_test.go</code>, <code>_test.rs</code>, <code>_test.py</code>, <code>.test.js</code>, <code>.test.jsx</code>,
+  <code>.test.ts</code>, <code>.test.tsx</code>, <code>.spec.js</code>, <code>.spec.jsx</code>, <code>.spec.ts</code>, or <code>.spec.tsx</code>;
+  and Python files named <code>test_*.py</code>.</li>
+<li>Rust <code>#[test]</code>, <code>#[tokio::test]</code>, and <code>#[async_std::test]</code> attributes, including
+  arguments for the asynchronous test attributes.</li>
+<li>Rust <code>#[cfg(test)]</code> and compound predicates that necessarily require <code>test</code>,
+  such as <code>all(test, not(loom))</code>. Every branch of an <code>any(...)</code> must require
+  <code>test</code> before it is classified as test-only.</li>
+</ul>
+<p><code>cfg(any(test, feature = "production"))</code>, <code>cfg(not(test))</code>, and a function name
+merely containing <code>test</code> do not prove test-only membership. Unclassified units
+remain on the production side. Path conventions apply to every fragment in the
+file, including test helpers; this is a disclosed policy, not semantic inference.
+Stories are not automatically classified as tests by fragment selection; setup
+may separately suggest story-path scopes and exclusions.</p>
+<p>Per-file exclusion counts remain distinct from parse failures and token-floor
+counts. Files with no retained units show the <code>fragment_selection</code> zero-fragment
+reason when selection (possibly combined with the token floor) explains the
+omission. Review that evidence before asserting coverage or migrating a baseline.</p>
+<p>Rust item macro token trees produce an explicit coverage warning; an otherwise
+empty file reports <code>opaque_syntax</code>. They are not expanded into arbitrary function
+bodies. Conventional path classification uses the current/selected root (the
+repository root for index snapshots); a standalone external file has filename
+and attribute evidence, not an inferred project directory. Component
+files such as <code>.vue</code> and <code>.svelte</code>, and Zig source, remain outside the registered
+parser set; inspect unsupported-extension counts separately from supported-file
+coverage. A high supported-file coverage ratio does not measure those files.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#comparison-units">Comparison units</a></li>
+<li><a href="#language-specific-boundaries">Language-specific boundaries</a></li>
+<li><a href="#visible-incompleteness">Visible incompleteness</a></li>
+<li><a href="#test-selection">Test selection</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

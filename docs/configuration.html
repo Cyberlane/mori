@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project configuration and ignore handling · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html" aria-current="page">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../source/docs/configuration.md">Markdown source ↗</a></div>
+<h1 id="project-configuration-and-ignore-handling">Project configuration and ignore handling</h1>
+<p>Mori can load one strict JSON configuration named <code>.mori.json</code>. It searches
+from the current working directory upward. Use <code>--config &lt;path&gt;</code> to select a
+different file or <code>--no-config</code> to disable configuration loading.</p>
+<p>Unknown fields, malformed JSON, non-regular files, and files larger than one
+MiB are errors. Relative <code>baseline</code> paths resolve from the configuration
+file's directory, and baseline documents are bounded to 16 MiB. A selected profile supplies defaults, explicit configuration
+fields override profile values, and explicit command-line values override
+both. Repeated <code>--exclude</code> and <code>--language-pair</code> values are additive. A
+command-line <code>--comparison-domain</code> overrides the configured domain. <code>--sql-dialect</code>
+overrides the configured SQL parser dialect.</p>
+<p>Create a review-oriented config with <code>mori init [directory]</code>. The command
+writes deterministic, explicit values so the file remains reviewable if a
+future Mori version changes a profile. It never replaces an existing
+<code>.mori.json</code> unless <code>--force</code> is supplied. <code>mori init --stdout</code> writes the
+template without changing the filesystem, and <code>--profile review|explore|sql</code>
+selects the template.</p>
+<h2 id="profiles">Profiles</h2>
+<p><code>profile</code> accepts:</p>
+<ul>
+<li><code>review</code>: same-language code, threshold <code>0.85</code>, 40-token floor, at most 250
+  groups and 10 retained occurrences per fingerprint, review ranking,
+  generated-source exclusion, and required aggregate coverage;</li>
+<li><code>explore</code>: the broad compatibility defaults—threshold <code>0.70</code>, 12-token
+  floor, at most 100 groups, structural ranking, every comparison domain, and
+  no required coverage or generated-source exclusion; or</li>
+<li><code>sql</code>: SQL-query comparison, threshold <code>0.70</code>, 12-token floor, at most 250
+  groups and 10 retained occurrences per fingerprint, review ranking,
+  generated-source exclusion, and required aggregate coverage.</li>
+</ul>
+<p>Profiles deliberately do not guess project-specific test, migration, generated
+router, or framework exclusions. Add those only after auditing the repository's
+source categories and the first report.</p>
+<p>The selected profile is recorded in schema-18 and later reports. Omitting <code>profile</code>
+retains the legacy defaults. A CLI <code>--profile</code> replaces a configured profile;
+explicit fields from the config are then applied, followed by explicit CLI
+flags. An explicit language-selection mode replaces the profile's mode, so
+<code>--profile review --cross-language-only</code> does not require a separate
+<code>--same-language-only=false</code> flag.</p>
+<h2 id="fields">Fields</h2>
+<pre><code class="language-json">{
+  &quot;profile&quot;: &quot;review&quot;,
+  &quot;threshold&quot;: 0.85,
+  &quot;min_tokens&quot;: 40,
+  &quot;max_groups&quot;: 250,
+  &quot;max_occurrences&quot;: 10,
+  &quot;max_pairs&quot;: 5000000,
+  &quot;max_file_bytes&quot;: 2097152,
+  &quot;workers&quot;: 8,
+  &quot;format&quot;: &quot;json&quot;,
+  &quot;comparison_domain&quot;: &quot;code&quot;,
+  &quot;fragment_selection&quot;: &quot;all&quot;,
+  &quot;sql_dialect&quot;: &quot;generic&quot;,
+    &quot;embedded_sql&quot;: false,
+    &quot;statement_blocks&quot;: false,
+    &quot;block_statements&quot;: 3,
+    &quot;max_blocks_per_function&quot;: 64,
+  &quot;ranking&quot;: &quot;review&quot;,
+  &quot;priority_paths&quot;: [&quot;**/auth/**=25&quot;, &quot;**/security/**=25&quot;],
+  &quot;same_language_only&quot;: true,
+  &quot;cross_language_only&quot;: false,
+  &quot;language_pairs&quot;: [],
+  &quot;fail_on_match&quot;: false,
+  &quot;require_coverage&quot;: true,
+    &quot;min_file_coverage&quot;: 0.95,
+    &quot;max_zero_fragment_files&quot;: 2,
+    &quot;fail_on_warning&quot;: false,
+    &quot;fail_on_parse_diagnostic&quot;: true,
+  &quot;exclude_generated&quot;: true,
+  &quot;baseline&quot;: &quot;mori-baseline.json&quot;,
+  &quot;baseline_scope&quot;: &quot;content&quot;,
+  &quot;exclude&quot;: [&quot;**/*_test.go&quot;],
+  &quot;respect_ignore&quot;: true
+}
+</code></pre>
+<h2 id="named-scopes">Named scopes</h2>
+<p>Monorepositories can keep reviewed scan surfaces in <code>scopes</code> and select one
+with <code>--scope NAME</code>:</p>
+<pre><code class="language-json">{
+  &quot;profile&quot;: &quot;review&quot;,
+  &quot;scopes&quot;: {
+    &quot;backend&quot;: {
+      &quot;roots&quot;: [&quot;cmd&quot;, &quot;internal&quot;],
+      &quot;exclude&quot;: [&quot;**/*_test.go&quot;],
+      &quot;priority_paths&quot;: [&quot;**/auth/**=25&quot;]
+    },
+    &quot;ios&quot;: {
+      &quot;roots&quot;: [&quot;Sources&quot;, &quot;Packages&quot;],
+      &quot;same_language_only&quot;: true
+    }
+  }
+}
+</code></pre>
+<p>Scope roots must be relative paths inside the configuration project. Top-level
+settings apply first, the selected scope overrides or adds its settings, and
+explicit CLI flags remain last. Positional scan paths override the scope's
+default roots without discarding its other policy. The selected name and roots
+participate in baseline scan-profile digests and appear as
+<code>configuration.scope</code> and <code>configuration.scope_roots</code>.</p>
+<p><code>comparison_domain</code> accepts one case-insensitive domain ID printed by
+<code>mori languages</code>. The selected domain is applied before parsing, so other
+domains do not affect file counts, warnings, focus, or pair limits. An empty or
+omitted value selects every registered domain.</p>
+<p><code>sql_dialect</code> accepts <code>generic</code> or <code>postgresql</code> and defaults to <code>generic</code>.
+It selects the parser for every discovered <code>.sql</code> file and does not affect
+non-SQL files. Use separate scans when one repository contains multiple SQL
+dialects.</p>
+<p><code>fragment_selection</code> accepts <code>all</code> (the default), <code>production</code>, or <code>tests</code>.
+The equivalent CLI option is <code>--fragment-selection</code>; named scopes can override
+it. It selects syntax-classified fragments after parsing, independently of
+file roots and exclusions. Conventional test paths and explicit Rust test
+attributes or unambiguously test-only conditional modules supply classification.
+See the <a href="reference/languages-and-parser-limits.html#test-selection">exact conventions</a>.
+Unclassified fragments remain production/unknown; <code>tests</code> is therefore not a
+universal test detector. Ordinary production closures remain eligible. Excluded fragment counts stay visible in file coverage, and a file
+with only excluded fragments is not evidence of analyzed comparison coverage.
+The selection participates in baseline and receipt compatibility.</p>
+<p>Keep the base <code>all</code> selection for inclusive staged gates; choose a separate
+named scope for production-only exploration. This field advances the recorded
+configuration contract to schema 2; <code>.mori.json</code> still has no schema-version
+field and previously valid files remain readable.</p>
+<p><code>embedded_sql</code> is an explicit opt-in for direct string arguments to recognized
+Go database methods. It requires <code>comparison_domain</code> to be <code>sql-query</code> and uses
+the selected <code>sql_dialect</code>. Arbitrary strings, variables, concatenations, and
+receiver-type inference remain outside extraction. Fixed safety limits skip a
+host file above 1,000 recognized calls and skip a decoded query above 256 KiB,
+with coverage warnings.</p>
+<p><code>statement_blocks</code> enables fixed-size statement windows inside code functions.
+<code>block_statements</code> accepts 2 through 10 and defaults to 3.
+<code>max_blocks_per_function</code> accepts 1 through 256 and defaults to 64. Exceeding
+the cap skips block extraction for that function with a visible coverage
+warning instead of returning a partial hidden sample. Embedded SQL and
+statement blocks are mutually exclusive scan modes.</p>
+<p><code>ranking</code> accepts <code>structural</code> or <code>review</code> and defaults to <code>structural</code>.
+Structural ordering sorts by similarity score, shared evidence mass,
+represented location-pair count, and stable identity. Review ordering first
+uses explicit location signals, then the existing structural order. It favors
+distinctively named candidates across directories, other cross-directory and
+cross-file candidates, and identities representing repeated location pairs. It does not
+change scores, fingerprints, candidate membership, focus priority, or baseline
+suppression. The equivalent command-line form is <code>--ranking review</code>.</p>
+<p><code>priority_paths</code> contains at most 32 deterministic <code>GLOB=WEIGHT</code> rules. Each
+weight must be an integer from 1 to 100. When review ranking is selected, a
+group receives a rule's weight once if either side of any retained location
+pair matches the doublestar glob. Repeat the equivalent <code>--priority-path</code>
+option for command-line use. Rules change presentation order only: they do not
+change similarity, fingerprints, baselines, or whether a group qualifies.
+Use them for reviewed project categories such as authorization or security
+paths; a matching path is not evidence that a finding is risky or actionable.</p>
+<p><code>same_language_only</code> compares within review families. TypeScript and TSX are
+one family and remain comparable, as do Bash/POSIX shell and Zsh, and PHP and
+Hack. It is mutually exclusive with
+<code>cross_language_only</code> and <code>language_pairs</code>. <code>language_pairs</code> accepts language
+IDs or families; the <code>typescript</code> selector includes both TypeScript and TSX,
+while <code>php-hack</code> includes both PHP and Hack. The concrete <code>php</code> selector still
+selects only PHP.
+Explicit pairs must belong to a selected comparison domain.</p>
+<p><code>max_groups</code> bounds distinct content-pair identities. <code>max_occurrences</code> bounds
+the locations shown for each fingerprint while retaining the exact occurrence
+count. Zero opts into an unlimited value and should be used deliberately.
+<code>--max-matches</code> remains a deprecated alias for <code>--max-groups</code>.</p>
+<p><code>require_coverage</code> requires at least one supported file and one extracted
+comparison fragment. When the requirement is not met, Mori still writes the
+deterministic report and its <code>coverage</code> warning, then exits with status <code>4</code>.
+This distinguishes an unsupported or inapplicable scan from a clean scan with
+no qualifying similarity groups. The command-line override is
+<code>--require-coverage</code>; use <code>--require-coverage=false</code> to disable a configured
+requirement for an explicitly exploratory invocation.</p>
+<p><code>min_file_coverage</code> accepts <code>0</code> through <code>1</code>; zero disables the policy. Its
+numerator is the number of analyzed files producing at least one comparison
+fragment, and its denominator is every analyzed supported file. Files with
+status <code>excluded_generated</code> remain visible evidence but do not enter the
+denominator. The command-line form is <code>--min-file-coverage</code>.</p>
+<p><code>max_zero_fragment_files</code> accepts <code>-1</code> or greater; <code>-1</code> disables the policy.
+It limits analyzed supported files that produced no comparison fragments. The
+command-line form is <code>--max-zero-fragment-files</code>.</p>
+<p><code>fail_on_warning</code> fails on any discovery, parsing, resource, focus, or coverage
+warning. <code>fail_on_parse_diagnostic</code> is narrower and fails only when a file has
+Tree-sitter parse diagnostics. Their command-line forms are
+<code>--fail-on-warning</code> and <code>--fail-on-parse-diagnostic</code>. Every strict coverage
+policy writes the report first and then exits with status <code>4</code>. Coverage policy
+failure takes precedence over finding status <code>3</code>, and baseline update or prune
+checks the policies before changing its baseline file.</p>
+<p><code>exclude_generated</code> excludes supported files only when Mori recognizes a
+conservative generated-source comment marker in the first 8 KiB, including
+<code>Code generated ... DO NOT EDIT</code>, <code>@generated</code>, and common automatically
+generated-file headers. The exact <code>Generated by typeshare</code> header is also
+recognized without treating arbitrary <code>Generated by</code> comments as generated
+source. The equivalent command-line flag is
+<code>--exclude-generated</code>. Excluded files remain visible in <code>file_coverage</code> with
+status <code>excluded_generated</code>, the recognized marker class, and zero fragments.
+The default remains <code>false</code>, so upgrading never silently removes source from a
+scan.</p>
+<h2 id="ignore-files">Ignore files</h2>
+<p>Directory scans honor <code>.gitignore</code> and <code>.moriignore</code> files from the working
+directory through nested scan directories. Rules are evaluated in order;
+<code>.moriignore</code> is read after <code>.gitignore</code> in the same directory, so it can add
+or negate repository rules. Common VCS, dependency, and build directories are
+still excluded by Mori's built-in policy. A linked worktree's <code>.git</code> control
+file is VCS metadata and is not included in unsupported-extension counts.</p>
+<p>Ignore files support the Git-style rules Mori needs for repository discovery:
+comments, negation, directory suffixes, anchoring, and <code>*</code>, <code>?</code>, and <code>**</code>
+wildcards. An ignored directory is still traversed when an applicable negation
+may re-include a descendant. Invalid, oversized, symlinked, or non-regular
+ignore files fail the scan instead of silently weakening exclusions.</p>
+<p>Ignore files affect directory traversal only. A file passed explicitly remains
+visible. Repeated <code>--exclude</code> globs remain additive and continue to exclude an
+explicitly requested file. Use <code>--no-ignore</code> to disable both ignore-file types.</p>
+<p>Schema-18 JSON reports record the effective profile, named scope, strict coverage policies,
+options, and every loaded ignore file with its SHA-256 content evidence under
+<code>configuration</code> so a scan can be
+reproduced. Review focus remains
+CLI-only: <code>--focus-path</code> is repeatable, <code>--changed-since</code> always requires an
+explicit locally available Git revision, and repeatable
+<code>--changed-worktree PATH=REVISION</code> values give every additional Git worktree
+its own revision. Dynamic Git revisions are intentionally not project config.</p>
+<p><code>--staged</code> is also CLI-only. It reads tracked sources, ignore files,
+<code>.mori.json</code>, and any configured or explicit baseline from one immutable
+Git-index snapshot and records the HEAD and index digest under
+<code>configuration.input</code>. A staged baseline must be a tracked regular file inside
+that worktree and no larger than 16 MiB; Mori fails closed rather than reading
+an untracked, external, or working-tree copy. Combine staged mode with <code>--include-focused</code>
+to bypass ordinary ignore rules for changed files while retaining explicit
+excludes, generated-source policy, and resource bounds. Add
+<code>--require-focused-coverage</code> when every supported non-deleted focused path must be
+analyzed; failures still write the report and exit with status <code>4</code>.</p>
+<p>See <a href="scan-selection.html">Scan selection controls</a> for the complete validation,
+execution, compatibility, and reporting contract.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#profiles">Profiles</a></li>
+<li><a href="#fields">Fields</a></li>
+<li><a href="#named-scopes">Named scopes</a></li>
+<li><a href="#ignore-files">Ignore files</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

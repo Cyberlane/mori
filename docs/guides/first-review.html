@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Choose a useful first review · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html" aria-current="page">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/first-review.md">Markdown source ↗</a></div>
+<h1 id="choose-a-useful-first-review">Choose a useful first review</h1>
+<blockquote>
+<p>Development build: the library suggestions, growing test-pattern policy, and
+next-command guidance on this page are not included in stable v0.32.0. Check
+<code>mori version</code> and <code>mori setup --help</code> before following them. Existing releases
+can still use explicit source roots and manually configured named scopes.</p>
+</blockquote>
+<p>A broad scan can surface hundreds of similar test callbacks. This is often a
+scope problem. A high structural score does not establish that two functions
+behave alike or should be merged.</p>
+<h2 id="start-with-the-code-you-maintain">Start with the code you maintain</h2>
+<p>For a no-write trial that also works with v0.32.0, choose a real source directory:</p>
+<pre><code class="language-sh">mori scan --profile review packages/core/src
+</code></pre>
+<p>Replace that path with your project's source root. The review profile uses
+same-language comparisons, an 85% threshold and a 40-token floor. It does not
+exclude tests. Colocated tests may still dominate this trial.</p>
+<p>For a reusable policy, run setup from the project root:</p>
+<pre><code class="language-sh">mori setup
+</code></pre>
+<p>Choose a scope after inspecting its roots, exclusions, counts and sample paths:</p>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Use it for</th>
+<th>What remains outside the promise</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>library</code></td>
+<td>Observed conventional library source roots</td>
+<td>Custom layouts may need edited roots. Naming does not establish ownership.</td>
+</tr>
+<tr>
+<td><code>application</code></td>
+<td>Broad source with conventional tests and stories excluded</td>
+<td>Demos, examples and tooling can remain.</td>
+</tr>
+<tr>
+<td><code>tests</code></td>
+<td>Observed test and story paths</td>
+<td>Inline tests and future files outside these literal roots may be missing.</td>
+</tr>
+<tr>
+<td><code>all</code></td>
+<td>Inclusive exploration under existing discovery rules</td>
+<td>Ignored, unsupported and generated-excluded files still follow policy.</td>
+</tr>
+</tbody>
+</table>
+<p>Run the exact scan command printed after setup. Named scopes are opt-in. Running
+plain <code>mori scan</code> does not automatically select the scope you just created.
+The printed command includes the configuration path so scope roots resolve
+correctly even when setup targeted a different directory.</p>
+<p>From the project root, a typical library review is:</p>
+<pre><code class="language-sh">mori scan --scope library --format agent --output review.json
+</code></pre>
+<p>Do not add <code>.</code> after this command unless you intend to replace the library's
+suggested roots with the whole current directory. Positional roots override the
+scope's roots, while its exclusions still apply.</p>
+<p>For an existing <code>.mori.json</code>, use <code>mori configure</code>. Existing named scopes are not
+overwritten implicitly. Choose a new scope name or explicitly edit the old one.
+Top-level exclusions still apply, and exploratory scopes do not narrow the
+canonical staged gate.</p>
+<h2 id="keep-the-scope-useful-as-the-repository-grows">Keep the scope useful as the repository grows</h2>
+<p>Application and library suggestions generalize observed conventions. For example,
+one <code>thing.test.ts</code> produces <code>**/*.test.*</code>, so a later <code>other.test.ts</code> is covered.
+A <code>tests</code> directory produces <code>**/tests/**</code>. Only observed conventions are proposed.
+A new convention, such as stories in a previously test-only project, needs review.
+Directories such as <code>runtime-test</code> remain eligible because they are not an exact
+<code>test</code> or <code>tests</code> directory component.</p>
+<p>Inspect patterns before applying them. They express naming policy and can exclude
+production files that use those names. Inline tests need fragment selection where
+supported. Keep a separate inclusive or test scope when reviewing test quality.</p>
+<p>Human-readable reports show a scope hint when at least half of five or more
+leading retained groups contain conventional test/story paths. The sample stops
+at 25 groups. It is a navigation aid, not a false-positive rate, and it never
+changes the scan or its JSON schema.</p>
+<h2 id="check-what-survived">Check what survived</h2>
+<p>Retain the report and inspect coverage, warnings, truncation, and both source
+locations. Confirm that known relevant matches remain. A smaller result count
+alone does not demonstrate better detection.</p>
+<p>In controlled public-repository comparisons, guided application scope reduced
+React Spring's core review from 119 groups to two. React Three Fiber's root
+review fell from 63 to 14, of which three were library-source pairs and eleven
+were demos or tooling. Those cases motivated the separate library scope. These
+numbers describe frozen research inputs, not every revision or project's result.
+The updated library scope returns four groups across React Spring's recognized
+source roots and three in React Three Fiber. All previously checked source pairs
+survived, and adding new test files after setup left both results unchanged.
+React Spring's <code>targets/*/src</code> is a custom layout outside these automatic roots
+and requires explicit selection when relevant. Some remaining matches are
+intentional symmetry, such as pause/resume methods.</p>
+<p>These checks used <a href="https://github.com/pmndrs/react-spring/tree/4be40b8b590238dc80872a48b91a42d92201d895">React Spring at 4be40b8</a>
+and <a href="https://github.com/pmndrs/react-three-fiber/tree/ff3899dbf43d2a88895fecf53c147192abfd7431">React Three Fiber at ff3899d</a>.</p>
+<p>See <a href="reviewing-results.html">Reviewing results</a> for deciding what deserves action
+and <a href="../scan-selection.html">Scan selection</a> for detailed policy precedence.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#start-with-the-code-you-maintain">Start with the code you maintain</a></li>
+<li><a href="#keep-the-scope-useful-as-the-repository-grows">Keep the scope useful as the repository grows</a></li>
+<li><a href="#check-what-survived">Check what survived</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

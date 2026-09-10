@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Building and publishing documentation · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html" aria-current="page">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/publishing-docs.md">Markdown source ↗</a></div>
+<h1 id="building-and-publishing-documentation">Building and publishing documentation</h1>
+<p>The documentation site renders the repository's Markdown using pinned
+Python-Markdown. Markdown files remain the source of truth. The build includes
+all pages under <code>docs/</code>, root overview/contribution/changelog pages, and locally
+linked Markdown references. Every page links to its exact Markdown snapshot included in the site. Other
+repository-file links point to GitHub source.</p>
+<h2 id="build-and-validate">Build and validate</h2>
+<p>Use Python 3.10 or newer. Create the virtual environment and output outside the
+checkout; these commands work on macOS and Linux:</p>
+<pre><code class="language-sh">python3 -m venv /tmp/mori-docs-venv
+/tmp/mori-docs-venv/bin/python -m pip install -r scripts/docs-requirements.txt
+/tmp/mori-docs-venv/bin/python scripts/test-build-docs.py
+site_output=$(mktemp -d /tmp/mori-docs-site.XXXXXX)
+/tmp/mori-docs-venv/bin/python scripts/build-docs.py --output &quot;$site_output&quot; --source-ref main
+</code></pre>
+<p>The builder refuses to overwrite a nonempty directory or place output inside the
+checkout. It verifies every local page, image, stylesheet link and heading
+fragment, and writes <code>build-report.json</code> with page/link counts and the renderer
+version. Missing links fail the build. External source and release links are not
+fetched by this check; validate the chosen source ref separately.</p>
+<p>For a reproducible published snapshot, pass the exact source commit to
+<code>--source-ref</code> instead of <code>main</code>, and build from that commit's clean checkout.
+A development worktree build can preview uncommitted documentation. Each page
+includes its exact Markdown source locally; GitHub code links use the chosen ref
+and cannot represent uncommitted implementation changes.
+The builder adds no timestamps to generated pages.</p>
+<p>Preview with a local HTTP server:</p>
+<pre><code class="language-sh">/tmp/mori-docs-venv/bin/python -m http.server 8765 --directory &quot;$site_output&quot;
+</code></pre>
+<p>Check the overview, first-review guide, a wide reference table, and navigation
+at desktop and phone widths. Confirm keyboard navigation, code scrolling,
+images, anchors and the development-version banner. Stop the server after review.</p>
+<h2 id="publish-deliberately">Publish deliberately</h2>
+<p>Publish only the validated output to an isolated <code>gh-pages</code> branch or equivalent
+static hosting artifact. Configure GitHub Pages to serve that branch's root.
+Keep source checkout changes, private files, research evidence and credentials
+out of the publication tree. Review the artifact and obtain the normal project
+publication authorization before pushing it. Do not mix publication history with
+<code>main</code> or use deployment as evidence that a release was published.</p>
+<p>The current template labels the site <strong>development documentation</strong>: guided
+library scopes and the described improvements are not yet in stable 0.32.
+Preserve that banner while the site describes unreleased behavior. Update it only
+when the corresponding release is verified, and make the documentation version
+explicit. There is intentionally no automatic main-branch or release-triggered
+publishing workflow.</p>
+<p>To change presentation, edit <a href="../../source/docs/site/site.css">the stylesheet</a> and the HTML template in
+<a href="../../source/scripts/build-docs.py">the builder</a>. Keep renderer updates pinned in
+<a href="../../source/scripts/docs-requirements.txt">the requirements file</a> and rerun the tests and visual checks after any
+update.</p>
+<p>The <a href="../../source/scripts/test-build-docs.py">build tests</a> exercise real documentation,
+source snapshots, Unicode headings, broken anchors and output-directory safety.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#build-and-validate">Build and validate</a></li>
+<li><a href="#publish-deliberately">Publish deliberately</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

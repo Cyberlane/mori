@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mori · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="docs/index.html">Mori documentation</a><a href="docs/guides/first-review.html">Choose a useful first review</a><a href="docs/getting-started.html">Getting started</a><a href="index.html" aria-current="page">Overview</a><a href="CHANGELOG.html">Changelog</a><a href="CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="SECURITY.html">Security policy</a><a href="docs/adding-a-language.html">Adding a language</a><a href="docs/architecture.html">Architecture</a><a href="docs/configuration.html">Project configuration and ignore handling</a><a href="docs/guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="docs/guides/editors-and-agents.html">Editors and coding agents</a><a href="docs/guides/feedback.html">Opt-in local feedback</a><a href="docs/guides/parser-compatibility.html">Parser compatibility</a><a href="docs/guides/project-upgrade.html">Project contract and upgrade</a><a href="docs/guides/publishing-docs.html">Building and publishing documentation</a><a href="docs/guides/review-policy.html">Choose the review policy</a><a href="docs/guides/reviewing-results.html">Reviewing Mori results</a><a href="docs/guides/sql.html">SQL and embedded SQL</a><a href="docs/guides/staged-cache.html">Opt-in staged analysis cache</a><a href="docs/guides/usability-rollout.html">Roll out smoother reviews</a><a href="docs/machine-integration.html">Machine and editor integration</a><a href="docs/reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="docs/scan-selection.html">Scan selection controls</a><a href="docs/scoring.html">Scoring contract</a><a href="editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="source/README.md">Markdown source ↗</a></div>
+<p align="center">
+  <img src="docs/assets/mori-hero.webp" alt="Mori forest-green banner with the forest kanji and the slogan Structural similarity, explained" width="100%">
+</p>
+
+<h1 id="mori">Mori</h1>
+<p><a href="https://github.com/Cyberlane/mori/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Cyberlane/mori?color=0f766e" /></a>
+<a href="https://github.com/Cyberlane/mori/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Cyberlane/mori/actions/workflows/ci.yml/badge.svg" /></a>
+<a href="https://github.com/Cyberlane/mori/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-d97706.svg" /></a></p>
+<p>Mori finds source fragments with similar structure—even when they use different
+names or programming languages—and gives you an explainable shortlist to review.</p>
+<blockquote>
+<p>Mori reports structural evidence. A match is never proof that two fragments
+behave the same way or should be merged.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🔒 <strong>Local</strong></td>
+<td>Source stays on your machine. No upload or telemetry is required.</td>
+</tr>
+<tr>
+<td>🌐 <strong>Cross-language</strong></td>
+<td>Compare compatible functions across supported languages.</td>
+</tr>
+<tr>
+<td>🔎 <strong>Explainable</strong></td>
+<td>See scores, locations, shared shape, and directional differences.</td>
+</tr>
+<tr>
+<td>⚙️ <strong>Predictable</strong></td>
+<td>Deterministic output, visible coverage, and bounded resource use.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="install">Install</h2>
+<p>Download a native archive from the <a href="https://github.com/Cyberlane/mori/releases/latest">latest release</a>,
+or build from source with Go 1.23+ and a C compiler:</p>
+<pre><code class="language-sh">go install github.com/Cyberlane/mori/cmd/mori@latest
+mori version
+</code></pre>
+<p>Official release binaries include complete build provenance and are recommended
+for CI and auditable reports.</p>
+<p>Each release also includes checksum-pinned Homebrew, Scoop, and WinGet manifest
+assets, an SPDX SBOM, and GitHub/Sigstore attestations. Package-index submission
+is intentionally separate, so verify the release asset before local use.</p>
+<h2 id="quick-start">Quick start</h2>
+<p>From a project root, inventory the source and preview a project setup:</p>
+<pre><code class="language-sh">mori inspect .
+mori setup
+</code></pre>
+<p><code>mori setup</code> inventories the project, asks a few focused questions, previews a
+conservative <code>.mori.json</code>, and writes it only after confirmation. Review its
+exclusions after the first scan; Mori cannot decide which tests, generated
+files, migrations, or framework repetition are intentional in your project.</p>
+<p>For a library or monorepository, choose the suggested <code>library</code> scope when its
+source roots match your intent. Choose <code>application</code> for broader non-test code,
+including demos and tooling. Review the proposed roots and exclusions, then run
+the exact command printed by setup. For an application scope, retain a first review:</p>
+<pre><code class="language-sh">mori scan --scope application --format agent --output review.json
+</code></pre>
+<p>Keep <code>review.json</code> local and inspect its coverage as well as both candidate
+locations. If you kept the inclusive configuration, omit <code>--scope application</code>.
+For very large layouts, choose a smaller source root before comparison. New
+library suggestions and future-proof test patterns require a development build.
+See the <a href="https://cyberlane.github.io/mori/">published documentation</a> and
+<a href="docs/guides/first-review.html">focused first-review guide</a>.</p>
+<p>For a no-write trial:</p>
+<pre><code class="language-sh">mori scan --profile review .
+</code></pre>
+<p>The review profile starts with same-language code, an 85% threshold, a
+40-token floor, generated-source exclusion, and required aggregate coverage.
+It still includes tests and stories. In a large repository, start with a reviewed
+source root such as <code>mori scan --profile review packages/core/src</code>; inspect both
+sides of the first groups before deciding which categories to exclude. See the
+<a href="docs/getting-started.html#run-a-first-review">first-review guide</a> for scope and
+staged-review tradeoffs.</p>
+<p>For a cross-language review, choose it explicitly:</p>
+<pre><code class="language-sh">mori scan --threshold 0.70 --cross-language-only examples/email-validation
+</code></pre>
+<p>Illustrative cross-language result (scores depend on source and version):</p>
+<pre><code class="language-text">1. 92.7% structural similarity · 1 location pair(s)
+   weighted feature evidence: 114 intersection / 123 union
+   A  Validator.java:6-9   [java]       looksLikeEmail
+   B  validator.js:1-4     [javascript] looksLikeEmail
+   shared shape: 3 calls, 1 return, 2 bindings
+</code></pre>
+<p>Always read both locations. Mori does not establish equivalent runtime values,
+effects, types, external calls, permissions, transactions, or error behavior.</p>
+<h2 id="choose-a-workflow">Choose a workflow</h2>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Start with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Review likely same-language duplication</td>
+<td><code>mori scan --profile review .</code></td>
+</tr>
+<tr>
+<td>Explore across languages</td>
+<td><code>mori scan --profile explore --cross-language-only .</code></td>
+</tr>
+<tr>
+<td>Review one language pair</td>
+<td><code>mori scan --language-pair go,typescript .</code></td>
+</tr>
+<tr>
+<td>Review SQL queries</td>
+<td><code>mori scan --profile sql path/to/sql</code></td>
+</tr>
+<tr>
+<td>Produce CI evidence</td>
+<td><code>mori scan --profile review --format json .</code></td>
+</tr>
+<tr>
+<td>Keep JSON while bounding agent context</td>
+<td><code>mori scan --profile review --format agent --output /tmp/mori-review.json .</code></td>
+</tr>
+<tr>
+<td>Enforce the canonical staged review</td>
+<td><code>mori review staged check .</code></td>
+</tr>
+<tr>
+<td>Acknowledge one exact staged review</td>
+<td><code>mori review staged acknowledge --accept-focused .</code></td>
+</tr>
+<tr>
+<td>Produce a concise terminal shortlist</td>
+<td><code>mori scan --profile review --format compact .</code></td>
+</tr>
+<tr>
+<td>Produce editor diagnostics</td>
+<td><code>mori scan --profile review --format sarif .</code></td>
+</tr>
+<tr>
+<td>Save a local visual report</td>
+<td><code>mori scan --profile review --format html . &gt; mori.html</code></td>
+</tr>
+<tr>
+<td>Inspect language coverage</td>
+<td><code>mori inspect .</code></td>
+</tr>
+<tr>
+<td>Check project setup</td>
+<td><code>mori doctor .</code></td>
+</tr>
+<tr>
+<td>Check project-managed Mori assets</td>
+<td><code>mori project upgrade --check .</code></td>
+</tr>
+</tbody>
+</table>
+<p>Lower the token floor toward 12 only for deliberate broad exploration; small
+callbacks and wrappers commonly dominate at that size.</p>
+<p>Use <code>mori explain &lt;content-pair-id&gt; [scan options] .</code> to reproduce and isolate
+one reported identity. Text output uses restrained color on terminals; set
+<code>--color never</code> or <code>NO_COLOR</code> to disable it.</p>
+<h2 id="supported-source">Supported source</h2>
+<p>Mori currently supports:</p>
+<ul>
+<li>Bash/POSIX shell and Zsh;</li>
+<li>C, C++, C#, Dart, GDScript, Go, Hack, Java, JavaScript/JSX, Kotlin, Lua,
+  Luau, PHP, PowerShell, Python, Ruby, Rust, Swift, TypeScript/TSX;</li>
+<li>generic SQL queries and explicitly selected PostgreSQL queries.</li>
+</ul>
+<p>Run <code>mori languages</code> for the exact extensions, families, fragment kinds, and
+extensionless shebangs supported by your installed version. See
+<a href="docs/reference/languages-and-parser-limits.html">Languages and parser limits</a>
+for comparison boundaries and known gaps.</p>
+<h2 id="editors-and-ai-coding-tools">Editors and AI coding tools</h2>
+<p>The repository includes a dependency-free
+<a href="editors/vscode/index.html">VS Code reference client</a>. It analyzes unsaved
+buffers through a local Mori process and reports SARIF diagnostics without
+uploading source.</p>
+<p>Install Mori's review skill into a project for compatible coding agents:</p>
+<pre><code class="language-sh">mori skill install --project .
+</code></pre>
+<p>The skill teaches agents to treat matches as review leads, verify coverage,
+inspect both source locations, and avoid score-only refactors.</p>
+<p>After installing a newer Mori binary, coordinate the project pin, embedded
+skill, configuration and baseline validation, and automation inventory with:</p>
+<pre><code class="language-sh">mori project upgrade --dry-run .
+mori project upgrade --apply .
+</code></pre>
+<p>Apply mode updates <code>.mori-version</code>, the tracked <code>.mori-project.json</code> contract,
+and only a missing or recognized Mori-managed Agent Skill, with backups.
+Unknown skill changes fail closed. It does not install the CLI, invent
+configuration policy, rewrite hooks or CI, commit, push, or release anything.</p>
+<p>To let a project agent configure Mori without granting hidden write access:</p>
+<pre><code class="language-sh">mori setup --agent --format json .
+</code></pre>
+<p>The agent can answer the emitted questions and preview the exact configuration
+before an explicit <code>--apply</code>. See <a href="docs/guides/editors-and-agents.html">Editors and coding agents</a>.</p>
+<h2 id="documentation">Documentation</h2>
+<ul>
+<li><a href="docs/index.html">Documentation home</a></li>
+<li><a href="docs/getting-started.html">Getting started</a></li>
+<li><a href="docs/guides/reviewing-results.html">Reviewing results</a></li>
+<li><a href="docs/guides/sql.html">SQL and embedded SQL</a></li>
+<li><a href="docs/guides/parser-compatibility.html">Parser compatibility</a></li>
+<li><a href="docs/guides/automation-and-baselines.html">Automation and baselines</a></li>
+<li><a href="docs/guides/editors-and-agents.html">Editors and coding agents</a></li>
+<li><a href="docs/guides/project-upgrade.html">Project contract and upgrades</a></li>
+<li><a href="docs/configuration.html">Project configuration</a></li>
+<li><a href="docs/scoring.html">Scoring</a></li>
+<li><a href="docs/machine-integration.html">Machine integration</a></li>
+<li><a href="docs/architecture.html">Architecture</a></li>
+<li><a href="docs/adding-a-language.html">Adding a language</a></li>
+</ul>
+<h2 id="smooth-project-reviews">Smooth project reviews</h2>
+<p>Start a new integration with <a href="docs/guides/review-policy.html">advisory staged review</a>
+to see structural leads without blocking on similarity alone. Existing hooks
+remain strict. Both policies retain configured coverage requirements; the report
+separates policy success from analysis completeness. Trust the project version
+pin and schedule upgrades separately. <a href="docs/guides/project-upgrade.html">Upgrade diagnostics</a>
+identify obsolete workflow instructions without rewriting project policy.</p>
+<p><a href="docs/guides/usability-rollout.html">Rollout guidance</a> covers native verification,
+reviewed project migration and opt-in pilot evaluation.</p>
+<p><a href="docs/guides/feedback.html">Local feedback</a> is off by default. Explicit per-project
+consent enables bounded measurements; export previews a separate minimized
+bundle. Mori does not upload feedback. Collection never accepts findings or
+changes a baseline. <code>mori feedback summarize</code> compares explicitly exported bundles
+offline without counting exports as distinct projects.</p>
+<h2 id="development">Development</h2>
+<pre><code class="language-sh">make check
+</code></pre>
+<p>See <a href="CONTRIBUTING.html">Contributing</a> for development policy. The calibration
+corpus is regression evidence for its reviewed cases, not a universal accuracy
+claim.</p>
+<h2 id="license">License</h2>
+<p><a href="https://github.com/Cyberlane/mori/blob/main/LICENSE">MIT</a></p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#install">Install</a></li>
+<li><a href="#quick-start">Quick start</a></li>
+<li><a href="#choose-a-workflow">Choose a workflow</a></li>
+<li><a href="#supported-source">Supported source</a></li>
+<li><a href="#editors-and-ai-coding-tools">Editors and AI coding tools</a></li>
+<li><a href="#documentation">Documentation</a></li>
+<li><a href="#smooth-project-reviews">Smooth project reviews</a></li>
+<li><a href="#development">Development</a></li>
+<li><a href="#license">License</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

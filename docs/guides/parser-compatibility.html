@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Parser compatibility · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html" aria-current="page">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/parser-compatibility.md">Markdown source ↗</a></div>
+<h1 id="parser-compatibility">Parser compatibility</h1>
+<p>Mori parses source syntax without running a compiler, database, preprocessor,
+or project build. A successful parse is comparison coverage, not proof that
+code compiles, executes, or behaves like a matched fragment.</p>
+<h2 id="c-frameworks">C frameworks</h2>
+<p>The bundled C grammar preserves conditional initializer branches when entries
+end in commas. It retains both alternatives without selecting a build
+configuration. It also recognizes these declaration and iteration forms:</p>
+<ul>
+<li><code>static UPPERCASE_DEFINE(...);</code> declarations with ordinary expression arguments.</li>
+<li><code>DT_INST_FOREACH_STATUS_OKAY(...)</code> declarations.</li>
+<li><code>ZMK_DISPLAY_WIDGET_LISTENER(name, type, update, get)</code> declarations.</li>
+<li><code>STRUCT_SECTION_FOREACH(type_name, variable) { ... }</code> statement bodies.</li>
+<li>One <code>else</code> clause enclosed by <code>#if</code>, <code>#ifdef</code>, or <code>#ifndef</code> after an <code>if</code> with a braced body and no existing <code>else</code>.</li>
+</ul>
+<p>These grammar rules retain arguments and bodies; they do not expand macros or
+validate macro definitions and arity. Other macro dialects and conditional
+layouts may still produce visible diagnostics. Invalid initializer branches,
+malformed arguments, and missing delimiters remain diagnosed, and affected
+functions are excluded from scoring.</p>
+<h2 id="swift">Swift</h2>
+<p>The bundled grammar distinguishes adjacent optional-type markers (<code>T??</code>) from
+whitespace-separated nil coalescing (<code>value as? T ?? fallback</code>). This also works
+inside call arguments, including subscript and method-call cast operands.
+The original cast and coalescing syntax is preserved without inserting synthetic
+parentheses. Malformed cast types, missing operands, and broken neighboring
+syntax remain diagnosed. Other inherited grammar limitations may still apply.</p>
+<p>Normalization version 13 invalidates older accepted identities because removing
+synthetic grouping changes profiles of expressions previously repaired that way.
+Review those identities again using the project upgrade and baseline workflow;
+do not copy old fingerprints into a new baseline to bypass the change.</p>
+<h2 id="javascript-and-typescript">JavaScript and TypeScript</h2>
+<p>The bundled JavaScript, TypeScript, and TSX grammars retain keyword-named export
+aliases. TypeScript/TSX also support semicolonless generic interface overloads,
+including intervening comments and CRLF, <code>import('module').Type</code> in array and
+nested-generic types, and <code>typeof import(...)</code> in generic call arguments.
+These are grammar corrections that preserve the original syntax tree and byte
+locations; Mori does not erase types with text substitution. Malformed nearby
+forms remain diagnosed and affected fragments remain excluded.</p>
+<h2 id="java">Java</h2>
+<p>Annotations before the varargs ellipsis, such as <code>String @Marker ... values</code>,
+are retained as syntax. Annotations misplaced after the ellipsis remain
+invalid. This does not validate annotation targets, overload resolution, or
+Java compilation.</p>
+<p>Normalization version 14 records these grammar corrections. Prior acceptance
+from normalization 12 or 13 requires an explicit reviewed migration; automatic
+loading does not reinterpret old accepted identities as current evidence.</p>
+<h2 id="sql">SQL</h2>
+<p>See <a href="sql.html">SQL and embedded SQL</a> for bounded SQLite compatibility and why a
+valid schema-only file may contain no comparable fragments.</p>
+<p>Generated grammar sources, local modifications, licenses, ABI versions, and
+checksums are recorded alongside each grammar under <code>internal/grammar/</code>.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#c-frameworks">C frameworks</a></li>
+<li><a href="#swift">Swift</a></li>
+<li><a href="#javascript-and-typescript">JavaScript and TypeScript</a></li>
+<li><a href="#java">Java</a></li>
+<li><a href="#sql">SQL</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

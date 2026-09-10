@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project contract and upgrade · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html" aria-current="page">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/project-upgrade.md">Markdown source ↗</a></div>
+<h1 id="project-contract-and-upgrade">Project contract and upgrade</h1>
+<p><code>mori project upgrade</code> uses <code>.mori-project.json</code> as the tracked Mori-specific
+contract. It is separate from <code>.mori.json</code>, which remains project-owned scan
+policy. The contract records the Mori version, embedded Agent Skill revision
+and digest, the hook-contract revision and digest, configuration, report,
+review-receipt and baseline schema revisions, and normalization version.</p>
+<p><code>--check</code> and <code>--dry-run</code> are read-only. Required managed drift or a managed
+conflict causes exit 5; policy, protected baseline evidence, and project-owned
+automation are reported as advisory or manual findings. <code>--apply</code> writes only the version
+pin, contract, and a missing/current/recorded-official Agent Skill. Unknown
+skill content is never overwritten. Existing managed files receive recoverable
+sibling backups before replacement.</p>
+<p>Apply does not stage or commit. When the Mori update itself will be committed,
+inspect and include the updated pin, project contract, and managed skill
+package together so a fresh checkout receives the same contract. Keep backup
+paths local and out of the commit.</p>
+<p>When either <code>.mori-version</code> or <code>.mori-project.json</code> opts a project into this
+contract, <code>scan</code> and <code>review</code> run a cheap local compatibility gate before
+analysis. Required managed drift and Mori-managed conflicts stop with exit 5
+and point to <code>project upgrade --dry-run</code>; <code>--no-config</code> does not bypass this
+gate. The check never contacts GitHub or another network service. Projects
+without either marker keep standalone behavior.</p>
+<p><code>mori hook pre-commit</code> is the canonical staged-check entrypoint for
+project-owned hooks. It has the same fixed staged inclusion and coverage
+contract as <code>mori review staged check</code>. Set
+<code>MORI_STAGED_REVIEW_RECEIPT=1</code> to validate the default private Git metadata
+receipt (<code>mori/staged-review.json</code>); unset or empty performs an unacknowledged
+check, and any other value is rejected.</p>
+<h2 id="maintainer-contract">Maintainer contract</h2>
+<p>A release that changes the embedded skill, canonical hook behavior, config or
+evidence schemas, or normalization must update the desired project contract
+and its lifecycle tests. Contract-schema changes must keep strict migration
+support for supported prior official contracts; an official managed project
+must not become a local-customization conflict solely because Mori was
+upgraded.</p>
+<h2 id="project-workflow-suggestions">Project workflow suggestions</h2>
+<p>Upgrade inspection also recognizes known adoption patterns that can make
+ordinary work unnecessarily expensive: checking the latest release before each
+source change, inspecting every focused group, and wrappers that may reject
+partial staging. The automation component includes the affected file, the
+reason to review it, and proposed replacement policy or command text. These are
+heuristic suggestions, not proof that arbitrary instructions or scripts are
+incorrect. Existing strict enforcement and receipt requirements still apply.</p>
+<p>Prefer trusting the pinned version during ordinary work, scheduling upgrades
+separately, and deeply reviewing a bounded shortlist while retaining the complete
+bounded report and disclosing unreviewed findings. A shortlist does not authorize
+acceptance of its unreviewed remainder. For an obsolete staged wrapper, consider
+<code>mori review staged check .</code> after verifying equivalent project enforcement.</p>
+<p>Inspection reads conventional workflow files, Mori-named scripts, tracked-hook
+locations (<code>.githooks/*</code> and <code>.husky/pre-commit</code>), and root <code>AGENTS.md</code>. It does
+not execute scripts or follow symlinked files or parent directories. Content
+inspection is bounded to 128 files of at most 1 MiB each; skipped or unreadable
+regular files are reported. Custom locations and unfamiliar instruction wording
+can require manual review. These advisory findings do not change the managed
+compatibility gate, and <code>--apply</code> never rewrites project instructions or hooks.
+The upgrade-plan JSON remains version 2 with its existing component fields.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#maintainer-contract">Maintainer contract</a></li>
+<li><a href="#project-workflow-suggestions">Project workflow suggestions</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

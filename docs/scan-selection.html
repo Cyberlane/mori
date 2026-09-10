@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scan selection controls · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html" aria-current="page">Scan selection controls</a><a href="scoring.html">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../source/docs/scan-selection.md">Markdown source ↗</a></div>
+<h1 id="scan-selection-controls">Scan selection controls</h1>
+<p>This document specifies how Mori selects comparison domains and language
+families before it scores structural similarity. The controls are intended to
+keep independent review profiles reproducible without forcing repositories to
+encode language-specific exclusion globs.</p>
+<h2 id="goals">Goals</h2>
+<ul>
+<li>Let a scan select one or more registered comparison domains directly.</li>
+<li>Let a scan compare fragments only within the same review family.</li>
+<li>Apply domain selection before parsing so excluded domains do not affect file
+  counts, parser warnings, focus resolution, or candidate-pair limits.</li>
+<li>Preserve deterministic ordering, existing fingerprints, and baseline
+  identities for the same selected fragments.</li>
+<li>Record every effective selection input in machine-readable reports.</li>
+</ul>
+<p>The controls do not rank findings by refactoring value and do not make a
+similarity score evidence of semantic or behavioral equivalence.</p>
+<h2 id="command-line-contract">Command-line contract</h2>
+<p><code>--profile review|explore|sql</code> applies a named set of defaults before explicit
+configuration fields and command-line flags. <code>review</code> is the conservative
+same-language code shortlist, <code>explore</code> names the broad compatibility defaults,
+and <code>sql</code> selects query review. Bare scans retain the compatibility defaults
+without reporting a selected profile. See <a href="configuration.html">Project configuration</a>
+for the exact values and precedence contract.</p>
+<p><code>--comparison-domain &lt;domain&gt;</code> accepts one case-insensitive domain identifier
+shown by <code>mori languages</code>, currently <code>code</code> or <code>sql-query</code>. Omitting it selects
+every registered domain.</p>
+<p>Examples:</p>
+<pre><code class="language-sh">mori scan --comparison-domain code .
+mori scan --comparison-domain sql-query --min-tokens 12 .
+</code></pre>
+<p><code>--sql-dialect &lt;dialect&gt;</code> selects <code>generic</code> (the default) or <code>postgresql</code> for
+every discovered <code>.sql</code> file. It does not infer a dialect from source content.
+Run separate profiles when a repository contains multiple SQL dialects.</p>
+<p><code>--embedded-sql</code> explicitly adds direct Go database-method string arguments to
+a <code>sql-query</code> scan. It requires <code>--comparison-domain sql-query</code>, uses the chosen
+dialect, and does not infer SQL from arbitrary strings or variables.</p>
+<p><code>--statement-blocks</code> adds bounded fixed-size <code>block</code> units to code scans.
+<code>--block-statements</code> selects 2 through 10 statements per window, while
+<code>--max-blocks-per-function</code> selects a cap from 1 through 256. These options are
+incompatible with embedded-SQL mode and the <code>sql-query</code> domain.</p>
+<p><code>--same-language-only</code> compares fragments only when their review families are
+the same. A family can contain multiple parser grammars, so TypeScript and TSX
+remain comparable in <code>typescript</code>, while Bash/POSIX shell and Zsh remain
+comparable in <code>shell</code>, and PHP and Hack remain comparable in <code>php-hack</code>. The filter
+partitions by comparison domain first; cross-domain pairs remain impossible.</p>
+<pre><code class="language-sh">mori scan --comparison-domain code --same-language-only .
+</code></pre>
+<p>The three language-selection modes are mutually exclusive:</p>
+<ul>
+<li><code>--same-language-only</code>;</li>
+<li><code>--cross-language-only</code>; and</li>
+<li>one or more <code>--language-pair</code> values.</li>
+</ul>
+<p>A comparison-domain filter can be combined with any one language-selection
+mode. Every explicit language pair must belong to a selected domain. Mori
+rejects contradictory options such as the following instead of returning a
+misleading empty report:</p>
+<pre><code class="language-sh">mori scan --comparison-domain sql-query --language-pair go,go .
+</code></pre>
+<h2 id="fragment-selection">Fragment selection</h2>
+<p><code>--fragment-selection all|production|tests</code> selects fragments after parsing.
+The default <code>all</code> preserves the existing comparison universe. Test selection
+recognizes conventional test paths, explicit Rust test attributes, and
+unambiguously test-only conditional modules; unclassified fragments remain on
+the production side. See the <a href="reference/languages-and-parser-limits.html#test-selection">exact conventions</a>. This is syntax classification, not proof of application
+ownership. File exclusions remain separate and cannot isolate inline tests.</p>
+<p>The report records the selection and per-file excluded test/production fragment
+counts. Fragment selection does not turn intentionally excluded fragments into
+analyzed coverage. It participates in baseline and receipt compatibility;
+keep staged-gate policy inclusive unless the consequences are explicitly
+reviewed. See <a href="configuration.html">configuration</a> for named scope overrides.</p>
+<h2 id="project-configuration">Project configuration</h2>
+<p><code>.mori.json</code> supports the equivalent fields:</p>
+<pre><code class="language-json">{
+  &quot;comparison_domain&quot;: &quot;code&quot;,
+  &quot;sql_dialect&quot;: &quot;generic&quot;,
+    &quot;embedded_sql&quot;: false,
+    &quot;statement_blocks&quot;: false,
+    &quot;block_statements&quot;: 3,
+    &quot;max_blocks_per_function&quot;: 64,
+  &quot;same_language_only&quot;: true
+}
+</code></pre>
+<p>The command-line domain overrides the configured domain, which permits a
+repository with a normal code profile to run a SQL-only scan without disabling
+its other configuration. Boolean command-line forms can explicitly override
+configured booleans, for example <code>--same-language-only=false</code>.</p>
+<h2 id="execution-model">Execution model</h2>
+<p>Mori validates domain names and option compatibility before discovery begins.
+Source discovery selects the configured SQL grammar, detects each other
+registered grammar, and drops a file whose comparison domain was not selected
+before file-size checks or parsing. As a result:</p>
+<ul>
+<li><code>files</code> and <code>fragments</code> count only selected domains;</li>
+<li>parser warnings come only from selected domains;</li>
+<li>changed-file and explicit-path focus resolve against selected files;</li>
+<li><code>candidate_pairs</code> and <code>--max-pairs</code> apply only to selected domains; and</li>
+<li>an explicitly requested file in an unselected domain is omitted without a
+  warning because the omission is the requested policy.</li>
+</ul>
+<p>After parsing, <code>--same-language-only</code> partitions fragments by comparison
+domain and then by review family. Every partition is scored independently,
+and the resulting groups enter the existing deterministic global ordering.</p>
+<h2 id="diagnostics">Diagnostics</h2>
+<p>Tree-sitter errors remain visible even when a source form is valid in a dialect
+that Mori's pinned grammar does not fully support. The parse warning therefore
+uses the neutral message <code>syntax tree contains parse errors; comparison
+coverage may be incomplete</code>.</p>
+<p>When one or more comparison fragments actually contain parse errors, the
+existing <code>skipped_fragments</code> count records that fact. Reports must not claim
+that fragments were invalid or skipped when the parser found errors only in
+source constructs that are not comparison units, such as SQL DDL.</p>
+<h2 id="report-and-compatibility-contract">Report and compatibility contract</h2>
+<p>Schema version 22 retains the effective parser and selection fields under
+<code>configuration</code>, including every opt-in extraction bound:</p>
+<pre><code class="language-json">{
+  &quot;profile&quot;: &quot;review&quot;,
+  &quot;comparison_domain&quot;: &quot;code&quot;,
+  &quot;sql_dialect&quot;: &quot;generic&quot;,
+    &quot;embedded_sql&quot;: false,
+    &quot;statement_blocks&quot;: false,
+    &quot;block_statements&quot;: 3,
+    &quot;max_blocks_per_function&quot;: 64,
+  &quot;same_language_only&quot;: true
+}
+</code></pre>
+<p>The domain is normalized to its registered lowercase identifier. An empty
+string means that no domain restriction was requested. Consumers must continue
+to reject or explicitly handle unknown report schema versions.</p>
+<p>Domain and family selection do not change fragment features. SQL dialect
+selection chooses a different parser and is therefore recorded explicitly.
+The current normalization version is 14. It includes the established parser
+and fragment contracts; see <a href="guides/parser-compatibility.html">parser compatibility</a>
+for the current repairs and boundaries. Baselines created with an older normalization version must
+be reviewed and regenerated. Changing a selection profile still requires the
+ordinary human review expected for any baseline scope change.</p>
+<h2 id="verification-requirements">Verification requirements</h2>
+<p>Tests must prove:</p>
+<ul>
+<li>code selection omits SQL files before parsing and warning generation;</li>
+<li>SQL selection omits code files;</li>
+<li>same-family mode includes TypeScript-to-TSX, PHP-to-Hack, and same-language pairs while
+  excluding Go-to-TypeScript pairs;</li>
+<li>cross-language and same-language modes are mutually exclusive;</li>
+<li>explicit language pairs incompatible with selected domains are rejected;</li>
+<li>configuration loads, merges, normalizes, and reports the new fields;</li>
+<li>generic SQL remains the default and PostgreSQL is selected only explicitly;</li>
+<li>the PostgreSQL fixtures include a positive and nearby negative;</li>
+<li>repeated identical scans produce byte-identical JSON; and</li>
+<li>the neutral parser warning reports zero skipped fragments for unsupported
+  DDL while retaining bounded diagnostics.</li>
+</ul>
+<p>The full repository gate remains <code>make check</code>. Representative release
+verification must also inspect a code-only repository scan, a SQL-only example
+scan, and the documented cross-language example.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#goals">Goals</a></li>
+<li><a href="#command-line-contract">Command-line contract</a></li>
+<li><a href="#fragment-selection">Fragment selection</a></li>
+<li><a href="#project-configuration">Project configuration</a></li>
+<li><a href="#execution-model">Execution model</a></li>
+<li><a href="#diagnostics">Diagnostics</a></li>
+<li><a href="#report-and-compatibility-contract">Report and compatibility contract</a></li>
+<li><a href="#verification-requirements">Verification requirements</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

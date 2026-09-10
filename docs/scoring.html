@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scoring contract · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html" aria-current="page">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../source/docs/scoring.md">Markdown source ↗</a></div>
+<h1 id="scoring-contract">Scoring contract</h1>
+<p>森 (<em>mori</em>) compares normalized AST feature <strong>multisets</strong>. Counts matter: a
+function with four branches is different from a function with one branch even
+when both sets contain the token <code>flow:if</code>. SQL queries use the same scoring
+formula in a separate comparison domain.</p>
+<h2 id="feature-construction">Feature construction</h2>
+<p>For each comparison fragment, the normalizer may emit:</p>
+<table>
+<thead>
+<tr>
+<th>Feature prefix</th>
+<th>Meaning</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>node:</code></td>
+<td>canonical or grammar-specific node</td>
+<td><code>node:flow:return</code></td>
+</tr>
+<tr>
+<td><code>class:</code></td>
+<td>broad cross-language class</td>
+<td><code>class:operation</code></td>
+</tr>
+<tr>
+<td><code>edge:</code></td>
+<td>canonical parent-child relation</td>
+<td><code>edge:flow:return&gt;expression:call</code></td>
+</tr>
+<tr>
+<td><code>role:</code></td>
+<td>selected grammar field role</td>
+<td><code>role:condition&gt;expression:comparison</code></td>
+</tr>
+<tr>
+<td><code>semantic:</code></td>
+<td>curated operation-family hint</td>
+<td><code>semantic:membership</code></td>
+</tr>
+<tr>
+<td><code>ordered:</code></td>
+<td>bounded canonical position evidence</td>
+<td><code>ordered:statement:first:binding</code></td>
+</tr>
+</tbody>
+</table>
+<p>Semantic hints currently cover membership, pattern matching, length, trimming,
+case conversion, filtering, mapping, and reduction. They have weight two.
+Everything else has weight one.</p>
+<p>SQL query normalization adds canonical structure for projections, sources,
+joins, predicates, grouping, ordering, CTEs, set operations, values, conflict
+handling, returning clauses, and <code>SELECT</code>/<code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code> operations.
+It also maps parameters and broad literal kinds without preserving names or
+values. These features describe syntax, not query equivalence or database
+behavior.</p>
+<p>The <code>generic</code> and <code>postgresql</code> parsers share the <code>sql</code> review family and
+<code>sql-query</code> domain, but one scan selects one parser dialect for all <code>.sql</code>
+files. PostgreSQL grammar wrappers and keyword nodes are reduced into the same
+query vocabulary; a matching score still does not account for schemas,
+constraints, plans, permissions, transactions, or PL/pgSQL behavior.</p>
+<p>Bash/POSIX shell and Zsh use separate grammars in one review family. Mori maps
+their grammar-specific word, variable-reference, and glob nodes to shared
+canonical features. A 100% result across those parsers is normalized structural
+identity, not byte identity or proof that shell options and runtime semantics
+are equivalent.</p>
+<p>Swift uses its own review family. Mori maps implemented declarations, closure
+parameters, arguments, identifiers, strings, collections, expressions, and
+control transfers into existing canonical code features. This improves useful
+Swift-to-other-language comparisons without preserving application-specific
+names or literal values; it does not model Swift types, dispatch, ownership,
+effects, or runtime behavior.</p>
+<p>Java and C# each use their own review family. Mori maps their implemented
+function-like declarations, parameters, blocks, bindings, calls, member
+access, construction, expressions, and control transfers into the same
+canonical code vocabulary. Redundant parentheses are transparent. Qualified
+Java method calls receive an anonymous member-access wrapper so their receiver
+shape aligns with other grammars without preserving receiver or method names.
+These mappings do not model types, overload resolution, dispatch, exceptions,
+effects, or runtime behavior.</p>
+<p>PHP and Hack use separate grammars in one <code>php-hack</code> review family. Mori maps
+implemented function-like declarations, parameters, blocks, bindings, calls,
+member access, collections, expressions, and control flow into shared code
+features. Curated aliases include PHP spellings such as <code>str_contains</code> and
+<code>strlen</code>. These are structural hints only; the score does not model types,
+coercions, dispatch, effects, or runtime behavior.</p>
+<p>The normalizer has a version constant for persisted review artifacts. Any
+change to the feature vocabulary, weights, canonical mappings, or
+semantic-hint list increments that version.</p>
+<p>These hints only say that a call <em>looks like</em> a familiar operation based on its
+callee name. User-defined <code>contains</code> or <code>map</code> methods can mean something else.</p>
+<h2 id="weighted-jaccard">Weighted Jaccard</h2>
+<p>Let (A_f) and (B_f) be the counts for feature (f):</p>
+<p>[
+J(A,B)=\frac{\sum_f \min(A_f,B_f)}{\sum_f \max(A_f,B_f)}
+]</p>
+<p>The result is in ([0,1]):</p>
+<ul>
+<li><code>1.0</code>: identical normalized feature counts;</li>
+<li>near <code>1.0</code>: very similar normalized structure;</li>
+<li>near <code>0.0</code>: little normalized structure in common.</li>
+</ul>
+<p>Empty feature bags score zero and are not emitted by normal parsing.</p>
+<h2 id="what-the-score-ignores">What the score ignores</h2>
+<ul>
+<li>identifier spelling;</li>
+<li>literal values, except their broad kinds;</li>
+<li>comments and formatting;</li>
+<li>selected type-only syntax; and</li>
+<li>nested function bodies, which are separate code fragments.</li>
+</ul>
+<p>Nested SQL queries are not separate fragments. Their normalized structure is
+retained inside the enclosing top-level query.</p>
+<p>The score does <strong>not</strong> model:</p>
+<ul>
+<li>data or control-flow equivalence;</li>
+<li>side effects;</li>
+<li>type resolution;</li>
+<li>dynamic dispatch;</li>
+<li>library contracts;</li>
+<li>aliasing;</li>
+<li>input/output behavior; or</li>
+<li>runtime values.</li>
+</ul>
+<p>For SQL this also excludes schema resolution, constraints, indexes, triggers,
+query plans, transaction context, permissions, and dialect-specific runtime
+semantics.</p>
+<p>Consequently, the words “duplicate” and “semantic” should be treated as review
+hypotheses, not conclusions.</p>
+<h2 id="threshold-selection">Threshold selection</h2>
+<p>The default <code>0.70</code> is discovery-oriented.</p>
+<p>Suggested calibration process:</p>
+<ol>
+<li>collect representative pairs your maintainers agree should be reviewed;</li>
+<li>collect nearby pairs that should stay separate;</li>
+<li>run both sets through the same version and options;</li>
+<li>choose the highest threshold that retains the useful positives;</li>
+<li>review false positives before enabling <code>--fail-on-match</code>; and</li>
+<li>pin the 森 version in CI because normalization changes can change scores.</li>
+</ol>
+<p>Typical starting points:</p>
+<ul>
+<li><code>0.85</code>–<code>0.95</code>: low-noise, same-language clones;</li>
+<li><code>0.70</code>–<code>0.85</code>: structurally close rewrites;</li>
+<li><code>0.60</code>–<code>0.70</code>: cross-language exploration.</li>
+</ul>
+<p>These are starting ranges, not universal quality levels. Start cross-language
+repository scans at <code>--min-tokens 40</code> so small callbacks and wrappers do not
+dominate, and lower the floor toward 12 only for deliberately broad
+exploration.</p>
+<h2 id="candidate-pruning">Candidate pruning</h2>
+<p>If feature bag (A) has no more features than (B), its maximum possible
+weighted Jaccard score is (|A|/|B|). 森 sorts fragments by feature count and
+stops considering larger partners as soon as this upper bound falls below the
+threshold.</p>
+<p><code>candidate_pairs</code> counts pairs that passed size pruning and language filtering
+and were actually scored. <code>--max-pairs</code> is checked before each score.</p>
+<p><code>total_location_pairs</code> counts every source-location pair at or above the
+threshold. Pairs with the same stable content identity are aggregated into one
+group; <code>total_match_groups</code> counts those identities. Unless <code>--max-groups 0</code>
+is used, 森 retains only the requested best groups and sets <code>truncated</code> when
+the report omits lower-ranked identities. <code>--max-occurrences</code> separately bounds
+the displayed locations for each fingerprint while retaining the exact count.</p>
+<p>Groups are ordered by descending similarity, then descending minimum feature
+count, descending represented location-pair count, and stable identity. The
+second key favors more substantial shared evidence among equal scores; it is
+not an empirically validated actionability score.</p>
+<h2 id="explanations">Explanations</h2>
+<p>Reports first include a non-semantic shared-shape summary of canonical calls,
+branches, loops, switches, returns, and bindings. They then include up to eight
+raw shared features, ordered by:</p>
+<ol>
+<li>descending shared count; and</li>
+<li>ascending feature name.</li>
+</ol>
+<p>An explanation helps answer “why did this group score highly?” It is not a
+complete decomposition of the numerator or a proof that the occurrences
+should be refactored. Domain descriptions still require source inspection.</p>
+<p>Schema 16 adds <code>structural_evidence</code> to every retained group. It records the
+exact weighted multiset intersection and union used by Jaccard scoring. Its
+<code>left_only</code> and <code>right_only</code> objects align with profile order by fingerprint,
+record the complete directional weighted-only total, and retain at most eight
+top features ordered by descending count then feature name. The bounded lists
+can omit lower-count feature names without losing the exact totals.</p>
+<p>Text output labels a 100% score as <strong>normalized feature identity</strong> and states
+that it is not proof of semantic or behavioral equivalence. Schema 16 added
+these explanation fields without changing the then-current scores.</p>
+<p>Normalization version 9 separately adds weight-one ordered evidence. Direct
+statements within canonical blocks are associated with <code>first</code>, <code>middle</code>,
+<code>last</code>, or <code>only</code> positions. Calls can also be associated with a canonical
+control position and a fragment-local anonymous callee slot. Call evidence is
+emitted only for two through eight distinct callees and is capped at eight call
+occurrences per fragment. Callee names and name digests are never serialized;
+the lexical assignment is local to each fragment, low-weight, and not a claim
+that similarly numbered slots identify the same operation. These features can
+make exchanged operations visible while limiting identifier influence.</p>
+<p>Every fragment report includes a stable content fingerprint derived from its
+normalized feature bag. Feature names are sorted before SHA-256 hashing and
+the result is truncated to 16 hexadecimal characters. Formatting, comments,
+literal values, most identifiers, line numbers, and file position do not
+affect this identity. A content-pair ID joins its two fragment fingerprints in
+lexical order, so pair order does not affect the ID. Every qualifying location
+pair with that identity belongs to one report group. This is useful for review
+workflows, but it also means an identical accepted fragment in a new location
+has the same content identity.</p>
+<h2 id="json-schema">JSON schema</h2>
+<p>The top-level shape is:</p>
+<pre><code class="language-json">{
+  &quot;schema_version&quot;: 22,
+  &quot;tool&quot;: {
+    &quot;name&quot;: &quot;mori&quot;,
+    &quot;version&quot;: &quot;&lt;version&gt;&quot;,
+    &quot;revision&quot;: &quot;&lt;full source revision&gt;&quot;,
+    &quot;source_date&quot;: &quot;&lt;RFC3339 commit time&gt;&quot;,
+    &quot;modified&quot;: false,
+    &quot;go_version&quot;: &quot;&lt;Go version&gt;&quot;,
+    &quot;goos&quot;: &quot;&lt;target OS&gt;&quot;,
+    &quot;goarch&quot;: &quot;&lt;target architecture&gt;&quot;,
+    &quot;normalization_version&quot;: 14
+  },
+  &quot;threshold&quot;: 0.85,
+  &quot;files&quot;: 4,
+  &quot;fragments&quot;: 4,
+  &quot;candidate_pairs&quot;: 0,
+  &quot;total_location_pairs&quot;: 0,
+  &quot;total_match_groups&quot;: 0,
+  &quot;total_focused_match_groups&quot;: 0,
+  &quot;suppressed_location_pairs&quot;: 0,
+  &quot;suppressed_match_groups&quot;: 0,
+  &quot;truncated&quot;: false,
+  &quot;groups&quot;: [],
+  &quot;warnings&quot;: [],
+  &quot;file_coverage&quot;: [],
+  &quot;coverage&quot;: {
+    &quot;supported_files&quot;: 4,
+    &quot;analyzed_files&quot;: 4,
+    &quot;fragment_files&quot;: 4,
+    &quot;zero_fragment_files&quot;: 0,
+    &quot;generated_excluded_files&quot;: 0,
+    &quot;warning_files&quot;: 0,
+    &quot;warning_count&quot;: 0,
+    &quot;parse_diagnostic_files&quot;: 0,
+    &quot;parse_diagnostic_count&quot;: 0,
+    &quot;unsupported_extensions&quot;: []
+  },
+  &quot;configuration&quot;: {
+    &quot;profile&quot;: &quot;review&quot;,
+    &quot;ignore_files&quot;: [],
+    &quot;ignore_file_evidence&quot;: [],
+    &quot;respect_ignore&quot;: true,
+    &quot;excludes&quot;: [],
+    &quot;min_tokens&quot;: 40,
+    &quot;max_groups&quot;: 250,
+    &quot;max_occurrences&quot;: 10,
+    &quot;max_pairs&quot;: 5000000,
+    &quot;max_file_bytes&quot;: 2097152,
+    &quot;comparison_domain&quot;: &quot;code&quot;,
+    &quot;sql_dialect&quot;: &quot;generic&quot;,
+    &quot;embedded_sql&quot;: false,
+    &quot;statement_blocks&quot;: false,
+    &quot;block_statements&quot;: 3,
+    &quot;max_blocks_per_function&quot;: 64,
+    &quot;ranking&quot;: &quot;review&quot;,
+    &quot;priority_paths&quot;: [],
+    &quot;same_language_only&quot;: true,
+    &quot;cross_language_only&quot;: false,
+    &quot;language_pairs&quot;: [],
+    &quot;require_coverage&quot;: true,
+    &quot;min_file_coverage&quot;: 0.95,
+    &quot;max_zero_fragment_files&quot;: 2,
+    &quot;fail_on_warning&quot;: false,
+    &quot;fail_on_parse_diagnostic&quot;: true,
+    &quot;focused_only&quot;: false,
+    &quot;scan_profile_digest&quot;: &quot;&lt;sha256&gt;&quot;
+  }
+}
+</code></pre>
+<p>Group objects include <code>content_pair_id</code>, <code>location_pairs</code>, one or two content
+profiles, occurrence counts and locations, a shape summary, and raw shared
+features. Schema 12 added bounded <code>literal_evidence</code> when at least one compared
+location pair contains literals. It reports compared pairs, pairs with
+differences, the maximum differing positions, and literal-count mismatches.
+Literal values and their internal digests are never serialized; this evidence
+does not affect scores, fingerprints, ordering, or baselines. Fragment
+occurrences expose language family, <code>comparison_domain</code>,
+<code>fragment_kind</code>, nesting depth, parent identity, and the number of excluded
+nested functions. The current domains are <code>code</code> with <code>function</code>, shell
+<code>script</code>, and opt-in <code>block</code> fragments, and <code>sql-query</code> with <code>query</code> fragments
+from <code>.sql</code> files or opt-in embedded Go SQL. Cross-domain and
+cross-fragment-kind pairs are never candidates.
+Selected comparison domains are applied before parsing. Same-language mode
+compares within review families, including TypeScript with TSX. Warnings can
+include bounded parser node ranges and skipped-fragment counts.
+Suppression fields separate affected source pairs from content identities.
+Consumers should reject or explicitly handle unknown schema versions.</p>
+<p>Schema 10 adds <code>review_priority</code> and <code>review_signals</code> to every group and records
+the effective <code>configuration.ranking</code>. <code>--ranking review</code> uses these explicit
+location-level signals before the established structural ordering. Distinctive
+identifiers are used only for the disclosed same-name signal; generic entry-
+point, constructor, and anonymous names are ignored. Identifiers remain absent
+from fingerprints and similarity scores. Focused groups always remain first.</p>
+<p>Review priority is the sum of disclosed, overlapping signals: 4 for a
+same-named pair across directories, 2 for any cross-directory pair, 2 for a
+same-named pair across files, 1 for any cross-file pair, and 1 when the content
+identity represents multiple location pairs. The existing structural
+comparator breaks ties. This is a shortlist-ordering heuristic, not semantic
+or refactoring confidence.</p>
+<p>Schema 12 also records effective <code>priority_paths</code>. Each matching configured
+rule adds its declared weight once per group and emits a
+<code>priority-path:GLOB(+WEIGHT)</code> signal. These rules are deterministic,
+presentation-only project policy; Mori does not infer security, reachability,
+or domain risk from source names.</p>
+<p>Schema 13 records <code>embedded_sql</code>, <code>statement_blocks</code>, <code>block_statements</code>, and
+<code>max_blocks_per_function</code>. Normalization version 8 covers the expanded opt-in
+comparison-unit contract. Statement blocks are fixed-size windows, retain
+parent-function linkage, and exclude overlapping same-file windows from pair
+eligibility. Embedded SQL uses source-mapped host literal locations and the
+explicitly selected SQL dialect. Existing baselines require review and
+regeneration because the normalization version changed, even when the new
+extractors remain disabled.</p>
+<p>Schema 14 adds an exact <code>coverage</code> summary, effective strict coverage-policy
+values, aggregate unsupported-extension counts, and pre-token-floor boundary
+evidence in every <code>file_coverage</code> entry. A zero-fragment analyzed file records
+one deterministic reason: <code>no_boundaries</code>, <code>below_token_floor</code>,
+<code>invalid_fragments</code>, or <code>resource_limit</code>; generated exclusions record
+<code>generated_excluded</code>. Generated exclusions are supported files but never enter
+the analyzed-file coverage denominator. Consumers can therefore enforce exact
+file-level policy without reconstructing totals or receiving a list of
+unsupported paths. Normalization remains version 8 and baseline schema remains
+version 2.</p>
+<p>Schema 15 records the active <code>configuration.scan_profile_digest</code> and, when a
+baseline is loaded, its digest and compatibility status. The digest covers
+effective candidate selection, threshold, dialect, fragment policy, explicit
+exclusions, loaded ignore-file paths and content, resource bounds, and strict
+coverage policy. Presentation-only ranking, focus, and output bounds are
+excluded. Normalization remains version 8. Baseline schema advances to 3 for
+the same profile evidence and durable entry classifications.</p>
+<p>Schema 16 adds exact and bounded difference-oriented structural evidence to
+each retained group. It changes reporting only. Normalization remains version
+8 and baseline schema remains version 3.</p>
+<p>Normalization version 9 adds bounded ordered statement and anonymous
+callee/control-position evidence without changing the schema-16 JSON shape or
+baseline schema 3. Scores, fingerprints, and accepted identities can change,
+so older-normalization baselines fail closed and require deliberate review and
+regeneration.</p>
+<p>Schema 17 adds the optional <code>configuration.stdin_path</code> field for bounded
+unsaved-buffer overlays. It changes reporting only: normalization remains
+version 9 and baseline schema remains version 3. Its complete contract remains
+available in the v0.27.0 and earlier release assets.</p>
+<p>Schema 18 adds <code>configuration.input</code> for immutable Git-index provenance,
+<code>configuration.scope</code> and <code>scope_roots</code> for named project surfaces, and exact
+focused-path evidence with required and covered totals. These report and
+candidate-surface changes leave normalization at version 12 and baseline
+schema at version 3. The selected scope and roots participate in the baseline
+scan-profile digest.</p>
+<p>Schema 19 adds optional <code>configuration.review_receipt</code> evidence for a
+compatible local staged-review acknowledgment. The report still includes all
+focused findings; the receipt changes only <code>--fail-on-focused-match</code> policy.
+Any change to HEAD, index bytes, the scan profile, tool or normalization
+version, or the complete focused identity set invalidates it.</p>
+<p>Schema 20 adds inclusive changed-line intervals to each applicable focused-path
+evidence entry and records <code>configuration.focused_only</code>. Canonical staged
+review sets that flag and parses the full repository while scoring only pairs
+that contain an exact hunk-intersecting fragment. It also corrects the public
+receipt-evidence contract to the current receipt schema 2. Baseline schema
+remained 4 and normalization remained 12. The schema-20 contract is
+published as
+<a href="https://github.com/Cyberlane/mori/blob/main/schemas/mori-report-v20.schema.json"><code>schemas/mori-report-v20.schema.json</code></a>.
+<code>focused_only</code> is recorded for report reproducibility but is not added to the
+schema-4 baseline profile digest: accepted scored identities remain valid when
+untouched-to-untouched pairs are omitted from a staged run.</p>
+<p>Normalization version 10 adds Java and C# function boundaries and canonical
+syntax mappings, makes redundant parentheses transparent, and adds the
+anonymous member wrapper for qualified Java method calls. Report schema 17 and
+baseline schema 3 are unchanged. Scores, fingerprints, and accepted identities
+can change, so older-normalization baselines fail closed and require deliberate
+review and regeneration.</p>
+<p>Normalization version 11 adds PHP and Hack function boundaries, shared
+canonical mappings, and curated PHP standard-library operation aliases. Report
+schema 17 and baseline schema 3 are unchanged. Scores, fingerprints, and
+accepted identities can change, so older-normalization baselines fail closed
+and require deliberate review and regeneration.</p>
+<p>Schema 9 added a deterministic <code>file_coverage</code> array with one entry per analyzed
+or generated-excluded supported file. Each entry records its language, review
+family, comparison domain, analysis status, generated-source classification,
+fragment count, skipped-fragment count, and parse-diagnostic count. Consumers
+must inspect zero-fragment and excluded entries instead of inferring per-file
+coverage from the aggregate <code>files</code> and <code>fragments</code> totals.</p>
+<p>Schema 8 added <code>configuration.focus.worktrees</code> for explicit multi-worktree Git
+focus. Each entry contains <code>root</code>, <code>requested_base</code>, full <code>base_commit</code>,
+<code>merge_base</code>, and <code>head_commit</code> values, working-tree and untracked inclusion
+flags, plus changed and deleted paths relative to that root. A single
+<code>--changed-since</code> scan retains the established scalar focus fields. Multi-root
+mode also exposes deterministic root-qualified aggregate <code>changed_paths</code> and
+<code>deleted_paths</code>. This reporting change does not alter normalization version 6,
+fragment fingerprints, similarity scores, or baseline schema 2.</p>
+<p>Official release binaries populate the full <code>revision</code> and <code>source_date</code>.
+Source-built commands such as <code>go install ...@version</code> or <code>go run
+...@version</code> can populate <code>version</code> while leaving either provenance field as
+<code>unknown</code> because the Go module build does not always contain VCS settings.
+Treat such a report as provenance-incomplete: it can support an explicitly
+disclosed exploratory local review, but not a provenance-sensitive audit or CI
+gate. Do not infer a revision or source date from the version string.</p>
+<p>Paths are relative to the current working directory when possible. Lines are
+one-based and inclusive. A future breaking shape change must increment
+<code>schema_version</code>; adding an optional field still requires documentation and
+consumer review.</p>
+<h2 id="baselines">Baselines</h2>
+<p>Use <code>--baseline &lt;path&gt;</code> to suppress candidates that maintainers have reviewed
+and accepted as intentional structural similarity. This records review
+acceptance, not semantic or behavioral equivalence. Missing or incompatible
+baseline files are errors; Mori never treats a failed load as an empty set.
+Baseline documents are bounded to 16 MiB before JSON decoding.</p>
+<p>Accept one reviewed identity from a complete scan:</p>
+<pre><code class="language-sh">mori baseline add \
+  --baseline mori-baseline.json \
+  --identity &lt;content-pair-id&gt; \
+  --classification intentional \
+  --note 'Reviewed with the owning team' \
+  .
+</code></pre>
+<p>Baseline schema 4 records an explicit <code>identity_scope</code>, deterministic
+<code>scan_profile_digest</code>, canonical profile fields, and optional durable
+<code>classification</code> and <code>note</code> values. Supported classifications are
+<code>intentional</code>, <code>necessary-duplication</code>, <code>test-fixture</code>, <code>generated</code>, and
+<code>false-positive</code>; <code>other</code> remains available for reviewed cases that do not fit
+a more precise classification. <code>baseline edit</code> updates or clears metadata without altering
+acceptance, and <code>baseline remove</code> revokes every accepted entry using one
+content identity.</p>
+<p>The default <code>content</code> scope accepts a normalized content-pair identity in every
+location, including future identical copies. A path-scoped baseline records
+reviewed source-path pairs instead, so a copy in a new file reappears. In that
+scope, one selective <code>baseline add --identity</code> accepts all exact path pairs for
+the identity in the active complete scan.</p>
+<p><code>baseline update</code> computes and prints replacement counts but does not write a
+file unless <code>--accept-all</code> is explicit. Existing notes and classifications are
+preserved for retained entries. Schema-1 through schema-3 baselines remain readable
+for suppression, with a visible legacy-profile warning, but mutation is
+refused until <code>baseline migrate --accept-profile</code> explicitly binds the current
+complete scan profile. A schema-4 profile mismatch fails closed until options
+match or that explicit migration is performed.</p>
+<p>The file also records the Mori version, normalization version, threshold,
+stable identities, and human-readable locations. The normalization version
+must match the running binary. Preserve the old file for review, generate a new
+baseline using the same effective scan profile, and selectively add reviewed
+identities; use <code>baseline update --accept-all</code> only when accepting every
+currently reported identity is deliberate.</p>
+<p><code>baseline prune</code> removes entries whose IDs no longer occur, while
+<code>baseline prune --check</code> reports stale entries and exits with status <code>3</code>
+without modifying the file. Both commands scan without suppression and use an
+unlimited report internally so bounded display retention cannot make the
+baseline incomplete. Every mutating baseline command refuses truncation and
+warnings by default. After review, repeat <code>--allow-warning KIND</code> only for each
+intentionally accepted warning category.</p>
+<p>For a one-commit staged exception that should not become durable suppression,
+first inspect the complete staged report, then record explicit acceptance:</p>
+<pre><code class="language-sh">mori review staged acknowledge --accept-focused .
+mori review staged check \
+  --review-receipt &quot;$(git rev-parse --git-path mori/staged-review.json)&quot; .
+</code></pre>
+<p>The receipt is local state under private Git metadata by default and uses
+owner-only file permissions on POSIX filesystems. It stores no source or
+timestamp, does not suppress findings, and becomes stale after the commit
+because HEAD changes. A missing, malformed, or stale requested receipt fails
+closed. The two canonical commands share immutable staged input, otherwise
+ignored focused-file inclusion, and complete focused-file coverage by
+construction. Receipt schema 2 records that contract and reports field-level
+drift without source content. The lower-level commands remain available for
+deliberately custom staged policies.</p>
+<h3 id="schema-21-staged-review-policy">Schema 21: staged review policy</h3>
+<p>Canonical staged checks add an optional <code>review</code> outcome separating the selected
+strict/advisory gate result from analysis completeness. Policy selection does not
+alter similarity or fingerprints. Separately, normalization 13 records corrected
+Swift optional-type/nil-coalescing grammar; formerly repaired expressions can
+change fingerprints when synthetic grouping nodes disappear. Baseline schema 4
+remains unchanged, but prior normalization acceptance needs review. See
+<a href="https://github.com/Cyberlane/mori/blob/main/schemas/mori-report-v21.schema.json">the schema-21 artifact</a> and
+<a href="guides/review-policy.html">review policies</a>. Timing and feedback are separate
+opt-in local records and never affect deterministic analysis or acceptance.</p>
+<h3 id="schema-22-explicit-fragment-selection">Schema 22: explicit fragment selection</h3>
+<p>The report records <code>configuration.fragment_selection</code> and per-file
+<code>excluded_test_fragment_count</code> and <code>excluded_production_fragment_count</code>.
+Default selection remains <code>all</code>; opt-in test/production selection changes the
+comparison universe and its compatibility evidence, not the meaning of a
+similarity score. Current normalization is 14; prior accepted identities need
+review before migration. See <a href="https://github.com/Cyberlane/mori/blob/main/schemas/mori-report-v22.schema.json">the current schema</a>
+and <a href="guides/parser-compatibility.html">parser compatibility</a>.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#feature-construction">Feature construction</a></li>
+<li><a href="#weighted-jaccard">Weighted Jaccard</a></li>
+<li><a href="#what-the-score-ignores">What the score ignores</a></li>
+<li><a href="#threshold-selection">Threshold selection</a></li>
+<li><a href="#candidate-pruning">Candidate pruning</a></li>
+<li><a href="#explanations">Explanations</a></li>
+<li><a href="#json-schema">JSON schema</a></li>
+<li><a href="#baselines">Baselines</a><ul>
+<li><a href="#schema-21-staged-review-policy">Schema 21: staged review policy</a></li>
+<li><a href="#schema-22-explicit-fragment-selection">Schema 22: explicit fragment selection</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

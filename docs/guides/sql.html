@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SQL and embedded SQL · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html" aria-current="page">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/sql.md">Markdown source ↗</a></div>
+<h1 id="sql-and-embedded-sql">SQL and embedded SQL</h1>
+<p>SQL queries occupy the <code>sql-query</code> comparison domain and never compare with
+code functions.</p>
+<h2 id="generic-sql">Generic SQL</h2>
+<pre><code class="language-sh">mori scan --profile sql path/to/queries
+</code></pre>
+<p>Mori extracts top-level <code>SELECT</code> and set-operation queries plus <code>INSERT</code>,
+<code>UPDATE</code>, and <code>DELETE</code>. DDL and nested queries are not independent comparison
+units. Nested structure remains part of its top-level query.</p>
+<p>The generic parser supports the documented SQLite and SQLC forms, including
+common pagination parameters and SQLite <code>ON CONFLICT</code> column targets. Exact,
+adjacent SQLC <code>-- name: Name :mode</code> comments are display labels only.</p>
+<p>The bundled generic grammar also recognizes SQLite <code>PRAGMA</code> assignments and
+arguments, <code>STRICT</code> table suffixes, expression-valued <code>CHECK</code> constraints
+(including <code>BETWEEN</code> and <code>GLOB</code>), and <code>BEGIN ... END</code> trigger bodies with query
+statements. These forms are parsed directly, retaining source offsets and
+visible errors in malformed statements. Recognizing DDL does not turn it into
+a comparable query: a schema-only file can still have zero fragments and fail
+an explicitly required fragment-coverage policy. This is bounded syntax support,
+not database execution or complete SQLite semantic validation.</p>
+<h2 id="postgresql">PostgreSQL</h2>
+<p>Select the dedicated PostgreSQL 18 parser explicitly:</p>
+<pre><code class="language-sh">mori scan \
+  --profile sql \
+  --sql-dialect postgresql \
+  path/to/postgresql
+</code></pre>
+<p>One invocation uses one dialect for every discovered <code>.sql</code> file. Split mixed
+dialect repositories into separate scans. PL/pgSQL procedural bodies are not
+independent comparison units.</p>
+<h2 id="sql-embedded-in-go">SQL embedded in Go</h2>
+<p>Mori can explicitly inspect direct string arguments to recognized
+<code>database/sql</code>-style <code>Exec</code>, <code>Query</code>, <code>QueryRow</code>, and <code>Prepare</code> methods:</p>
+<pre><code class="language-sh">mori scan \
+  --comparison-domain sql-query \
+  --embedded-sql \
+  --sql-dialect postgresql \
+  path/to/go/project
+</code></pre>
+<p>This mode is off by default. It does not guess from arbitrary strings, follow
+variables, concatenate expressions, or perform receiver-type analysis.
+Locations point to the host Go string and retain parent-function metadata.</p>
+<p>Mori visibly skips a file above 1,000 recognized calls and a decoded query
+above 256 KiB. A string containing multiple top-level statements is one
+query-batch unit. Inspect the host call, runtime values, database permissions,
+transactions, schemas, and query plans before acting on any structural match.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#generic-sql">Generic SQL</a></li>
+<li><a href="#postgresql">PostgreSQL</a></li>
+<li><a href="#sql-embedded-in-go">SQL embedded in Go</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

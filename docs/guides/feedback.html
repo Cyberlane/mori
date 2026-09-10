@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Opt-in local feedback · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html" aria-current="page">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/feedback.md">Markdown source ↗</a></div>
+<h1 id="opt-in-local-feedback">Opt-in local feedback</h1>
+<p>Mori feedback is off by default. Normal scans do not create feedback state until
+this OS user explicitly enables it for the project directory. Mori never uploads
+feedback, contacts a feedback service, or changes review decisions from feedback.</p>
+<pre><code class="language-sh">mori feedback status --root .
+mori feedback enable --root .
+# Run ordinary scans, then inspect exactly what could be shared:
+mori feedback export --root .
+# Saving the preview is an explicit export; it does not submit anything:
+mori feedback export --root . &gt; feedback.json
+mori feedback disable --root .
+mori feedback clear --root .
+</code></pre>
+<p><code>disable</code> stops collection and retains existing samples. <code>clear</code> deletes retained
+samples while keeping the current consent decision. To stop collection and erase
+history, run both. Empty status, clear, disable, and export operations do not enroll
+a project. Consent is outside tracked project configuration, under the OS user's
+configuration directory in <code>mori/feedback</code>. A local digest of the canonical project
+path selects the storage directory; it is never included in exports. Use the same
+project root for enabling feedback and scans. Different roots and worktrees have
+independent consent; moving a project does not inherit consent.</p>
+<p>CI is excluded unless enabled separately with <code>mori feedback enable --ci --root .</code>.
+This grants CI collection only for this user's local state and this project root;
+it does not create a portable repository permission or an upload permission.
+Common CI environment indicators are recognized; custom automation should set
+<code>CI=true</code>. Enabling again without <code>--ci</code> withdraws CI consent.</p>
+<h2 id="what-is-collected">What is collected</h2>
+<p>The schema-version-1 bundle contains at most the latest 256 samples, with no
+age-based expiry. Samples contain only:</p>
+<ul>
+<li>Total scan elapsed-time bucket: under 1 second, 1–9 seconds, 10–59 seconds,
+  1–5 minutes (exclusive of 5 minutes), or at least 5 minutes. This measures scan time, not human review effort.</li>
+<li>Coarse counts for files, fragments, candidate pairs, match groups, and parse
+  diagnostics: zero, 1–9, 10–99, 100–999, or at least 1000.</li>
+<li>Outcome category: completed, findings, coverage, error, or unknown.</li>
+<li>Review policy (<code>strict</code>, <code>advisory</code>, or ordinary <code>scan</code>), reported analysis
+  status (<code>complete</code>, <code>incomplete</code>, <code>no-comparable-source</code>, or <code>unknown</code>), and
+  findings scope (<code>focused</code> or <code>all</code>). Focused scans count focused match groups.
+  Ordinary scans use <code>unknown</code> analysis status; command success never implies
+  complete analysis.</li>
+<li>Coarse warning counts by fixed categories (<code>parse</code>, <code>coverage</code>, <code>baseline</code>,
+  <code>focus</code>, or <code>other</code>), never raw diagnostic messages or paths.</li>
+<li>Whether the report was truncated, and cache status (hit, miss, bypassed).</li>
+<li>Tool release version restricted to numeric <code>major.minor.patch</code>; development,
+  prerelease and custom builds are reported as <code>dev</code>, with no revision metadata.</li>
+<li>Coarse file counts by a fixed allowlist of language categories; unknown language
+  labels become <code>other</code>.</li>
+<li>Optional explicit classification of one reviewed finding, its coarse shortlist
+  rank, and self-reported review effort. These are absent until supplied.</li>
+</ul>
+<p>There are no source snippets, names, paths, hashes, repository metadata, exact
+counts, timestamps, persistent project identifiers, raw diagnostics, command
+arguments, environment values, free text, or automatic review classifications in
+the sharing schema. No consent settings are exported. Aggregate combinations may
+still characterize a workload; review the exact preview before choosing to share
+it. The export command accepts no destination service and cannot transmit data.</p>
+<p>Samples are constructed from an explicit allowlist rather than redacting ordinary
+reports. State is size-bounded, parsed strictly, and validates all exported values
+against fixed enumerations. POSIX files and newly created directories use user-only permissions.
+On Windows, mode bits cannot establish ACL privacy; storage relies on the OS
+user configuration directory's inherited ACL. Mori does not modify Windows ACLs. Unsafe storage paths and concurrent writes fail closed; feedback failure
+never changes a scan's exit code, report, baseline, or review receipt.</p>
+<h2 id="optional-review-feedback">Optional review feedback</h2>
+<p>After inspecting a finding from the most recent retained scan:</p>
+<pre><code class="language-sh">mori feedback classify --root . --classification intentional --rank 7 --effort 1-5m
+</code></pre>
+<p>Classification is <code>useful</code>, <code>intentional</code>, <code>false-positive</code>, or <code>uncertain</code>.
+Optional effort is <code>under-1m</code>, <code>1-5m</code>, <code>5-15m</code>, or <code>15m+</code>; it is a self-reported
+estimate for the review session, never inferred from elapsed scan time. Optional
+positive rank is stored as <code>1-5</code>, <code>6-10</code>, <code>11-25</code>, or <code>26+</code>. Omit rank when unknown.
+This annotates <strong>one reviewed finding</strong> in the latest sample and replaces any
+previous annotation there. It does not classify every finding in that scan or
+count multiple reviewed findings. Classification requires current collection
+consent (including CI consent in CI); no sample or zero findings means no classification. It never
+creates a receipt, accepts a baseline, or authorizes a refactor.</p>
+<h2 id="limits-and-next-steps">Limits and next steps</h2>
+<p>This local pilot measures coarse scan cost, cache use, language mix, findings
+volume, and voluntarily annotated usefulness/rank and review effort. It cannot
+identify repeated findings across scans, establish complete review coverage, or
+measure upgrade interruptions. A single voluntarily selected finding is not an
+unbiased sample of all findings. Feedback consent does not authorize
+source-fixture sharing, automatic submission, or changes to accepted baselines.
+A future submission service needs a separately reviewed consent and retention
+contract. Do not interpret unreviewed findings as either useful or false positives.</p>
+<p>Collection is skipped for scans with multiple explicit paths, multiple worktrees,
+or non-staged <code>--include-focused</code> source scopes. This avoids applying one project's
+consent to source belonging to another project. Enable and scan individual project
+roots to obtain measurements for those workflows.</p>
+<p>Interrupted writes recover automatically on a later operation: an unchanged,
+empty lock directory older than ten minutes may be removed with one bounded
+retry. Recent locks, nonempty locks, and symlinks are left untouched. After acquiring
+the lock, Mori inspects at most 512 directory entries and removes only regular
+<code>.state-</code> temporary files older than ten minutes. Other files and fresh temporary
+files are preserved. Collection and consent changes never wait indefinitely on a
+lock; a recent busy writer produces a retryable feedback error.</p>
+<h2 id="offline-pilot-and-calibration">Offline pilot and calibration</h2>
+<p>Use <code>mori feedback summarize EXPORT.json [EXPORT.json ...]</code> to inspect explicitly
+exported bundles without opening consent storage or sending data. It accepts up to
+64 regular files, each at most 1 MiB and 256 samples, and rejects non-feedback
+schemas, unknown fields, and invalid categories before writing any summary. Output
+is human-readable text; the feedback sharing schema remains version 1.</p>
+<p>The summary separates scan samples, selected finding annotations, annotations with
+rank, and self-reported review sessions. It shows timing buckets grouped by tool
+version, policy, cache state and file-count bucket, and reports analysis status,
+findings volume, warning and language presence. Presence counts overlap when a
+sample contains several languages or warnings. It prints no input paths or raw
+export contents. Identical bundles are counted with an explicit notice: without
+project identifiers, Mori cannot tell copied exports from independent projects
+that happened to produce identical measurements. Exports are never a project count.</p>
+<p>A reproducible local pilot can use the following procedure. Each participating
+user decides independently whether to collect and whether to share the preview.</p>
+<ol>
+<li>Agree on a fixed observation window and representative tasks before collecting.
+   Record the chosen release, policy and workload locally. Preserve strict gates
+   where required; any advisory trial needs the project's explicit agreement.</li>
+<li>Enable feedback at the exact project root. Complete ordinary tasks, recording
+   at most one finding classification per retained scan. Choose a consistent
+   sampling rule in advance (for example, the first actually reviewed finding),
+   and keep the same rule throughout. Record rank only when known. This reduces
+   selection drift but does not make the sample unbiased.</li>
+<li>For a cache experiment, compare the same staged snapshot and options with a
+   cold invocation and repeated <code>--cache</code> invocations. Keep correctness checks
+   separate from timing. Use a local benchmark for differences within one timing
+   bucket; bucketed feedback cannot establish a percentage speedup.</li>
+<li>Export and inspect the exact preview. Save one final export per collection
+   window outside tracked source. Clear retained samples before a subsequent
+   window to prevent overlap, only after retaining the intended export. Do not
+   combine rolling snapshots of the same retained samples.</li>
+<li>Run the offline summary on those final exports. Compare matched version,
+   policy, cache and workload strata. Treat missing classifications as unknown.
+   Examine incomplete analysis and coverage outcomes before interpreting fewer
+   findings as an improvement.</li>
+<li>Require a reviewed source fixture and a nearby negative before changing a
+   parser or ranking rule. Export consent does not include source-fixture consent.
+   Verify the fixture locally or obtain separate permission to share it. Validate
+   the proposed change on held-out fixtures and the corpus, then repeat the pilot.</li>
+<li>Disable collection and optionally clear retained samples when the window ends.
+   Shared copies have their own retention owner; local clearing cannot delete them.</li>
+</ol>
+<p>A synthetic test of summary arithmetic is not a project pilot. Useful-finding
+counts describe only volunteered annotations, and repeated scans can correlate.
+Do not use this data to infer semantic equivalence, calculate a global false
+positive rate, or automatically adjust thresholds/ranking. Upgrade interruptions,
+pre-analysis errors and receipt invalidations that occur before a report exists
+remain unmeasured. Address those gaps only with a separately specified minimized
+contract; no source or error text should be added as a shortcut.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#what-is-collected">What is collected</a></li>
+<li><a href="#optional-review-feedback">Optional review feedback</a></li>
+<li><a href="#limits-and-next-steps">Limits and next steps</a></li>
+<li><a href="#offline-pilot-and-calibration">Offline pilot and calibration</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>
