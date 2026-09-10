@@ -97,7 +97,13 @@ supported zero-fragment files, zero-fragment reasons, boundary counts, skipped
 fragments, parse diagnostics, generated exclusions, and warnings. A successful
 aggregate does not excuse a supported file with no comparison units.
 
-For a pre-commit decision, prefer the immutable index snapshot:
+For a pre-commit decision, prefer the immutable index snapshot. Existing
+checks remain strict by default; new integrations may explicitly choose
+`--policy advisory` to report similarity without blocking on it. Both policies
+preserve configured coverage failures and immutable input checks. The report
+`review` object separates policy status from analysis completeness.
+
+Strict invocation:
 
 ```sh
 mori review staged check --format agent --output "$MORI_REPORT" .
@@ -167,3 +173,10 @@ Recommendation: <specific next check or no action>
 End with Mori version, exact command, config/ignore sources, warnings,
 coverage, group and location-pair totals, truncation state, baseline scope if
 used, and whether tests or runtime behavior were inspected.
+
+
+For repeated canonical staged checks, `--cache` explicitly opts into private
+local analysis reuse. It binds the complete immutable index, options, tool and
+contracts; changed inputs or unverifiable cache data cause fresh analysis.
+Baseline, receipt and coverage checks still run after reuse. It does not enable
+feedback or add a network operation. Do not edit cache files to accept findings.

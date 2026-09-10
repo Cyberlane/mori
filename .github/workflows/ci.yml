@@ -72,6 +72,10 @@ jobs:
         include:
           - name: Linux AMD64
             runner: ubuntu-24.04
+          - name: Linux ARM64
+            runner: ubuntu-24.04-arm
+          - name: macOS AMD64
+            runner: macos-15-intel
           - name: macOS ARM64
             runner: macos-15
           - name: Windows AMD64

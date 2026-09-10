@@ -40,3 +40,28 @@ and its lifecycle tests. Contract-schema changes must keep strict migration
 support for supported prior official contracts; an official managed project
 must not become a local-customization conflict solely because Mori was
 upgraded.
+
+## Project workflow suggestions
+
+Upgrade inspection also recognizes known adoption patterns that can make
+ordinary work unnecessarily expensive: checking the latest release before each
+source change, inspecting every focused group, and wrappers that may reject
+partial staging. The automation component includes the affected file, the
+reason to review it, and proposed replacement policy or command text. These are
+heuristic suggestions, not proof that arbitrary instructions or scripts are
+incorrect. Existing strict enforcement and receipt requirements still apply.
+
+Prefer trusting the pinned version during ordinary work, scheduling upgrades
+separately, and deeply reviewing a bounded shortlist while retaining the complete
+bounded report and disclosing unreviewed findings. A shortlist does not authorize
+acceptance of its unreviewed remainder. For an obsolete staged wrapper, consider
+`mori review staged check .` after verifying equivalent project enforcement.
+
+Inspection reads conventional workflow files, Mori-named scripts, tracked-hook
+locations (`.githooks/*` and `.husky/pre-commit`), and root `AGENTS.md`. It does
+not execute scripts or follow symlinked files or parent directories. Content
+inspection is bounded to 128 files of at most 1 MiB each; skipped or unreadable
+regular files are reported. Custom locations and unfamiliar instruction wording
+can require manual review. These advisory findings do not change the managed
+compatibility gate, and `--apply` never rewrites project instructions or hooks.
+The upgrade-plan JSON remains version 2 with its existing component fields.

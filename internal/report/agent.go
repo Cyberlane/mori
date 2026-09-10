@@ -113,6 +113,17 @@ func Agent(writer io.Writer, value model.Report) error {
 	); err != nil {
 		return err
 	}
+	if review := value.Review; review != nil {
+		if _, err := fmt.Fprintf(writer,
+			"review: policy %s; status %s; analysis %s; coverage policy met %t; %d finding(s); acknowledged %t\n",
+			terminalSafe(review.Policy), terminalSafe(review.Status), terminalSafe(review.Analysis),
+			review.CoveragePolicyMet, review.Findings, review.Acknowledged); err != nil {
+			return err
+		}
+	}
+	if err := agentCoverageDetails(writer, value); err != nil {
+		return err
+	}
 	if receipt := value.Configuration.ReviewReceipt; receipt != nil {
 		if _, err := fmt.Fprintf(
 			writer,
@@ -136,6 +147,10 @@ func Agent(writer io.Writer, value model.Report) error {
 			group.LocationPairs,
 			terminalSafe(agentGroupLocations(group, value.Configuration.Focus)),
 		); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(writer, "   review priority: %d; signals: %s\n",
+			group.ReviewPriority, terminalSafe(agentPrioritySignals(group.ReviewSignals))); err != nil {
 			return err
 		}
 	}
@@ -162,9 +177,10 @@ func Agent(writer io.Writer, value model.Report) error {
 		}
 		if _, err := fmt.Fprintf(
 			writer,
-			"warning[%s]%s: %s\n",
+			"warning[%s]%s (%s): %s\n",
 			terminalSafe(kind),
 			terminalSafe(location),
+			agentWarningScope(warning.Path, value.Configuration.Focus),
 			terminalSafe(warning.Message),
 		); err != nil {
 			return err
@@ -292,4 +308,76 @@ func agentFocusedLocation(location model.Location, focus *model.FocusConfig) boo
 
 func sameAgentLocation(left, right model.Location) bool {
 	return left.Path == right.Path && left.StartLine == right.StartLine && left.EndLine == right.EndLine && left.Name == right.Name
+}
+
+// Scope is file-level evidence, not an assertion that a diagnostic overlaps
+// changed lines. Warnings without a path or without focus remain unscoped.
+func agentWarningScope(path string, focus *model.FocusConfig) string {
+	if path == "" || focus == nil {
+		return "unscoped"
+	}
+	normalized := filepath.ToSlash(filepath.Clean(path))
+	for _, evidence := range focus.PathEvidence {
+		if filepath.ToSlash(filepath.Clean(evidence.Path)) == normalized {
+			return "focused file"
+		}
+	}
+	return "background file"
+}
+
+func agentCoverageDetails(writer io.Writer, value model.Report) error {
+	type counts struct{ warnings, diagnostics int }
+	scopes := map[string]*counts{"focused file": {}, "background file": {}, "unscoped": {}}
+	for _, warning := range value.Warnings {
+		count := scopes[agentWarningScope(warning.Path, value.Configuration.Focus)]
+		count.warnings++
+		count.diagnostics += warning.TotalDiagnostics
+	}
+	if len(value.Warnings) > 0 {
+		for _, scope := range []string{"focused file", "background file", "unscoped"} {
+			count := scopes[scope]
+			if _, err := fmt.Fprintf(writer, "diagnostic scope [%s]: %d warning(s); %d parse diagnostic(s)\n", scope, count.warnings, count.diagnostics); err != nil {
+				return err
+			}
+		}
+	}
+	reasons := map[string]int{}
+	for _, coverage := range value.FileCoverage {
+		if coverage.FragmentCount != 0 || coverage.Status != "analyzed" {
+			continue
+		}
+		reason := coverage.ZeroReason
+		switch reason {
+		case "no_boundaries", "below_token_floor", "invalid_fragments", "resource_limit":
+		default:
+			reason = "unspecified"
+		}
+		reasons[reason]++
+	}
+	for _, reason := range []struct{ code, description string }{
+		{"no_boundaries", "no comparable function/query boundaries"},
+		{"below_token_floor", "all candidates below token floor"},
+		{"invalid_fragments", "parser diagnostics or invalid fragments"},
+		{"resource_limit", "resource or read limitation"},
+		{"unspecified", "reason unavailable"},
+	} {
+		if count := reasons[reason.code]; count > 0 {
+			if _, err := fmt.Fprintf(writer, "no comparison fragments: %d file(s); %s\n", count, reason.description); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func agentPrioritySignals(signals []string) string {
+	if len(signals) == 0 {
+		return "none recorded"
+	}
+	const limit = 6
+	result := strings.Join(signals[:min(len(signals), limit)], ", ")
+	if len(signals) > limit {
+		result += fmt.Sprintf("; %d more in complete JSON", len(signals)-limit)
+	}
+	return result
 }

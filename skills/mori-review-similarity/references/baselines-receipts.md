@@ -70,5 +70,5 @@ never hides findings. Any HEAD, index, staged-review contract, profile, tool,
 normalization, or focused-identity change invalidates it.
 
 Receipt creation/use requires owner authorization. Direct commit
-authorization need not be re-requested, but ask again for unresolved findings
-or warnings, or whenever receipt authorization has not been given.
+authorization need not be re-requested, but honor standing project authorization for this action. Ask again only
+for unresolved owner decisions or when receipt authorization is absent.

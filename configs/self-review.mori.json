@@ -13,6 +13,11 @@
   "max_zero_fragment_files": 5,
   "fail_on_warning": true,
   "exclude_generated": true,
-  "exclude": ["**/*_test.go", "examples/**"],
+  "exclude": [
+    "**/*_test.go",
+    "examples/**",
+    "corpus/**",
+    "internal/grammar/**"
+  ],
   "respect_ignore": true
 }

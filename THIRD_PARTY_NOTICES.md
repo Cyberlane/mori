@@ -5,12 +5,13 @@
 | Component | Version | Copyright | License |
 | --- | --- | --- | --- |
 | Go runtime and standard library | release toolchain 1.26.6 | Copyright 2009 The Go Authors | BSD 3-Clause |
+| `golang.org/x/sys` (Windows cache ACL support) | 0.30.0 | Copyright 2009 The Go Authors | BSD 3-Clause |
 | `github.com/bmatcuk/doublestar/v4` | 4.10.0 | Copyright (c) 2014 Bob Matcuk | MIT |
 | `github.com/mattn/go-pointer` | 0.0.1 | Copyright (c) 2019 Yasuhiro Matsumoto | MIT |
 | `github.com/tree-sitter/go-tree-sitter` | 0.25.0 | Copyright (c) 2024 Amaan Qureshi | MIT |
 | Tree-sitter core | bundled by the Go binding | Copyright (c) 2018 Max Brunsfeld | MIT |
 | Tree-sitter Bash grammar | 0.25.1 | Copyright (c) 2017 Max Brunsfeld | MIT |
-| Tree-sitter C grammar | 0.24.2 | Copyright (c) 2014 Max Brunsfeld | MIT |
+| Tree-sitter C grammar | 0.24.2 with Mori compatibility changes | Copyright (c) 2014 Max Brunsfeld | MIT |
 | Tree-sitter C++ grammar | 0.23.4 | Copyright (c) 2014 Max Brunsfeld | MIT |
 | Tree-sitter C# grammar | 0.23.5 | Copyright (c) 2014-2023 Max Brunsfeld, Damien Guard, Amaan Qureshi, and contributors | MIT |
 | Tree-sitter Dart grammar (`github.com/UserNobody14/tree-sitter-dart`) | source at `be07cf7118d3` | Copyright (c) 2020-2023 UserNobody14 and others | MIT |
@@ -29,9 +30,9 @@
 | Tree-sitter Ruby grammar | 0.23.1 | Copyright (c) 2016 Rob Rix | MIT |
 | Tree-sitter PostgreSQL grammar (`github.com/gmr/tree-sitter-postgres`) | 1.2.4 | Copyright (c) 2026 Gavin M. Roy, AWeber | BSD 3-Clause |
 | Tree-sitter Rust grammar | 0.24.2 | Copyright (c) 2017 Maxim Sokolov | MIT |
-| Tree-sitter Swift grammar (`github.com/alex-pinkus/tree-sitter-swift`) | 0.7.3 source at `8d02b7ff390a17a43ce90c4e987c49315cfc4be6` | Copyright (c) 2021 alex-pinkus | MIT |
+| Tree-sitter Swift grammar (`github.com/alex-pinkus/tree-sitter-swift`) | 0.7.3 source at `8d02b7ff390a17a43ce90c4e987c49315cfc4be6` with Mori optional-type compatibility change | Copyright (c) 2021 alex-pinkus | MIT |
 | Tree-sitter Zsh grammar (`github.com/georgeharker/tree-sitter-zsh`) | 0.63.5 | Copyright (c) 2017 Max Brunsfeld | MIT |
-| Tree-sitter SQL grammar (`github.com/wippyai/tree-sitter-sql`) | 0.0.4 | Copyright (c) 2021 Derek Stride | MIT |
+| Tree-sitter SQL grammar (`github.com/wippyai/tree-sitter-sql`) | 0.0.4 with Mori compatibility changes | Copyright (c) 2021 Derek Stride | MIT |
 
 ## MIT license text
 
@@ -55,7 +56,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Go runtime and standard library
+## Go runtime, standard library and golang.org/x/sys
 
 Copyright 2009 The Go Authors.
 
@@ -173,3 +174,11 @@ in this Software without prior written authorization of the copyright holder.
 
 All trademarks and registered trademarks mentioned herein are the property of
 their respective owners.
+
+## Mori grammar compatibility sources
+
+The C and generic SQL grammars include local grammar changes and generated C
+sources. Their upstream licenses, generation instructions, ABI versions, and
+checksums are recorded in `internal/grammar/c/PROVENANCE.md` and
+`internal/grammar/sql/PROVENANCE.md`. Ordinary builds do not regenerate or
+fetch grammars.

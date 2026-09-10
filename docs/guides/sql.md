@@ -17,6 +17,15 @@ The generic parser supports the documented SQLite and SQLC forms, including
 common pagination parameters and SQLite `ON CONFLICT` column targets. Exact,
 adjacent SQLC `-- name: Name :mode` comments are display labels only.
 
+The bundled generic grammar also recognizes SQLite `PRAGMA` assignments and
+arguments, `STRICT` table suffixes, expression-valued `CHECK` constraints
+(including `BETWEEN` and `GLOB`), and `BEGIN ... END` trigger bodies with query
+statements. These forms are parsed directly, retaining source offsets and
+visible errors in malformed statements. Recognizing DDL does not turn it into
+a comparable query: a schema-only file can still have zero fragments and fail
+an explicitly required fragment-coverage policy. This is bounded syntax support,
+not database execution or complete SQLite semantic validation.
+
 ## PostgreSQL
 
 Select the dedicated PostgreSQL 18 parser explicitly:

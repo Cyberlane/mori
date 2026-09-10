@@ -8,7 +8,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/tree-sitter/go-tree-sitter v0.25.0
 	github.com/tree-sitter/tree-sitter-bash v0.25.1
-	github.com/tree-sitter/tree-sitter-c v0.24.2
+	github.com/tree-sitter/tree-sitter-c v0.24.2 // indirect
 	github.com/tree-sitter/tree-sitter-c-sharp v0.23.5
 	github.com/tree-sitter/tree-sitter-cpp v0.23.4
 	github.com/tree-sitter/tree-sitter-go v0.25.0
@@ -19,7 +19,6 @@ require (
 	github.com/tree-sitter/tree-sitter-rust v0.24.2
 	github.com/tree-sitter/tree-sitter-typescript v0.23.2
 	github.com/tree-sitter/tree-sitter-zsh v0.63.5
-	github.com/wippyai/tree-sitter-sql v0.0.4
 )
 
 require (
@@ -29,6 +28,7 @@ require (
 	github.com/tree-sitter-grammars/tree-sitter-luau v1.2.0
 	github.com/tree-sitter/tree-sitter-ruby v0.23.1
 	github.com/wharflab/tree-sitter-powershell v0.38.1
+	golang.org/x/sys v0.30.0
 )
 
 require github.com/mattn/go-pointer v0.0.1 // indirect

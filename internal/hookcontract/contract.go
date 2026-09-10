@@ -5,11 +5,11 @@ import "crypto/sha256"
 
 // Revision changes when the canonical staged-review invocation or its fixed
 // policy changes. Project hooks remain project-owned and are never installed.
-const Revision = "mori-hook-pre-commit/v1"
+const Revision = "mori-hook-pre-commit/v2"
 
 const definition = Revision + "\x00" +
 	"parse canonical staged-review options; resolve the immutable Git index; " +
-	"run review staged check; optionally validate MORI_STAGED_REVIEW_RECEIPT=1 " +
+	"run review staged check with strict default or explicit advisory findings policy; preserve coverage gates and report policy separately from completeness; optionally validate MORI_STAGED_REVIEW_RECEIPT=1 " +
 	"from private Git metadata at mori/staged-review.json"
 
 // Digest is the stable SHA-256 identity of the hook contract definition.

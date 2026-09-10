@@ -1,0 +1,37 @@
+{
+	"grammars": [
+		{
+			"name": "sql",
+			"camelcase": "SQL",
+			"scope": "source.sql",
+			"path": ".",
+			"file-types": [
+				"sql"
+			],
+			"highlights": [
+				"queries/highlights.scm"
+			]
+		}
+	],
+	"metadata": {
+		"version": "0.3.7",
+		"license": "MIT",
+		"description": "Tree-sitter Grammar for SQL",
+		"authors": [
+			{
+				"name": "derek stride"
+			}
+		],
+		"links": {
+			"repository": "https://github.com/ponyruntime/tree-sitter-sql"
+		}
+	},
+	"bindings": {
+		"c": true,
+		"go": true,
+		"node": false,
+		"python": false,
+		"rust": false,
+		"swift": false
+	}
+}

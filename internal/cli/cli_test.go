@@ -398,7 +398,7 @@ func TestRunFiltersDomainsBeforeParsingAndReportsSelection(t *testing.T) {
 		t.Fatalf("decode SQL report: %v", err)
 	}
 	if sqlReport.Files != 3 || sqlReport.Fragments != 2 ||
-		sqlReport.TotalMatchGroups != 1 || len(sqlReport.Warnings) != 1 ||
+		sqlReport.TotalMatchGroups != 1 || len(sqlReport.Warnings) != 0 || sqlReport.Coverage.ZeroFragmentFiles != 1 ||
 		sqlReport.Configuration.ComparisonDomain != "sql-query" {
 		t.Fatalf("SQL report = %+v", sqlReport)
 	}
@@ -1457,7 +1457,7 @@ func TestBaselineMigrationIsExplicitAndWarningsBlockMutation(t *testing.T) {
 	if err := os.WriteFile(legacyPath, []byte(`{
   "schema_version": 2,
   "mori_version": "0.20.0",
-  "normalization_version": 12,
+  "normalization_version": 13,
   "identity_scope": "content",
   "threshold": 0.7,
   "entries": []

@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -326,6 +327,12 @@ func inspectProjectBaseline(root string, settings config.Settings, configExists 
 	}
 	set, err := baseline.Load(path)
 	if err != nil {
+		if _, migrationErr := baseline.LoadForMigration(path); migrationErr == nil {
+			component.Status, component.Classification = "recommended", "recommended"
+			component.Detail = "supported prior normalization baseline detected; accepted evidence was not changed"
+			component.Action = "run mori baseline migrate --accept-profile with --baseline set to this path and the complete project scan scope and profile; review retained stale entries"
+			return component
+		}
 		component.Status, component.Classification, component.Detail, component.Action = "conflict/manual", "conflict/manual", err.Error(), "repair or migrate the baseline explicitly"
 		return component
 	}
@@ -338,23 +345,36 @@ func inspectProjectBaseline(root string, settings config.Settings, configExists 
 }
 
 func inspectProjectAutomation(root string) projectUpgradeComponent {
-	patterns := []string{".github/workflows/*.yml", ".github/workflows/*.yaml", ".pre-commit-config.yaml", "lefthook.yml", "lefthook.yaml", "Scripts/*mori*", "scripts/*mori*", "AGENTS.md"}
+	patterns := []string{".github/workflows/*.yml", ".github/workflows/*.yaml", ".pre-commit-config.yaml", "lefthook.yml", "lefthook.yaml", "Scripts/*mori*", "scripts/*mori*", ".githooks/*", ".husky/pre-commit", "AGENTS.md"}
 	paths := make([]string, 0)
 	seen := make(map[string]struct{})
 	legacyStagedFocus, customStagedContract := false, false
+	diagnostics := make([]string, 0)
+	actions := make([]string, 0)
+	inspected := 0
 	for _, pattern := range patterns {
 		matches, _ := filepath.Glob(filepath.Join(root, filepath.FromSlash(pattern)))
 		for _, match := range matches {
 			info, err := os.Lstat(match)
-			if err == nil && info.Mode().IsRegular() {
+			if err == nil && info.Mode().IsRegular() && projectAutomationParentsRegular(root, match) {
 				canonical := canonicalPath(match)
 				if _, duplicate := seen[canonical]; duplicate {
 					continue
 				}
 				seen[canonical] = struct{}{}
 				paths = append(paths, displayCLIPath(match))
-				if info.Size() <= 1024*1024 {
-					content, readErr := os.ReadFile(match)
+				if info.Size() <= 1024*1024 && inspected < 128 {
+					inspected++
+					content, readErr := readProjectAutomation(match)
+					if readErr == nil {
+						found, proposed := projectAutomationPolicyDiagnostics(string(content))
+						for _, finding := range found {
+							diagnostics = append(diagnostics, displayCLIPath(match)+": "+finding)
+						}
+						actions = append(actions, proposed...)
+					} else {
+						diagnostics = append(diagnostics, displayCLIPath(match)+": automation content could not be inspected")
+					}
 					if readErr == nil && bytes.Contains(content, []byte("mori")) && !bytes.Contains(content, []byte("review staged check")) {
 						if bytes.Contains(content, []byte("git diff --cached")) && !bytes.Contains(content, []byte("--staged")) {
 							legacyStagedFocus = true
@@ -363,6 +383,8 @@ func inspectProjectAutomation(root string) projectUpgradeComponent {
 							customStagedContract = true
 						}
 					}
+				} else {
+					diagnostics = append(diagnostics, displayCLIPath(match)+": automation inspection skipped (1 MiB per file, 128 files maximum)")
 				}
 			}
 		}
@@ -383,7 +405,93 @@ func inspectProjectAutomation(root string) projectUpgradeComponent {
 		component.Detail += "; found a lower-level staged scan instead of the canonical staged-review contract"
 		component.Action = "review migration to mori review staged check"
 	}
+	if len(diagnostics) > 0 {
+		component.Status = "review"
+		sort.Strings(diagnostics)
+		component.Detail += "; " + strings.Join(diagnostics, "; ")
+		sort.Strings(actions)
+		last := ""
+		for _, action := range actions {
+			if action != last {
+				component.Action += "; " + action
+				last = action
+			}
+		}
+	}
 	return component
+}
+
+// Conventional automation is advisory and never executed. Do not follow a
+// symlinked parent out of the project when looking for migration suggestions.
+func projectAutomationParentsRegular(root, path string) bool {
+	for parent := filepath.Dir(path); parent != root; parent = filepath.Dir(parent) {
+		if parent == filepath.Dir(parent) {
+			return false
+		}
+		info, err := os.Lstat(parent)
+		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func readProjectAutomation(path string) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	content, err := io.ReadAll(io.LimitReader(file, 1024*1024+1))
+	if len(content) > 1024*1024 {
+		return nil, errors.New("automation exceeds inspection limit")
+	}
+	return content, err
+}
+
+// Tie rejection to partial staging itself. Whole-file keyword co-occurrence
+// confuses task-isolation guidance with an unrelated strict findings gate.
+var projectPartialStagingRejection = regexp.MustCompile(`(?:reject(?:s|ed|ing)? (?:all )?(?:partially staged (?:files|changes)|partial staging)|(?:partially staged (?:files|changes)|partial staging) (?:is |are )?not (?:supported|allowed))`)
+
+// Retain the conventional two-line shell rejection even without prose such as
+// "not supported", without borrowing an exit from elsewhere in the file.
+var projectPartialStagingExit = regexp.MustCompile(`(?im)^\s*(?:echo|printf)\b[^\r\n]*partially staged[^\r\n]*\r?\n[ \t]*exit[ \t]+1\b`)
+
+// These are conservative hints for known adoption patterns, not an interpreter
+// for natural-language project policy or arbitrary shell programs.
+func projectAutomationPolicyDiagnostics(content string) ([]string, []string) {
+	normalized := strings.ToLower(strings.Join(strings.Fields(content), " "))
+	// Do not flag the straightforward negations used by migrated policies.
+	for _, phrase := range []string{
+		"inspect every focused mori group",
+		"inspect both source locations for every focused group",
+	} {
+		normalized = strings.ReplaceAll(normalized, "do not "+phrase, "bounded review")
+		normalized = strings.ReplaceAll(normalized, "never "+phrase, "bounded review")
+	}
+	if !strings.Contains(normalized, "mori") {
+		return nil, nil
+	}
+	var findings, actions []string
+	if strings.Contains(normalized, "at the start of source-changing work, compare") &&
+		(strings.Contains(normalized, "releases/latest") || strings.Contains(normalized, "latest official mori")) {
+		findings = append(findings, "per-task latest-release check can interrupt unrelated work")
+		actions = append(actions, "proposed policy: Trust .mori-version and the local project contract; schedule release checks and upgrades as separate maintenance work")
+	}
+	if strings.Contains(normalized, "inspect every focused mori group") ||
+		strings.Contains(normalized, "inspect both source locations for every focused group") {
+		findings = append(findings, "exhaustive focused review can repeat intentional findings")
+		actions = append(actions, "proposed policy: Deeply inspect at most 25 distinct focused identities in ordinary review, retain the full bounded report, and disclose unreviewed counts; preserve explicit strict receipt requirements")
+	}
+	partialPolicy := strings.ReplaceAll(normalized, "do not reject partially staged", "support partially staged")
+	partialPolicy = strings.ReplaceAll(partialPolicy, "never reject partially staged", "support partially staged")
+	partialPolicy = strings.ReplaceAll(partialPolicy, "do not reject partial staging", "support partial staging")
+	partialPolicy = strings.ReplaceAll(partialPolicy, "never reject partial staging", "support partial staging")
+	if projectPartialStagingRejection.MatchString(partialPolicy) || projectPartialStagingExit.MatchString(content) {
+		findings = append(findings, "possible obsolete partial-staging rejection; verify wrapper behavior")
+		actions = append(actions, "proposed wrapper: mori review staged check .; preserve project enforcement and receipt policy while removing a confirmed blanket partial-staging rejection")
+	}
+	return findings, actions
 }
 
 func applyProjectUpgrade(root string, plan projectUpgradePlan) ([]string, error) {
