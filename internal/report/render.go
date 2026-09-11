@@ -34,6 +34,9 @@ func Text(writer io.Writer, report model.Report) error {
 	); err != nil {
 		return err
 	}
+	if err := sourceCoverageSummary(writer, report); err != nil {
+		return err
+	}
 	if report.Truncated {
 		if _, err := fmt.Fprintf(
 			writer,

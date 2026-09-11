@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "license": "MIT",
+  "reference": {
+    "mori_version": "development",
+    "normalization_version": 14
+  },
+  "cases": [
+    {
+      "id": "suite-scaffolding",
+      "classification": "false-positive",
+      "reviewer": "provisional-mori-development-review",
+      "language_pair": [
+        "javascript",
+        "javascript"
+      ],
+      "threshold": 0.85,
+      "expected": {
+        "min_score": 0.985,
+        "max_score": 1,
+        "rank": 5,
+        "reference_score": 1,
+        "reference_rank": 5
+      },
+      "left": {
+        "path": "tests/review.test.js",
+        "name": "suiteAccounts"
+      },
+      "right": {
+        "path": "tests/review.test.js",
+        "name": "suiteImages"
+      }
+    },
+    {
+      "id": "duplicated-test-helper",
+      "classification": "accepted-positive",
+      "reviewer": "provisional-mori-development-review",
+      "language_pair": [
+        "javascript",
+        "javascript"
+      ],
+      "threshold": 0.85,
+      "expected": {
+        "min_score": 0.985,
+        "max_score": 1,
+        "rank": 2,
+        "reference_score": 1,
+        "reference_rank": 2
+      },
+      "left": {
+        "path": "tests/review.test.js",
+        "name": "assertAccountResponse"
+      },
+      "right": {
+        "path": "tests/review.test.js",
+        "name": "assertProjectResponse"
+      }
+    },
+    {
+      "id": "append-versus-remove",
+      "classification": "false-positive",
+      "reviewer": "provisional-mori-development-review",
+      "language_pair": [
+        "javascript",
+        "javascript"
+      ],
+      "threshold": 0.85,
+      "expected": {
+        "min_score": 0.935,
+        "max_score": 0.965,
+        "rank": 9,
+        "reference_score": 0.95,
+        "reference_rank": 9
+      },
+      "left": {
+        "path": "code/operations.js",
+        "name": "addItem"
+      },
+      "right": {
+        "path": "code/operations.js",
+        "name": "removeItem"
+      }
+    },
+    {
+      "id": "axis-easing",
+      "classification": "intentional-similarity",
+      "reviewer": "provisional-mori-development-review",
+      "language_pair": [
+        "javascript",
+        "javascript"
+      ],
+      "threshold": 0.85,
+      "expected": {
+        "min_score": 0.985,
+        "max_score": 1,
+        "rank": 1,
+        "reference_score": 1,
+        "reference_rank": 1
+      },
+      "left": {
+        "path": "code/operations.js",
+        "name": "easeHorizontal"
+      },
+      "right": {
+        "path": "code/operations.js",
+        "name": "easeVertical"
+      }
+    },
+    {
+      "id": "receive-versus-peek",
+      "classification": "false-positive",
+      "reviewer": "provisional-mori-development-review",
+      "language_pair": [
+        "go",
+        "go"
+      ],
+      "threshold": 0.85,
+      "expected": {
+        "min_score": 0.829961,
+        "max_score": 0.859961,
+        "rank": 10,
+        "reference_score": 0.8449612403100775,
+        "reference_rank": 10
+      },
+      "left": {
+        "path": "code/queue.go",
+        "name": "Receive"
+      },
+      "right": {
+        "path": "code/queue.go",
+        "name": "Peek"
+      }
+    },
+    {
+      "id": "unrelated-equality",
+      "classification": "intentional-similarity",
+      "reviewer": "provisional-mori-development-review",
+      "language_pair": [
+        "java",
+        "java"
+      ],
+      "threshold": 0.85,
+      "expected": {
+        "min_score": 0.985,
+        "max_score": 1,
+        "rank": 7,
+        "reference_score": 1,
+        "reference_rank": 7
+      },
+      "left": {
+        "path": "code/Identity.java",
+        "name": "equalsAccount"
+      },
+      "right": {
+        "path": "code/Identity.java",
+        "name": "equalsProject"
+      }
+    },
+    {
+      "id": "read-write-adapters",
+      "classification": "intentional-similarity",
+      "reviewer": "provisional-mori-development-review",
+      "language_pair": [
+        "c",
+        "c"
+      ],
+      "threshold": 0.85,
+      "expected": {
+        "min_score": 0.985,
+        "max_score": 1,
+        "rank": 4,
+        "reference_score": 1,
+        "reference_rank": 4
+      },
+      "left": {
+        "path": "code/c/adapters.c",
+        "name": "read_primary"
+      },
+      "right": {
+        "path": "code/c/adapters.c",
+        "name": "write_secondary"
+      }
+    },
+    {
+      "id": "platform-copy",
+      "classification": "accepted-positive",
+      "reviewer": "provisional-mori-development-review",
+      "language_pair": [
+        "c",
+        "c"
+      ],
+      "threshold": 0.85,
+      "expected": {
+        "min_score": 0.985,
+        "max_score": 1,
+        "rank": 3,
+        "reference_score": 1,
+        "reference_rank": 3
+      },
+      "left": {
+        "path": "code/c/adapters.c",
+        "name": "copy_linux"
+      },
+      "right": {
+        "path": "code/c/adapters.c",
+        "name": "copy_windows"
+      }
+    },
+    {
+      "id": "inline-test-oracle",
+      "classification": "intentional-similarity",
+      "reviewer": "provisional-mori-development-review",
+      "language_pair": [
+        "rust",
+        "rust"
+      ],
+      "threshold": 0.85,
+      "expected": {
+        "min_score": 0.956429,
+        "max_score": 0.986429,
+        "rank": 8,
+        "reference_score": 0.9714285714285714,
+        "reference_rank": 8
+      },
+      "left": {
+        "path": "code/inline.rs",
+        "name": "normalize"
+      },
+      "right": {
+        "path": "code/inline.rs",
+        "name": "expected"
+      }
+    },
+    {
+      "id": "swift-outer-panels",
+      "classification": "false-positive",
+      "reviewer": "provisional-mori-development-review",
+      "language_pair": [
+        "swift",
+        "swift"
+      ],
+      "threshold": 0.85,
+      "expected": {
+        "min_score": 0.985,
+        "max_score": 1,
+        "rank": 6,
+        "reference_score": 1,
+        "reference_rank": 6
+      },
+      "left": {
+        "path": "code/panels.swift",
+        "name": "accountPanel"
+      },
+      "right": {
+        "path": "code/panels.swift",
+        "name": "projectPanel"
+      }
+    }
+  ]
+}

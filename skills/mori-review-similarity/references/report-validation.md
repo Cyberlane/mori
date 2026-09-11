@@ -29,7 +29,7 @@ undiscovered. A successful aggregate does not excuse an empty supported file.
 
 ## Required report fields
 
-Require `schema_version` to equal `21`. Validate the mandatory `tool` object:
+Require `schema_version` to equal `22`. Validate the mandatory `tool` object:
 version, revision, source date, modified flag, platform, Go version, and
 normalization version. Official release binaries provide full revision and
 source date. A version-pinned source build may report its version while
@@ -112,3 +112,35 @@ means policy findings from `--fail-on-match` or `--fail-on-focused-match`, not
 a crash. Use focused policy only after adopting a reviewed threshold, scope,
 and exclusions. Exit `4` is incomplete coverage and takes precedence over
 finding status `3`; report it as not applicable/incomplete, never clean.
+
+## Explicit failures and fragment selection
+
+A candidate-limit failure exits 1. JSON output or agent `--output` retains a
+separate `artifact: "mori-scan-failure"` document with
+`failure_schema_version: 1` and `complete: false`. It is not a report: do not
+interpret missing groups as zero findings, accept it into a baseline, or use
+it to authorize a receipt. Inspect its inventory and configuration, then
+choose a narrower named scope/root. `--max-groups` controls display only.
+
+Schema 22 includes excluded test/production fragment counts in `file_coverage`.
+`configuration.fragment_selection` records an opt-in selection; missing or
+`all` is inclusive. Selection exclusions are not parse errors or analyzed
+comparison units. File parsing coverage and selected fragment coverage differ.
+Rust macro token trees can remain opaque even in otherwise analyzed files.
+Unsupported extension totals describe selected discovery, not all repository
+source; do not treat 100% supported-file coverage as whole-repository coverage.
+
+
+## Opt-in support diagnostics
+
+Mori v0.33.0 can capture one explicitly requested scan with
+`mori scan --diagnostics session.json ...`. Place the diagnostics flag first to
+capture later argument failures. This is separate from the ordinary report,
+feedback consent, and staged acceptance. Do not enable it without the user
+requesting diagnostic capture.
+
+Users can run `mori support bundle --session session.json --output mori-support.zip`
+and `mori support inspect mori-support.zip` to preview the exact allowlisted
+contents before sharing. No source, raw paths, raw errors, repository identifiers,
+or environment values belong in the support session. Bundle creation is not
+transmission authority. Hard termination may prevent a completed session file.

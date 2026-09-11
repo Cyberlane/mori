@@ -65,6 +65,7 @@ type ScanProfile struct {
 	ComparisonDomain  string       `json:"comparison_domain"`
 	SQLDialect        string       `json:"sql_dialect"`
 	EmbeddedSQL       bool         `json:"embedded_sql"`
+	FragmentSelection string       `json:"fragment_selection,omitempty"`
 	StatementBlocks   bool         `json:"statement_blocks"`
 	BlockStatements   int          `json:"block_statements"`
 	MaxBlocksPerFunc  int          `json:"max_blocks_per_function"`
@@ -154,7 +155,7 @@ func decode(content []byte, migration bool) (Set, error) {
 			SchemaVersion,
 		)
 	}
-	if stored.NormalizationVersion != normalize.Version && !(migration && normalize.Version == 13 && stored.NormalizationVersion == 12) {
+	if stored.NormalizationVersion != normalize.Version && !(migration && normalize.Version == 14 && (stored.NormalizationVersion == 12 || stored.NormalizationVersion == 13)) {
 		return Set{}, fmt.Errorf(
 			"baseline normalization version %d does not match current version %d; migrate or regenerate the baseline",
 			stored.NormalizationVersion,
@@ -223,6 +224,9 @@ func Digest(profile ScanProfile) string {
 }
 
 func normalizedProfile(profile ScanProfile) ScanProfile {
+	if profile.FragmentSelection == "all" {
+		profile.FragmentSelection = ""
+	}
 	profile.LanguagePairs = uniqueSorted(profile.LanguagePairs)
 	profile.Excludes = uniqueSorted(profile.Excludes)
 	profile.IgnoreFiles = append([]IgnoreFile{}, profile.IgnoreFiles...)
@@ -595,6 +599,11 @@ func writeEntries(
 }
 
 func validateProfile(profile ScanProfile) error {
+	switch profile.FragmentSelection {
+	case "", "all", "production", "tests":
+	default:
+		return errors.New("fragment_selection must be all, production, or tests")
+	}
 	for index, evidence := range profile.IgnoreFiles {
 		if evidence.Path == "" {
 			return fmt.Errorf("ignore file %d has no path", index+1)

@@ -64,7 +64,7 @@ func TestUpgradePreservesSupportedPriorNormalizationBaseline(t *testing.T) {
 				t.Fatal(err)
 			}
 			if invalid == "future" {
-				bad["normalization_version"] = float64(14)
+				bad["normalization_version"] = float64(15)
 			} else {
 				bad["scan_profile_digest"] = "corrupt"
 			}

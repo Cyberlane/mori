@@ -57,7 +57,15 @@ jobs:
       - name: Check reference VS Code extension
         run: |
           node --check editors/vscode/extension.js
+          node --test editors/vscode/extension.test.js
           node -e 'JSON.parse(require("fs").readFileSync("editors/vscode/package.json", "utf8"))'
+
+      - name: Verify documentation build and links
+        run: |
+          python3 -m venv "$RUNNER_TEMP/mori-docs-venv"
+          "$RUNNER_TEMP/mori-docs-venv/bin/python" -m pip install -r scripts/docs-requirements.txt
+          "$RUNNER_TEMP/mori-docs-venv/bin/python" scripts/test-build-docs.py
+          "$RUNNER_TEMP/mori-docs-venv/bin/python" scripts/build-docs.py --output "$RUNNER_TEMP/mori-docs-site"
 
       - name: Verify example scan
         env:

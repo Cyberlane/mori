@@ -29,3 +29,17 @@ func TestWithin(t *testing.T) {
 		})
 	}
 }
+
+func TestIsRootedAcrossPlatforms(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		path string
+		want bool
+	}{
+		{"/tmp/tests/project/main.ts", true}, {`C:\tests\project\main.ts`, true}, {"C:/tests/project/main.ts", true}, {`\\server\tests\main.ts`, true}, {`\tests\main.ts`, true}, {"//server/tests/main.ts", true}, {"C:tests/main.ts", true}, {"tests/main.ts", false}, {"packages/runtime-test/src/main.ts", false}, {"./tests/main.ts", false}, {"../tests/main.ts", false}, {"", false}, {"1:tests/main.ts", false},
+	} {
+		if got := IsRooted(tt.path); got != tt.want {
+			t.Errorf("IsRooted(%q)=%t want %t", tt.path, got, tt.want)
+		}
+	}
+}

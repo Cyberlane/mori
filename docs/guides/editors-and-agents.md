@@ -9,6 +9,12 @@ The repository contains a dependency-free
 [reference extension](../../editors/vscode/README.md). It debounces edits,
 cancels superseded scans, rejects stale results, and displays findings as
 informational diagnostics and incomplete-analysis conditions as warnings.
+Locationless warnings are labeled **Scan-level warning** at the start of the
+edited document. A failed process or invalid response replaces stale findings
+with **Mori analysis unavailable**; **Mori: Show Diagnostic Output** opens the
+detail. Warnings specific only to another file remain outside the edited file's
+diagnostics. The runtime language list comes directly from extension activation
+capabilities, including Dart, Kotlin, PowerShell, and Ruby.
 
 The extension does not download Mori, upload source, write temporary source
 files, or send telemetry. Install an official binary separately and place it
@@ -98,8 +104,10 @@ mori setup --agent --format json . > mori-setup-plan.json
 ```
 
 The plan uses project-relative paths and describes the supported-language
-inventory, unsupported extensions, current configuration state, questions, and
-next commands. A project agent can write a small answers document such as:
+inventory, unsupported extensions, current configuration state, editable scope
+suggestions, questions, and next commands. Setup-plan schema 2 adds those
+suggestions; the strict answers document remains backward-compatible and has
+no version field. A project agent can write a small answers document such as:
 
 ```json
 {
@@ -107,9 +115,24 @@ next commands. A project agent can write a small answers document such as:
   "comparison_mode": "cross-language",
   "strictness": "standard",
   "exclude_generated": true,
-  "exclude": ["fixtures/**"]
+  "review_intent": "application",
+  "scope_name": "application",
+  "roots": ["src"],
+  "scope_exclude": ["**/*.test.ts"]
 }
 ```
+
+`review_intent` accepts `keep`, `application`, `tests`, or `all`. Omit `roots`
+and `scope_exclude` to use a suggested policy; an explicit empty
+`scope_exclude` removes the suggested exclusions, but cannot remove existing
+base exclusions. Existing named scopes are never overwritten: choose a new
+`scope_name` or edit the old policy deliberately. Test/story path conventions
+are suggestions, not proof of ownership or complete inline-test classification.
+
+The example creates an opt-in application scope. Use `mori scan --scope
+application` for that exploratory surface and keep the base policy inclusive
+for `mori review staged check`. Setting top-level `exclude` still affects every
+scope and can make supported staged paths unanalyzed.
 
 Preview the exact `.mori.json` without writing:
 

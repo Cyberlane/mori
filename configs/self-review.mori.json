@@ -10,14 +10,16 @@
   "same_language_only": true,
   "require_coverage": true,
   "min_file_coverage": 0.9,
-  "max_zero_fragment_files": 5,
+  "max_zero_fragment_files": 6,
   "fail_on_warning": true,
   "exclude_generated": true,
   "exclude": [
     "**/*_test.go",
     "examples/**",
     "corpus/**",
-    "internal/grammar/**"
+    "internal/grammar/**",
+    "editors/vscode/*.test.js",
+    "editors/vscode/smoke-test.js"
   ],
   "respect_ignore": true
 }

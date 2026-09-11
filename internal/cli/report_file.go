@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,10 @@ import (
 )
 
 func writeCompleteJSONReport(path string, value model.Report) error {
+	return writeJSONArtifact(path, func(w io.Writer) error { return report.JSON(w, value) })
+}
+
+func writeJSONArtifact(path string, encode func(io.Writer) error) error {
 	if strings.TrimSpace(path) == "" {
 		return errors.New("report output path is required")
 	}
@@ -51,7 +56,7 @@ func writeCompleteJSONReport(path string, value model.Report) error {
 		_ = temporary.Close()
 		return fmt.Errorf("protect temporary report: %w", err)
 	}
-	if err := report.JSON(temporary, value); err != nil {
+	if err := encode(temporary); err != nil {
 		_ = temporary.Close()
 		return fmt.Errorf("encode report: %w", err)
 	}

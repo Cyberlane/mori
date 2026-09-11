@@ -4,25 +4,12 @@ const path = require("path");
 const { spawn } = require("child_process");
 const vscode = require("vscode");
 
-const supportedLanguages = new Set([
-  "csharp",
-  "go",
-  "gdscript",
-  "hack",
-  "java",
-  "javascript",
-  "javascriptreact",
-  "lua",
-  "luau",
-  "php",
-  "python",
-  "rust",
-  "shellscript",
-  "sql",
-  "swift",
-  "typescript",
-  "typescriptreact",
-]);
+// Keep activation and runtime eligibility on the same capability list.
+const supportedLanguages = new Set(
+  require("./package.json").activationEvents
+    .filter((event) => event.startsWith("onLanguage:"))
+    .map((event) => event.slice("onLanguage:".length)),
+);
 const acceptedExitCodes = new Set([0, 3, 4]);
 const timers = new Map();
 const running = new Map();
@@ -40,10 +27,9 @@ function activate(context) {
       return;
     }
     const key = document.uri.toString();
-    const existing = timers.get(key);
-    if (existing) {
-      clearTimeout(existing);
-    }
+    // Invalidate immediately, including the debounce interval before the next scan.
+    cancel(key);
+    diagnostics.delete(document.uri);
     const delay = immediate
       ? 0
       : configuration(document).get("debounceMilliseconds", 750);
@@ -73,6 +59,7 @@ function activate(context) {
         queue(document, true);
       }
     }),
+    vscode.commands.registerCommand("mori.showOutput", () => output.show(true)),
     vscode.commands.registerCommand("mori.refreshDiagnostics", () => {
       const document = vscode.window.activeTextEditor?.document;
       if (document) {
@@ -91,10 +78,11 @@ function deactivate() {
     clearTimeout(timer);
   }
   timers.clear();
-  for (const state of running.values()) {
+  const states = [...running.values()];
+  running.clear();
+  for (const state of states) {
     state.child.kill();
   }
-  running.clear();
 }
 
 function configuration(document) {
@@ -117,8 +105,8 @@ function cancel(key) {
   }
   const state = running.get(key);
   if (state) {
-    state.child.kill();
     running.delete(key);
+    state.child.kill();
   }
 }
 
@@ -144,12 +132,18 @@ function analyze(document, diagnostics, output) {
     document.uri.fsPath,
     root,
   ];
-  const child = spawn(executable, args, {
-    cwd: root,
-    shell: false,
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true,
-  });
+  let child;
+  try {
+    child = spawn(executable, args, {
+      cwd: root,
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+    });
+  } catch (error) {
+    unavailable(document, diagnostics, output, `Unable to run ${executable}: ${error.message}`);
+    return;
+  }
   const state = { child, token, stdout: "", stderr: "" };
   running.set(key, state);
   child.stdout.setEncoding("utf8");
@@ -165,8 +159,7 @@ function analyze(document, diagnostics, output) {
       return;
     }
     running.delete(key);
-    diagnostics.delete(document.uri);
-    output.appendLine(`Unable to run ${executable}: ${error.message}`);
+    unavailable(document, diagnostics, output, `Unable to run ${executable}: ${error.message}`);
   });
   child.on("close", (code, signal) => {
     if (!isCurrent(key, token)) {
@@ -174,25 +167,33 @@ function analyze(document, diagnostics, output) {
     }
     running.delete(key);
     if (signal || !acceptedExitCodes.has(code)) {
-      diagnostics.delete(document.uri);
-      output.appendLine(
-        `Mori scan failed for ${document.uri.fsPath} (exit ${code}, signal ${signal || "none"}).`,
-      );
-      if (state.stderr.trim()) {
-        output.appendLine(state.stderr.trim());
-      }
+      unavailable(document, diagnostics, output,
+        `Mori scan failed for ${document.uri.fsPath} (exit ${code}, signal ${signal || "none"}).\n${state.stderr.trim()}`);
+
       return;
     }
     try {
       const log = JSON.parse(state.stdout);
       diagnostics.set(document.uri, diagnosticsForDocument(log, document, root));
     } catch (error) {
-      diagnostics.delete(document.uri);
-      output.appendLine(`Mori returned invalid SARIF for ${document.uri.fsPath}: ${error.message}`);
+      unavailable(document, diagnostics, output,
+        `Mori returned invalid SARIF for ${document.uri.fsPath}: ${error.message}`);
     }
   });
   child.stdin.on("error", () => {});
   child.stdin.end(document.getText(), "utf8");
+}
+
+function unavailable(document, diagnostics, output, detail) {
+  output.appendLine(detail);
+  const diagnostic = new vscode.Diagnostic(
+    new vscode.Range(0, 0, 0, 0),
+    "Mori analysis unavailable. Run ‘Mori: Show Diagnostic Output’ for details, then refresh to retry.",
+    vscode.DiagnosticSeverity.Warning,
+  );
+  diagnostic.source = "Mori";
+  diagnostic.code = "MORI_UNAVAILABLE";
+  diagnostics.set(document.uri, [diagnostic]);
 }
 
 function isCurrent(key, token) {
@@ -204,12 +205,31 @@ function diagnosticsForDocument(log, document, root) {
     throw new Error("expected SARIF 2.1.0 with a runs array");
   }
   const result = [];
+  if (log.runs.length === 0) {
+    throw new Error("expected at least one SARIF run");
+  }
   for (const run of log.runs) {
-    for (const finding of run.results || []) {
+    if (!Array.isArray(run?.results)) {
+      throw new Error("expected a results array in each SARIF run");
+    }
+    for (const finding of run.results) {
+      if (!finding || typeof finding !== "object") {
+        throw new Error("expected a SARIF result object");
+      }
       const locations = [
         ...(finding.locations || []),
         ...(finding.relatedLocations || []),
       ];
+      if (finding.ruleId === "MORI002" && locations.length === 0) {
+        const diagnostic = new vscode.Diagnostic(
+          new vscode.Range(0, 0, 0, 0),
+          `Scan-level warning: ${finding.message?.text || "Mori analysis is incomplete"}`,
+          vscode.DiagnosticSeverity.Warning,
+        );
+        diagnostic.source = "Mori";
+        diagnostic.code = finding.ruleId;
+        result.push(diagnostic);
+      }
       const localLocations = locations.filter(
         (location) => resolveLocation(location, root) === path.normalize(document.uri.fsPath),
       );

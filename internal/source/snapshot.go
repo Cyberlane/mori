@@ -258,7 +258,7 @@ func (state *snapshotDiscoveryState) addFile(entry SnapshotEntry, path string, e
 	}
 	content := append([]byte(nil), entry.Content...)
 	state.result.Files = append(state.result.Files, File{
-		Path: cleanPath, DisplayPath: displayPath(state.cwd, cleanPath), Language: spec,
+		Path: cleanPath, DisplayPath: displayPath(state.cwd, cleanPath), ClassificationPath: entry.Path, Language: spec,
 		AnalysisDomain: analysisDomain, Generated: generated, Marker: marker,
 		MaxBytes: state.options.MaxFileBytes, Content: content,
 	})
@@ -288,7 +288,7 @@ func normalizeSnapshotRoots(root string, cwd string, requested []string, entries
 		if !filepath.IsAbs(absolute) {
 			absolute = filepath.Join(cwd, value)
 		}
-		absolute = filepath.Clean(absolute)
+		absolute = snapshotRootAlias(root, filepath.Clean(absolute))
 		relative, err := filepath.Rel(root, absolute)
 		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			return nil, nil, fmt.Errorf("staged scan path %q is outside the Git worktree", value)
@@ -344,4 +344,28 @@ func compactSnapshotStrings(values []string) []string {
 		}
 	}
 	return result
+}
+
+// snapshotRootAlias accepts filesystem aliases of the worktree root, such as
+// macOS /var -> /private/var, without resolving any path inside the immutable
+// snapshot. A working-tree symlink must never redirect an indexed source path.
+func snapshotRootAlias(root, absolute string) string {
+	if relative, err := filepath.Rel(root, absolute); err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return absolute
+	}
+	canonicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return absolute
+	}
+	for ancestor := absolute; ; ancestor = filepath.Dir(ancestor) {
+		if canonical, err := filepath.EvalSymlinks(ancestor); err == nil && canonical == canonicalRoot {
+			suffix, err := filepath.Rel(ancestor, absolute)
+			if err == nil {
+				return filepath.Join(root, suffix)
+			}
+		}
+		if filepath.Dir(ancestor) == ancestor {
+			return absolute
+		}
+	}
 }

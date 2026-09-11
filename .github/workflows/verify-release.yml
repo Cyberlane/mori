@@ -107,3 +107,20 @@ jobs:
             exit 1
           fi
           "$binary" languages
+          # Exercise support capture/export with the actual downloaded native binary.
+          support_project="$PWD/support-project"
+          mkdir -p "$support_project"
+          cat > "$support_project/main.go" <<'GO'
+          package example
+          func total(values []int) int {
+            sum := 0
+            for _, value := range values {
+              if value > 0 { sum += value }
+            }
+            return sum
+          }
+          GO
+          "$binary" scan --diagnostics "$PWD/support-session.json" --profile review --min-tokens 12 "$support_project"
+          "$binary" support bundle --session "$PWD/support-session.json" --output "$PWD/mori-support.zip"
+          "$binary" support inspect "$PWD/mori-support.zip" > "$PWD/support-preview.json"
+          test -s "$PWD/support-preview.json"

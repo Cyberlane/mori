@@ -13,9 +13,10 @@ The minimum Go job tests Go 1.23 separately. A configured job is not a passing
 result; retain its outcome for the exact candidate commit. Do not substitute a
 cross-compile for a native CGO test.
 
-The report contract is schema 21 and the hook contract is v2. Configuration and
-project-contract schemas remain 1; baseline and receipt versions
-remain 4 and 2; normalization advances to 13 for corrected Swift grammar.
+The report contract is schema 22 and the hook contract is v2. Configuration
+contract schema is 2; project-contract schema remains 1. Baseline and receipt
+versions remain 4 and 2; normalization is 14. Setup-plan schema is 2, and the
+separate candidate-limit failure artifact uses failure schema 1.
 Prior normalization acceptance needs explicit review during migration.
 Supported prior official project state must have a normal
 managed migration, with strict decoding and no automatic rewrite of project-owned

@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -18,9 +19,13 @@ import (
 	"github.com/Cyberlane/mori/internal/source"
 )
 
-const projectPlanVersion = 1
+const projectPlanVersion = 2
 
 type setupAnswers struct {
+	ReviewIntent     string   `json:"review_intent,omitempty"`
+	ScopeName        string   `json:"scope_name,omitempty"`
+	Roots            []string `json:"roots,omitempty"`
+	ScopeExcludes    []string `json:"scope_exclude,omitempty"`
 	Profile          string   `json:"profile"`
 	ComparisonMode   string   `json:"comparison_mode,omitempty"`
 	LanguagePairs    []string `json:"language_pairs,omitempty"`
@@ -46,6 +51,7 @@ type languageInventory struct {
 }
 
 type projectInventory struct {
+	suggestions           []scopeSuggestion
 	SupportedFiles        int                             `json:"supported_files"`
 	Languages             []languageInventory             `json:"languages"`
 	UnsupportedExtensions []unsupportedExtensionInventory `json:"unsupported_extensions"`
@@ -58,15 +64,16 @@ type unsupportedExtensionInventory struct {
 }
 
 type setupPlan struct {
-	Version      int              `json:"version"`
-	Command      string           `json:"command"`
-	Project      string           `json:"project"`
-	ConfigPath   string           `json:"config_path"`
-	ConfigExists bool             `json:"config_exists"`
-	Inventory    projectInventory `json:"inventory"`
-	Current      *config.Settings `json:"current_config,omitempty"`
-	Questions    []setupQuestion  `json:"questions"`
-	Next         []string         `json:"next_steps"`
+	Suggestions  []scopeSuggestion `json:"scope_suggestions"`
+	Version      int               `json:"version"`
+	Command      string            `json:"command"`
+	Project      string            `json:"project"`
+	ConfigPath   string            `json:"config_path"`
+	ConfigExists bool              `json:"config_exists"`
+	Inventory    projectInventory  `json:"inventory"`
+	Current      *config.Settings  `json:"current_config,omitempty"`
+	Questions    []setupQuestion   `json:"questions"`
+	Next         []string          `json:"next_steps"`
 }
 
 func runProjectSetup(
@@ -86,7 +93,7 @@ func runProjectSetup(
 	dryRun := false
 	format := "text"
 	flags.BoolVar(&agent, "agent", false, "emit a deterministic, read-only setup plan for a project agent")
-	flags.StringVar(&answersPath, "answers", "", "read versioned setup answers from a JSON path or - for stdin")
+	flags.StringVar(&answersPath, "answers", "", "read setup answers from a JSON path or - for stdin")
 	flags.BoolVar(&apply, "apply", false, "atomically write the previewed configuration")
 	flags.BoolVar(&dryRun, "dry-run", false, "print the proposed configuration without writing it")
 	flags.StringVar(&format, "format", format, "agent plan format: json")
@@ -154,17 +161,22 @@ func runProjectSetup(
 		return writeJSON(stdout, plan, stderr)
 	}
 
+	interactiveReader := bufio.NewReader(stdin)
 	var answers setupAnswers
 	if answersPath != "" {
 		answers, err = readSetupAnswers(answersPath, stdin)
 	} else {
-		answers, err = promptSetupAnswers(stdin, stdout, current, exists)
+		answers, err = promptSetupPlan(interactiveReader, stdout, plan)
 	}
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: %s: %v\n", command, err)
 		return exitError
 	}
 	settings, err := applySetupAnswers(current, exists, answers)
+	if err != nil {
+		return usageError(stderr, err.Error())
+	}
+	settings, err = applySetupScope(settings, answers, plan)
 	if err != nil {
 		return usageError(stderr, err.Error())
 	}
@@ -188,7 +200,7 @@ func runProjectSetup(
 		if _, err := stdout.Write(content); err != nil {
 			return exitError
 		}
-		confirmed, err := promptChoice(bufio.NewReader(stdin), stdout, "Apply this configuration?", "no", []string{"yes", "no"})
+		confirmed, err := promptChoice(interactiveReader, stdout, "Apply this configuration?", "no", []string{"yes", "no"})
 		if err != nil {
 			fmt.Fprintf(stderr, "mori: %s: %v\n", command, err)
 			return exitError
@@ -202,8 +214,44 @@ func runProjectSetup(
 		fmt.Fprintf(stderr, "mori: %s: %v\n", command, err)
 		return exitError
 	}
-	fmt.Fprintf(stdout, "%s %s\n", map[bool]string{true: "Updated", false: "Created"}[exists], displayCLIPath(target))
+	if _, err := fmt.Fprintf(stdout, "%s %s\n", map[bool]string{true: "Updated", false: "Created"}[exists], displayCLIPath(target)); err != nil {
+		return exitError
+	}
+	if err := writeSetupNextScan(stdout, root, target, answers); err != nil {
+		return exitError
+	}
 	return exitSuccess
+}
+
+// An explicit config path works even when setup targeted another directory.
+// Do not append a positional root for named scopes: it would override their roots.
+func writeSetupNextScan(w io.Writer, root, target string, answers setupAnswers) error {
+	command := "mori scan --config " + quoteSetupShellArgument(target, runtime.GOOS)
+	if answers.ReviewIntent != "" && answers.ReviewIntent != "keep" {
+		name := answers.ScopeName
+		if name == "" {
+			name = answers.ReviewIntent
+		}
+		command += " --scope " + quoteSetupShellArgument(name, runtime.GOOS)
+		if _, err := fmt.Fprintln(w, "Named scopes are opt-in. Use --scope to select this scope; a bare scan still uses the base configuration."); err != nil {
+			return err
+		}
+	} else {
+		command += " -- " + quoteSetupShellArgument(root, runtime.GOOS)
+	}
+	shell := "your shell"
+	if runtime.GOOS == "windows" {
+		shell = "PowerShell"
+	}
+	_, err := fmt.Fprintf(w, "Next, run in %s:\n  %s\n", shell, command)
+	return err
+}
+
+func quoteSetupShellArgument(value, goos string) string {
+	if goos == "windows" {
+		return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 func projectDirectory(path string) (string, error) {
@@ -238,6 +286,9 @@ func loadExactConfig(path string) (config.Settings, bool, error) {
 
 func buildSetupPlan(ctx context.Context, command, root, target string, current config.Settings, exists bool) (setupPlan, error) {
 	options := defaultScanOptions()
+	if !exists {
+		_ = applyScanProfile(&options, profileReview)
+	}
 	if exists {
 		if current.Profile != "" {
 			if err := applyScanProfile(&options, current.Profile); err != nil {
@@ -261,6 +312,19 @@ func buildSetupPlan(ctx context.Context, command, root, target string, current c
 			"mori doctor .",
 		},
 	}
+	plan.Suggestions = inventory.suggestions
+	for i := range plan.Questions {
+		if plan.Questions[i].ID == "review_intent" {
+			plan.Questions[i].Choices = []string{"keep"}
+			for _, intent := range []string{"library", "application", "tests", "all"} {
+				for _, suggestion := range plan.Suggestions {
+					if suggestion.Intent == intent {
+						plan.Questions[i].Choices = append(plan.Questions[i].Choices, intent)
+					}
+				}
+			}
+		}
+	}
 	if exists {
 		copy := current
 		plan.Current = &copy
@@ -273,12 +337,30 @@ func setupQuestions(current config.Settings, exists bool) []setupQuestion {
 	if exists && current.Profile != "" {
 		profile = current.Profile
 	}
+	mode, strictness := "same-language", "standard"
+	if exists {
+		mode, strictness = "keep", "keep"
+	}
+	generatedDefault := true
+	if exists {
+		options := defaultScanOptions()
+		if current.Profile != "" {
+			_ = applyScanProfile(&options, current.Profile)
+		}
+		applyConfig(&options, current, ".")
+		generatedDefault = options.excludeGenerated
+	}
 	return []setupQuestion{
 		{ID: "profile", Prompt: "What is the primary workflow?", Choices: []string{"review", "explore", "sql"}, Default: profile, Description: "review is conservative, explore finds broader candidates, and sql compares queries"},
-		{ID: "comparison_mode", Prompt: "Which language relationships should Mori compare?", Choices: []string{"same-language", "cross-language", "all", "pairs"}, Default: "same-language", Description: "pairs requires language_pairs in the answers document"},
-		{ID: "strictness", Prompt: "How should incomplete coverage be treated?", Choices: []string{"advisory", "standard", "strict"}, Default: "standard", Description: "strict fails on warnings, parse diagnostics, and incomplete file coverage"},
-		{ID: "exclude_generated", Prompt: "Exclude detected generated source?", Default: true, Description: "generated files remain visible in coverage evidence but are not compared"},
-		{ID: "exclude", Prompt: "Which additional project-relative globs should be excluded?", Default: []string{}, Description: "vendor and common build directories are already excluded"},
+		{ID: "comparison_mode", Prompt: "Which language relationships should Mori compare?", Choices: []string{"same-language", "cross-language", "all", "pairs", "keep"}, Default: mode, Description: "pairs requires language_pairs in the answers document"},
+		{ID: "strictness", Prompt: "How should incomplete coverage be treated?", Choices: []string{"advisory", "standard", "strict", "keep"}, Default: strictness, Description: "strict fails on warnings, parse diagnostics, and incomplete file coverage"},
+		{ID: "language_pairs", Prompt: "Language pairs for pairs mode", Default: current.LanguagePairs, Description: "JSON array such as [\"go:rust\"]"},
+		{ID: "exclude_generated", Prompt: "Exclude detected generated source?", Default: generatedDefault, Description: "generated files remain visible in coverage evidence but are not compared"},
+		{ID: "exclude", Prompt: "Which additional project-relative globs should be excluded?", Default: current.Excludes, Description: "vendor and common build directories are already excluded"},
+		{ID: "review_intent", Prompt: "Create a named review scope", Choices: []string{"keep", "library", "application", "tests", "all"}, Default: "keep", Description: "keep preserves existing scope policy; other choices add an explicit scope while the base staged policy stays inclusive"},
+		{ID: "scope_name", Prompt: "New scope name (optional)", Default: "", Description: "Existing scopes are never overwritten"},
+		{ID: "roots", Prompt: "Override suggested roots (optional)", Default: nil, Description: "JSON array of literal project-relative paths; null uses suggestion"},
+		{ID: "scope_exclude", Prompt: "Override suggested scope exclusions (optional)", Default: nil, Description: "JSON array; [] explicitly removes suggested exclusions; base exclusions still apply"},
 	}
 }
 
@@ -318,27 +400,6 @@ func readSetupAnswers(path string, stdin io.Reader) (setupAnswers, error) {
 	return answers, nil
 }
 
-func promptSetupAnswers(stdin io.Reader, stdout io.Writer, current config.Settings, exists bool) (setupAnswers, error) {
-	reader := bufio.NewReader(stdin)
-	profileDefault := profileReview
-	if exists && current.Profile != "" {
-		profileDefault = current.Profile
-	}
-	profile, err := promptChoice(reader, stdout, "Primary workflow", profileDefault, []string{"review", "explore", "sql"})
-	if err != nil {
-		return setupAnswers{}, err
-	}
-	mode, err := promptChoice(reader, stdout, "Comparison mode", "same-language", []string{"same-language", "cross-language", "all"})
-	if err != nil {
-		return setupAnswers{}, err
-	}
-	strictness, err := promptChoice(reader, stdout, "Coverage policy", "standard", []string{"advisory", "standard", "strict"})
-	if err != nil {
-		return setupAnswers{}, err
-	}
-	return setupAnswers{Profile: profile, ComparisonMode: mode, Strictness: strictness, ExcludeGenerated: pointer(true)}, nil
-}
-
 func promptChoice(reader *bufio.Reader, stdout io.Writer, prompt, defaultValue string, choices []string) (string, error) {
 	fmt.Fprintf(stdout, "%s [%s] (%s): ", prompt, defaultValue, strings.Join(choices, "/"))
 	line, err := reader.ReadString('\n')
@@ -369,11 +430,11 @@ func applySetupAnswers(current config.Settings, exists bool, answers setupAnswer
 	if err != nil {
 		return config.Settings{}, err
 	}
-	if exists && (answers.Profile == "" || answers.Profile == current.Profile) {
+	if exists {
 		settings = current
 		settings.Profile = profile
 	}
-	if answers.ComparisonMode != "" {
+	if answers.ComparisonMode != "" && answers.ComparisonMode != "keep" {
 		settings.SameLanguageOnly = pointer(false)
 		settings.CrossLanguageOnly = pointer(false)
 		settings.LanguagePairs = nil
@@ -410,7 +471,7 @@ func applySetupAnswers(current config.Settings, exists bool, answers setupAnswer
 		}
 		settings.Excludes = append([]string{}, answers.Excludes...)
 	}
-	if answers.Strictness != "" {
+	if answers.Strictness != "" && answers.Strictness != "keep" {
 		switch answers.Strictness {
 		case "advisory":
 			settings.RequireCoverage = pointer(false)
@@ -518,6 +579,7 @@ func runConfigCommand(args []string, stdout, stderr io.Writer) int {
 }
 
 type effectiveConfiguration struct {
+	FragmentSelection string   `json:"fragment_selection"`
 	Profile           string   `json:"profile,omitempty"`
 	Threshold         float64  `json:"threshold"`
 	MinTokens         int      `json:"min_tokens"`
@@ -649,12 +711,13 @@ func projectConfiguration(root string) (config.Settings, string, bool, scanOptio
 }
 
 func effectiveFromOptions(options scanOptions) effectiveConfiguration {
-	return effectiveConfiguration{Profile: options.profile, Threshold: options.threshold, MinTokens: options.minTokens, MaxGroups: options.maxGroups, MaxOccurrences: options.maxOccurrences, MaxPairs: options.maxPairs, MaxFileBytes: options.maxFileBytes, Workers: options.workers, Format: options.format, ComparisonDomain: options.comparisonDomain, SQLDialect: options.sqlDialect, EmbeddedSQL: options.embeddedSQL, Ranking: options.ranking, SameLanguageOnly: options.sameLanguageOnly, CrossLanguageOnly: options.crossLanguageOnly, LanguagePairs: append([]string{}, options.languagePairs...), RequireCoverage: options.requireCoverage, MinFileCoverage: options.minFileCoverage, MaxZeroFiles: options.maxZeroFiles, FailOnWarning: options.failOnWarning, FailOnDiagnostic: options.failOnDiagnostic, ExcludeGenerated: options.excludeGenerated, Excludes: append([]string{}, options.excludes...), RespectIgnore: options.respectIgnore}
+	return effectiveConfiguration{
+		FragmentSelection: options.fragmentSelection, Profile: options.profile, Threshold: options.threshold, MinTokens: options.minTokens, MaxGroups: options.maxGroups, MaxOccurrences: options.maxOccurrences, MaxPairs: options.maxPairs, MaxFileBytes: options.maxFileBytes, Workers: options.workers, Format: options.format, ComparisonDomain: options.comparisonDomain, SQLDialect: options.sqlDialect, EmbeddedSQL: options.embeddedSQL, Ranking: options.ranking, SameLanguageOnly: options.sameLanguageOnly, CrossLanguageOnly: options.crossLanguageOnly, LanguagePairs: append([]string{}, options.languagePairs...), RequireCoverage: options.requireCoverage, MinFileCoverage: options.minFileCoverage, MaxZeroFiles: options.maxZeroFiles, FailOnWarning: options.failOnWarning, FailOnDiagnostic: options.failOnDiagnostic, ExcludeGenerated: options.excludeGenerated, Excludes: append([]string{}, options.excludes...), RespectIgnore: options.respectIgnore}
 }
 
 func runInspect(ctx context.Context, args []string, stdout, stderr io.Writer) int {
-	format, root, options, code := parseProjectReportArgs("inspect", args, stderr)
-	if code != exitSuccess {
+	format, root, options, code, ok := parseProjectReportArgs("inspect", args, stderr)
+	if !ok {
 		return code
 	}
 	inventory, err := inspectProject(ctx, root, options)
@@ -692,8 +755,8 @@ type doctorCheck struct {
 }
 
 func runDoctor(ctx context.Context, args []string, stdout, stderr io.Writer) int {
-	format, root, options, code := parseProjectReportArgs("doctor", args, stderr)
-	if code != exitSuccess {
+	format, root, options, code, ok := parseProjectReportArgs("doctor", args, stderr)
+	if !ok {
 		return code
 	}
 	_, path, exists, _, configErr := projectConfiguration(root)
@@ -741,22 +804,29 @@ func runDoctor(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	return exitSuccess
 }
 
-func parseProjectReportArgs(command string, args []string, stderr io.Writer) (string, string, scanOptions, int) {
+func parseProjectReportArgs(command string, args []string, stderr io.Writer) (string, string, scanOptions, int, bool) {
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
-	flags.SetOutput(stderr)
+	trackedStderr := &errorTrackingWriter{writer: stderr}
+	flags.SetOutput(trackedStderr)
 	format := "text"
 	flags.StringVar(&format, "format", format, "output format: text or json")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			return "", "", scanOptions{}, exitSuccess
+			if trackedStderr.err != nil {
+				return "", "", scanOptions{}, exitError, false
+			}
+			return "", "", scanOptions{}, exitSuccess, false
 		}
-		return "", "", scanOptions{}, exitUsage
+		return "", "", scanOptions{}, exitUsage, false
+	}
+	if err := validateOptionPlacement(args, flags.Args(), flags); err != nil {
+		return "", "", scanOptions{}, usageError(stderr, err.Error()), false
 	}
 	if format != "text" && format != "json" {
-		return "", "", scanOptions{}, usageError(stderr, "--format must be text or json")
+		return "", "", scanOptions{}, usageError(stderr, "--format must be text or json"), false
 	}
 	if len(flags.Args()) > 1 {
-		return "", "", scanOptions{}, usageError(stderr, command+" accepts at most one directory")
+		return "", "", scanOptions{}, usageError(stderr, command+" accepts at most one directory"), false
 	}
 	directory := "."
 	if len(flags.Args()) == 1 {
@@ -765,17 +835,17 @@ func parseProjectReportArgs(command string, args []string, stderr io.Writer) (st
 	root, err := projectDirectory(directory)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: %s: %v\n", command, err)
-		return "", "", scanOptions{}, exitError
+		return "", "", scanOptions{}, exitError, false
 	}
 	_, _, exists, options, err := projectConfiguration(root)
 	if err != nil {
 		fmt.Fprintf(stderr, "mori: %s: %v\n", command, err)
-		return "", "", scanOptions{}, exitError
+		return "", "", scanOptions{}, exitError, false
 	}
 	if !exists {
 		options = defaultScanOptions()
 	}
-	return format, root, options, exitSuccess
+	return format, root, options, exitSuccess, true
 }
 
 func inspectProject(ctx context.Context, root string, options scanOptions) (projectInventory, error) {
@@ -804,6 +874,7 @@ func inspectProject(ctx context.Context, root string, options scanOptions) (proj
 	}
 	sort.Strings(ids)
 	result := projectInventory{SupportedFiles: len(discovered.Files), Languages: []languageInventory{}, UnsupportedExtensions: []unsupportedExtensionInventory{}, Warnings: []string{}}
+	result.suggestions = suggestSetupScopes(root, discovered.Files)
 	for _, id := range ids {
 		result.Languages = append(result.Languages, languageInventory{ID: id, Files: counts[id], Fragments: specs[id].FragmentKind})
 	}

@@ -76,6 +76,9 @@ func embeddedSQLFragments(
 		if err != nil {
 			return nil, []model.Warning{{Path: file.DisplayPath, Message: err.Error()}}, coverage
 		}
+		if warning == nil && excludeSelectedFragment(candidate.literal, content, file, options.FragmentSelection, &coverage) {
+			continue
+		}
 		fragments = append(fragments, parsed...)
 		if len(parsed) == 0 && (warning == nil || warning.SkippedFragments == 0) {
 			coverage.BelowTokenFloor++

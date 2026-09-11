@@ -1,0 +1,714 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Cyberlane/mori/blob/main/schemas/mori-support-session-v1.schema.json",
+  "title": "Mori opt-in source-free support session v1",
+  "description": "Separate from feedback and scan reports. No paths, source, names, repository identifiers, raw errors, or argv. Numeric counts are unavailable when report_available is false. Runtime validation additionally rejects duplicate keys, duplicate language/phase/finding entries, incompatible language selectors, nonzero counts without a report, and failure metadata on success. Input JSON is bounded to 65536 bytes. Integer consumers must preserve signed 64-bit values without float64 conversion.",
+  "$ref": "#/$defs/Session",
+  "$defs": {
+    "Session": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "report_available": {
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "tool": {
+          "$ref": "#/$defs/Build"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "success",
+            "error",
+            "usage",
+            "findings",
+            "coverage",
+            "upgrade",
+            "cancelled"
+          ]
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/Failure"
+            }
+          ]
+        },
+        "settings": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/Settings"
+            }
+          ]
+        },
+        "counts": {
+          "$ref": "#/$defs/Counts"
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Phase"
+          },
+          "maxItems": 5
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LanguageCount"
+          },
+          "maxItems": 24
+        },
+        "reviewed_findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ReviewedFinding"
+          },
+          "maxItems": 25
+        }
+      },
+      "required": [
+        "report_available",
+        "schema_version",
+        "tool",
+        "status",
+        "failure",
+        "settings",
+        "counts",
+        "phases",
+        "languages"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "failure": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "report_available": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "counts": {
+                "properties": {
+                  "leading_groups": {
+                    "const": 0
+                  },
+                  "leading_test_story_groups": {
+                    "const": 0
+                  },
+                  "files": {
+                    "const": 0
+                  },
+                  "fragments": {
+                    "const": 0
+                  },
+                  "candidate_pairs": {
+                    "const": 0
+                  },
+                  "location_pairs": {
+                    "const": 0
+                  },
+                  "match_groups": {
+                    "const": 0
+                  },
+                  "warnings": {
+                    "const": 0
+                  },
+                  "parse_diagnostics": {
+                    "const": 0
+                  },
+                  "test_files": {
+                    "const": 0
+                  },
+                  "story_files": {
+                    "const": 0
+                  },
+                  "test_fragments": {
+                    "const": 0
+                  },
+                  "story_fragments": {
+                    "const": 0
+                  },
+                  "zero_fragment_files": {
+                    "const": 0
+                  },
+                  "generated_excluded_files": {
+                    "const": 0
+                  },
+                  "truncated": {
+                    "const": false
+                  }
+                }
+              },
+              "languages": {
+                "maxItems": 0
+              },
+              "reviewed_findings": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Build": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modified": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(unknown|dev|v?[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,4}(\\+dirty)?)$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(unknown|[a-f0-9]{7,40}(-dirty)?)$"
+        },
+        "goos": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "aix",
+            "android",
+            "darwin",
+            "dragonfly",
+            "freebsd",
+            "illumos",
+            "ios",
+            "js",
+            "linux",
+            "netbsd",
+            "openbsd",
+            "plan9",
+            "solaris",
+            "wasip1",
+            "windows"
+          ]
+        },
+        "goarch": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "386",
+            "amd64",
+            "arm",
+            "arm64",
+            "loong64",
+            "mips",
+            "mipsle",
+            "mips64",
+            "mips64le",
+            "ppc64",
+            "ppc64le",
+            "riscv64",
+            "s390x",
+            "wasm"
+          ]
+        },
+        "go_version": {
+          "type": "string",
+          "pattern": "^(unknown|go[0-9]{1,3}\\.[0-9]{1,3}(\\.[0-9]{1,3})?((rc|beta)[0-9]{1,3})?)$"
+        },
+        "report_schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "normalization_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "config_schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "contract_schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        }
+      },
+      "required": [
+        "modified",
+        "version",
+        "revision",
+        "goos",
+        "goarch",
+        "go_version",
+        "report_schema",
+        "normalization_version",
+        "config_schema",
+        "contract_schema"
+      ]
+    },
+    "Failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "error",
+            "usage",
+            "findings",
+            "coverage",
+            "upgrade",
+            "cancelled",
+            "resource-limit",
+            "parse",
+            "configuration",
+            "invalid-arguments",
+            "io",
+            "unknown"
+          ]
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "arguments",
+            "validation",
+            "configuration",
+            "project",
+            "baseline",
+            "discovery",
+            "analysis",
+            "receipt",
+            "output",
+            "coverage"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "stage"
+      ]
+    },
+    "Phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": [
+            "total",
+            "discovery",
+            "parse",
+            "compare",
+            "analysis"
+          ]
+        },
+        "milliseconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 604800000
+        }
+      },
+      "required": [
+        "name",
+        "milliseconds"
+      ]
+    },
+    "LanguageCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": [
+            "bash",
+            "c",
+            "cpp",
+            "csharp",
+            "dart",
+            "gdscript",
+            "go",
+            "java",
+            "javascript",
+            "lua",
+            "kotlin",
+            "luau",
+            "php",
+            "hack",
+            "typescript",
+            "tsx",
+            "python",
+            "powershell",
+            "ruby",
+            "rust",
+            "swift",
+            "zsh",
+            "sql",
+            "postgresql"
+          ]
+        },
+        "files": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "fragments": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        }
+      },
+      "required": [
+        "language",
+        "files",
+        "fragments"
+      ]
+    },
+    "Counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "leading_groups": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 25
+        },
+        "leading_test_story_groups": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 25
+        },
+        "files": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "fragments": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "candidate_pairs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "location_pairs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "match_groups": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "warnings": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "parse_diagnostics": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "test_files": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "story_files": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "test_fragments": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "story_fragments": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "zero_fragment_files": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "generated_excluded_files": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "leading_groups",
+        "leading_test_story_groups",
+        "files",
+        "fragments",
+        "candidate_pairs",
+        "location_pairs",
+        "match_groups",
+        "warnings",
+        "parse_diagnostics",
+        "test_files",
+        "story_files",
+        "test_fragments",
+        "story_fragments",
+        "zero_fragment_files",
+        "generated_excluded_files",
+        "truncated"
+      ]
+    },
+    "Settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": [
+            "",
+            "default",
+            "review",
+            "explore",
+            "sql",
+            "strict",
+            "custom"
+          ]
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "min_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "max_groups": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "max_occurrences": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "max_pairs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "max_file_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "workers": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "comparison_domain": {
+          "type": "string",
+          "enum": [
+            "",
+            "code",
+            "sql-query",
+            "all"
+          ]
+        },
+        "sql_dialect": {
+          "type": "string",
+          "enum": [
+            "",
+            "generic",
+            "postgresql"
+          ]
+        },
+        "fragment_selection": {
+          "type": "string",
+          "enum": [
+            "",
+            "all",
+            "production",
+            "tests"
+          ]
+        },
+        "ranking": {
+          "type": "string",
+          "enum": [
+            "",
+            "structural",
+            "review"
+          ]
+        },
+        "same_language_only": {
+          "type": "boolean"
+        },
+        "cross_language_only": {
+          "type": "boolean"
+        },
+        "embedded_sql": {
+          "type": "boolean"
+        },
+        "statement_blocks": {
+          "type": "boolean"
+        },
+        "block_statements": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "max_blocks_per_function": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "exclude_generated": {
+          "type": "boolean"
+        },
+        "respect_ignore": {
+          "type": "boolean"
+        },
+        "fail_on_match": {
+          "type": "boolean"
+        },
+        "require_coverage": {
+          "type": "boolean"
+        },
+        "min_file_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_zero_fragment_files": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 9223372036854775807
+        },
+        "fail_on_warning": {
+          "type": "boolean"
+        },
+        "fail_on_parse_diagnostic": {
+          "type": "boolean"
+        },
+        "scope_selected": {
+          "type": "boolean"
+        },
+        "root_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "exclude_pattern_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "priority_path_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "language_pair_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "baseline_enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "profile",
+        "threshold",
+        "min_tokens",
+        "max_groups",
+        "max_occurrences",
+        "max_pairs",
+        "max_file_bytes",
+        "workers",
+        "comparison_domain",
+        "sql_dialect",
+        "fragment_selection",
+        "ranking",
+        "same_language_only",
+        "cross_language_only",
+        "embedded_sql",
+        "statement_blocks",
+        "block_statements",
+        "max_blocks_per_function",
+        "exclude_generated",
+        "respect_ignore",
+        "fail_on_match",
+        "require_coverage",
+        "min_file_coverage",
+        "max_zero_fragment_files",
+        "fail_on_warning",
+        "fail_on_parse_diagnostic",
+        "scope_selected",
+        "root_count",
+        "exclude_pattern_count",
+        "priority_path_count",
+        "language_pair_count",
+        "baseline_enabled"
+      ]
+    },
+    "ReviewedFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "classification": {
+          "type": "string",
+          "enum": [
+            "useful",
+            "intentional",
+            "false-positive",
+            "uncertain"
+          ]
+        }
+      },
+      "required": [
+        "rank",
+        "classification"
+      ]
+    }
+  }
+}

@@ -31,6 +31,7 @@ type Settings struct {
 	ComparisonDomain  string                   `json:"comparison_domain,omitempty"`
 	SQLDialect        string                   `json:"sql_dialect,omitempty"`
 	EmbeddedSQL       *bool                    `json:"embedded_sql,omitempty"`
+	FragmentSelection string                   `json:"fragment_selection,omitempty"`
 	StatementBlocks   *bool                    `json:"statement_blocks,omitempty"`
 	BlockStatements   *int                     `json:"block_statements,omitempty"`
 	MaxBlocksPerFunc  *int                     `json:"max_blocks_per_function,omitempty"`
@@ -68,6 +69,7 @@ type ScopeSettings struct {
 	ComparisonDomain  string   `json:"comparison_domain,omitempty"`
 	SQLDialect        string   `json:"sql_dialect,omitempty"`
 	EmbeddedSQL       *bool    `json:"embedded_sql,omitempty"`
+	FragmentSelection string   `json:"fragment_selection,omitempty"`
 	StatementBlocks   *bool    `json:"statement_blocks,omitempty"`
 	BlockStatements   *int     `json:"block_statements,omitempty"`
 	MaxBlocksPerFunc  *int     `json:"max_blocks_per_function,omitempty"`
@@ -96,7 +98,7 @@ func (scope ScopeSettings) Settings() Settings {
 		MaxGroups: scope.MaxGroups, MaxOccurrences: scope.MaxOccurrences, MaxPairs: scope.MaxPairs,
 		MaxFileBytes: scope.MaxFileBytes, Workers: scope.Workers, Format: scope.Format,
 		ComparisonDomain: scope.ComparisonDomain, SQLDialect: scope.SQLDialect,
-		EmbeddedSQL: scope.EmbeddedSQL, StatementBlocks: scope.StatementBlocks,
+		EmbeddedSQL: scope.EmbeddedSQL, FragmentSelection: scope.FragmentSelection, StatementBlocks: scope.StatementBlocks,
 		BlockStatements: scope.BlockStatements, MaxBlocksPerFunc: scope.MaxBlocksPerFunc,
 		Ranking: scope.Ranking, PriorityPaths: scope.PriorityPaths,
 		SameLanguageOnly: scope.SameLanguageOnly, CrossLanguageOnly: scope.CrossLanguageOnly,

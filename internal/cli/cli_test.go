@@ -1454,14 +1454,14 @@ func TestBaselineMigrationIsExplicitAndWarningsBlockMutation(t *testing.T) {
 	t.Parallel()
 
 	legacyPath := filepath.Join(t.TempDir(), "legacy.json")
-	if err := os.WriteFile(legacyPath, []byte(`{
+	if err := os.WriteFile(legacyPath, []byte(fmt.Sprintf(`{
   "schema_version": 2,
   "mori_version": "0.20.0",
-  "normalization_version": 13,
+  "normalization_version": %d,
   "identity_scope": "content",
   "threshold": 0.7,
   "entries": []
-}`), 0o600); err != nil {
+}`, normalize.Version)), 0o600); err != nil {
 		t.Fatalf("WriteFile legacy: %v", err)
 	}
 	baseArgs := []string{

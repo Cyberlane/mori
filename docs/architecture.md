@@ -225,8 +225,11 @@ default remains structural ordering.
 
 When focus is active, groups with at least one exact focused occurrence sort
 before other groups, while the comparator within both buckets is unchanged.
-Focus never restricts discovery or pair comparison and never changes scores,
-fingerprints, or baseline identities. Exact focused totals are computed before
+Ordinary focus only changes presentation. Explicit `--focused-only` and
+canonical staged review restrict comparisons to pairs touching focused source;
+unchanged source remains available as the other side. Focus does not alter
+fragment scores or fingerprints, but selection policy is recorded for baseline
+compatibility. Exact focused totals are computed before
 occurrence sampling and group retention.
 
 When a baseline is supplied, accepted identities are filtered after scoring but
@@ -238,13 +241,13 @@ limits.
 
 ### `internal/baseline`
 
-Baseline files are versioned JSON review artifacts. Schema 3 stores an explicit
+Baseline files are versioned JSON review artifacts. Schema 4 stores an explicit
 `content` or `path` identity scope, stable content-pair IDs, the normalization
 version, the writing Mori version, a canonical scan profile and its SHA-256
 digest, exact loaded ignore-file content digests, durable classifications and
 notes, and locations for human context.
-Schemas 1 and 2 remain readable but require explicit profile migration before
-mutation. Loading fails closed on a missing file, unsupported schema,
+Schemas 1 through 3 remain readable; older profile or normalization evidence
+requires explicit reviewed migration before mutation. Loading fails closed on a missing file, unsupported schema,
 normalization-version mismatch, tampered profile evidence, or an active profile
 mismatch. Writes are sorted and atomic; selective add/remove/edit operations
 preserve review metadata, preview-first replacement requires `--accept-all`,
@@ -342,3 +345,13 @@ Each runner tests, builds, and creates one deterministic archive. A final job
 downloads the archives, writes SHA-256 checksums, creates or reuses a draft
 release, uploads the complete asset set, and then publishes. This ordering is
 compatible with GitHub immutable releases.
+
+
+## Self-review coverage
+
+The repository's self-review policy permits six analyzed files without comparison
+fragments at its 40-token floor. This includes the data-only support session
+types, which have no function boundaries, plus the existing small platform and
+report/embed helpers. These files remain visible in file coverage. Minimum file
+coverage remains 90 percent, and warnings still fail the self-review policy.
+Revisit the individual reasons when the file set changes.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -67,7 +68,7 @@ func TestAgentFormatWritesJSONEvidenceOnce(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "complete JSON evidence:") ||
 		!strings.Contains(stdout.String(), "Mori agent summary:") ||
-		!strings.Contains(stdout.String(), "report schema 21") ||
+		!strings.Contains(stdout.String(), fmt.Sprintf("report schema %d", model.SchemaVersion)) ||
 		strings.HasPrefix(strings.TrimSpace(stdout.String()), "{") {
 		t.Fatalf("agent output = %q", stdout.String())
 	}

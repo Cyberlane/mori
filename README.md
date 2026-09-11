@@ -38,19 +38,49 @@ Each release also includes checksum-pinned Homebrew, Scoop, and WinGet manifest
 assets, an SPDX SBOM, and GitHub/Sigstore attestations. Package-index submission
 is intentionally separate, so verify the release asset before local use.
 
-## Quick start
+## Debugging and support
 
-From a project root:
+Mori v0.33.0 can capture an optional, source-free diagnostic session for a scan.
+Put `--diagnostics` before other scan options so argument errors can be captured:
 
 ```sh
+mori scan --diagnostics session.json --profile review .
+mori support bundle --session session.json --output mori-support.zip
+mori support inspect mori-support.zip
+```
+
+Inspect the bundle before attaching it to a support conversation. Nothing is
+uploaded automatically. See [support reports](docs/guides/support.md) for the
+exact contents, limits, and optional reviewed-finding labels.
+
+## Quick start
+
+From a project root, inventory the source and preview a project setup:
+
+```sh
+mori inspect .
 mori setup
-mori scan .
 ```
 
 `mori setup` inventories the project, asks a few focused questions, previews a
 conservative `.mori.json`, and writes it only after confirmation. Review its
 exclusions after the first scan; Mori cannot decide which tests, generated
 files, migrations, or framework repetition are intentional in your project.
+
+For a library or monorepository, choose the suggested `library` scope when its
+source roots match your intent. Choose `application` for broader non-test code,
+including demos and tooling. Review the proposed roots and exclusions, then run
+the exact command printed by setup. For an application scope, retain a first review:
+
+```sh
+mori scan --scope application --format agent --output review.json
+```
+
+Keep `review.json` local and inspect its coverage as well as both candidate
+locations. If you kept the inclusive configuration, omit `--scope application`.
+For very large layouts, choose a smaller source root before comparison. Library suggestions and future-proof test patterns require Mori v0.33.0 or later.
+See the [published documentation](https://cyberlane.github.io/mori/) and
+[focused first-review guide](docs/guides/first-review.md).
 
 For a no-write trial:
 
@@ -60,8 +90,19 @@ mori scan --profile review .
 
 The review profile starts with same-language code, an 85% threshold, a
 40-token floor, generated-source exclusion, and required aggregate coverage.
+It still includes tests and stories. In a large repository, start with a reviewed
+source root such as `mori scan --profile review packages/core/src`; inspect both
+sides of the first groups before deciding which categories to exclude. See the
+[first-review guide](docs/getting-started.md#run-a-first-review) for scope and
+staged-review tradeoffs.
 
-Example result:
+For a cross-language review, choose it explicitly:
+
+```sh
+mori scan --threshold 0.70 --cross-language-only examples/email-validation
+```
+
+Illustrative cross-language result (scores depend on source and version):
 
 ```text
 1. 92.7% structural similarity · 1 location pair(s)

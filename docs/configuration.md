@@ -58,6 +58,7 @@ flags. An explicit language-selection mode replaces the profile's mode, so
   "workers": 8,
   "format": "json",
   "comparison_domain": "code",
+  "fragment_selection": "all",
   "sql_dialect": "generic",
 	"embedded_sql": false,
 	"statement_blocks": false,
@@ -120,6 +121,22 @@ omitted value selects every registered domain.
 It selects the parser for every discovered `.sql` file and does not affect
 non-SQL files. Use separate scans when one repository contains multiple SQL
 dialects.
+
+`fragment_selection` accepts `all` (the default), `production`, or `tests`.
+The equivalent CLI option is `--fragment-selection`; named scopes can override
+it. It selects syntax-classified fragments after parsing, independently of
+file roots and exclusions. Conventional test paths and explicit Rust test
+attributes or unambiguously test-only conditional modules supply classification.
+See the [exact conventions](reference/languages-and-parser-limits.md#test-selection).
+Unclassified fragments remain production/unknown; `tests` is therefore not a
+universal test detector. Ordinary production closures remain eligible. Excluded fragment counts stay visible in file coverage, and a file
+with only excluded fragments is not evidence of analyzed comparison coverage.
+The selection participates in baseline and receipt compatibility.
+
+Keep the base `all` selection for inclusive staged gates; choose a separate
+named scope for production-only exploration. This field advances the recorded
+configuration contract to schema 2; `.mori.json` still has no schema-version
+field and previously valid files remain readable.
 
 `embedded_sql` is an explicit opt-in for direct string arguments to recognized
 Go database methods. It requires `comparison_domain` to be `sql-query` and uses

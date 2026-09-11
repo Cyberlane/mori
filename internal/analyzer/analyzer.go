@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Cyberlane/mori/internal/fingerprint"
 	"github.com/Cyberlane/mori/internal/model"
@@ -24,8 +25,15 @@ const (
 	RankingReview     = "review"
 )
 
+// PhaseTimings records opt-in wall times without changing deterministic reports.
+type PhaseTimings struct {
+	Parse, Compare                 time.Duration
+	ParseObserved, CompareObserved bool
+}
+
 // Options controls parsing concurrency and pair selection.
 type Options struct {
+	Timings           *PhaseTimings
 	Threshold         float64
 	MinTokens         int
 	MaxGroups         int
@@ -41,17 +49,18 @@ type Options struct {
 	// FocusedOnly limits scoring to pairs containing an exact focused
 	// occurrence. It is opt-in; default scans retain the historical full
 	// comparison universe.
-	FocusedOnly      bool
-	Suppress         func(id string, left model.Location, right model.Location) bool
-	ExcludedCoverage []model.FileCoverage
-	Unsupported      []model.UnsupportedExtension
-	Ranking          string
-	PriorityPaths    []model.PriorityPathRule
-	EmbeddedSQL      bool
-	SQLDialect       string
-	StatementBlocks  bool
-	BlockStatements  int
-	MaxBlocksPerFunc int
+	FocusedOnly       bool
+	Suppress          func(id string, left model.Location, right model.Location) bool
+	ExcludedCoverage  []model.FileCoverage
+	Unsupported       []model.UnsupportedExtension
+	Ranking           string
+	PriorityPaths     []model.PriorityPathRule
+	EmbeddedSQL       bool
+	SQLDialect        string
+	FragmentSelection string
+	StatementBlocks   bool
+	BlockStatements   int
+	MaxBlocksPerFunc  int
 }
 
 // LanguagePair selects one concrete grammar-ID pair for comparison.
@@ -160,6 +169,17 @@ func Analyze(
 		return report, nil
 	}
 
+	var parseStarted time.Time
+	if options.Timings != nil {
+		parseStarted = time.Now()
+		options.Timings.ParseObserved = true
+	}
+	parseFinished := false
+	defer func() {
+		if options.Timings != nil && !parseFinished {
+			options.Timings.Parse = time.Since(parseStarted)
+		}
+	}()
 	workers := options.Workers
 	if workers < 1 {
 		workers = 1
@@ -181,12 +201,13 @@ func Analyze(
 					return
 				}
 				fragments, warnings, parserCoverage := parser.FileWithCoverage(ctx, job.file, parser.Options{
-					MinTokens:        options.MinTokens,
-					EmbeddedSQL:      options.EmbeddedSQL,
-					SQLDialect:       options.SQLDialect,
-					StatementBlocks:  options.StatementBlocks,
-					BlockStatements:  options.BlockStatements,
-					MaxBlocksPerFunc: options.MaxBlocksPerFunc,
+					MinTokens:         options.MinTokens,
+					EmbeddedSQL:       options.EmbeddedSQL,
+					SQLDialect:        options.SQLDialect,
+					FragmentSelection: options.FragmentSelection,
+					StatementBlocks:   options.StatementBlocks,
+					BlockStatements:   options.BlockStatements,
+					MaxBlocksPerFunc:  options.MaxBlocksPerFunc,
 				})
 				results <- parseResult{
 					index:     job.index,
@@ -241,6 +262,20 @@ func Analyze(
 	sortWarnings(report.Warnings)
 	report.Fragments = len(fragments)
 
+	if options.Timings != nil {
+		options.Timings.Parse = time.Since(parseStarted)
+	}
+	parseFinished = true
+	var compareStarted time.Time
+	if options.Timings != nil {
+		compareStarted = time.Now()
+		options.Timings.CompareObserved = true
+	}
+	defer func() {
+		if options.Timings != nil {
+			options.Timings.Compare = time.Since(compareStarted)
+		}
+	}()
 	ordered := append([]model.Fragment(nil), fragments...)
 	sort.Slice(ordered, func(i, j int) bool {
 		return fragmentLess(ordered[i], ordered[j])
@@ -271,6 +306,7 @@ func Analyze(
 		compareErr = compareCompatibleDomains(ordered, &collector)
 	}
 	if compareErr != nil {
+		report.Coverage = summarizeReportCoverage(report.FileCoverage, report.Warnings, options.Unsupported)
 		return report, compareErr
 	}
 	collector.finish()
@@ -290,16 +326,18 @@ func summarizeCoverage(
 	parserCoverage parser.Coverage,
 ) model.FileCoverage {
 	coverage := model.FileCoverage{
-		Path:             file.DisplayPath,
-		Language:         file.Language.ID,
-		LanguageFamily:   file.Language.Family,
-		ComparisonDomain: file.AnalysisDomain,
-		Status:           "analyzed",
-		Generated:        file.Generated,
-		GeneratedMarker:  file.Marker,
-		FragmentCount:    len(fragments),
-		CandidateCount:   parserCoverage.CandidateFragments,
-		BelowTokenFloor:  parserCoverage.BelowTokenFloor,
+		Path:                        file.DisplayPath,
+		Language:                    file.Language.ID,
+		LanguageFamily:              file.Language.Family,
+		ComparisonDomain:            file.AnalysisDomain,
+		Status:                      "analyzed",
+		Generated:                   file.Generated,
+		GeneratedMarker:             file.Marker,
+		FragmentCount:               len(fragments),
+		CandidateCount:              parserCoverage.CandidateFragments,
+		BelowTokenFloor:             parserCoverage.BelowTokenFloor,
+		ExcludedTestFragments:       parserCoverage.ExcludedTestFragments,
+		ExcludedProductionFragments: parserCoverage.ExcludedProductionFragments,
 	}
 	if coverage.ComparisonDomain == "" {
 		coverage.ComparisonDomain = file.Language.ComparisonDomain
@@ -322,8 +360,14 @@ func zeroFragmentReason(coverage model.FileCoverage, warnings []model.Warning) s
 	}
 	for _, warning := range warnings {
 		if warning.Path == coverage.Path {
+			if warning.Kind == "coverage" && strings.Contains(warning.Message, "macro token trees are opaque") {
+				return "opaque_syntax"
+			}
 			return "resource_limit"
 		}
+	}
+	if coverage.ExcludedTestFragments+coverage.ExcludedProductionFragments > 0 && coverage.ExcludedTestFragments+coverage.ExcludedProductionFragments+coverage.BelowTokenFloor == coverage.CandidateCount {
+		return "fragment_selection"
 	}
 	if coverage.CandidateCount > 0 &&
 		coverage.BelowTokenFloor == coverage.CandidateCount {
@@ -418,6 +462,11 @@ func domainAndFamilyKey(fragment model.Fragment) string {
 }
 
 func validateOptions(options Options) error {
+	switch options.FragmentSelection {
+	case "", "all", "production", "tests":
+	default:
+		return errors.New("fragment selection must be all, production, or tests")
+	}
 	if math.IsNaN(options.Threshold) || math.IsInf(options.Threshold, 0) ||
 		options.Threshold <= 0 || options.Threshold > 1 {
 		return errors.New("threshold must be finite, greater than 0, and at most 1")
@@ -695,11 +744,7 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 	}
 	if collector.options.MaxPairs > 0 &&
 		collector.report.CandidatePairs >= collector.options.MaxPairs {
-		return fmt.Errorf(
-			"candidate pair limit of %d reached; narrow the scan, raise --min-tokens, "+
-				"raise --threshold, or increase --max-pairs",
-			collector.options.MaxPairs,
-		)
+		return &CandidateLimitError{Limit: collector.options.MaxPairs, Compared: collector.report.CandidatePairs}
 	}
 
 	collector.report.CandidatePairs++

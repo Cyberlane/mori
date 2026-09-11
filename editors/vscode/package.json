@@ -2,7 +2,7 @@
   "name": "mori-vscode",
   "displayName": "Mori Structural Review",
   "description": "Review Mori structural-similarity leads while editing.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "Cyberlane",
   "license": "MIT",
   "icon": "icon.png",
@@ -30,6 +30,7 @@
   "main": "./extension.js",
   "activationEvents": [
     "onCommand:mori.refreshDiagnostics",
+    "onCommand:mori.showOutput",
     "onLanguage:csharp",
     "onLanguage:dart",
     "onLanguage:go",
@@ -57,6 +58,10 @@
       {
         "command": "mori.refreshDiagnostics",
         "title": "Mori: Refresh Structural Diagnostics"
+      },
+      {
+        "command": "mori.showOutput",
+        "title": "Mori: Show Diagnostic Output"
       }
     ],
     "configuration": {
@@ -93,7 +98,8 @@
     }
   },
   "scripts": {
-    "check": "node --check extension.js",
-    "package": "npx --yes @vscode/vsce@3.9.1 package --no-dependencies"
+    "check": "node --check extension.js && node --test extension.test.js",
+    "package": "npx --yes @vscode/vsce@3.9.1 package --no-dependencies",
+    "smoke": "node smoke-test.js"
   }
 }

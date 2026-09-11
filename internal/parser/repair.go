@@ -9,7 +9,6 @@ import (
 )
 
 var (
-	typescriptImportType    = regexp.MustCompile(`^import\((?:"[A-Za-z0-9_@./:-]+"|'[A-Za-z0-9_@./:-]+')\)(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+$`)
 	sqlLimitOffsetParameter = regexp.MustCompile(`(?i)\b(?:LIMIT|OFFSET)[ \t]+(\?|sqlc\.(?:arg|narg)\([^()\r\n]+\))`)
 	sqlConflictTarget       = regexp.MustCompile(`(?i)\bON[ \t]+CONFLICT[ \t]*(\([^()\r\n]*\))[ \t]+DO[ \t]+(?:NOTHING|UPDATE)\b`)
 	sqlIdentifierList       = regexp.MustCompile(`^\([ \t]*[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*,[ \t]*[A-Za-z_][A-Za-z0-9_]*)*[ \t]*\)$`)
@@ -211,65 +210,4 @@ func isJSXEntity(content []byte) bool {
 		}
 	}
 	return true
-}
-
-// repairTypeScriptImportTypes adapts import("module").Type references that the
-// pinned grammar misreads as expressions inside ambient interface properties.
-// Only complete import type error nodes are eligible; runtime imports and
-// malformed type expressions retain their diagnostics. No function annotation
-// is rewritten. The placeholder preserves byte offsets.
-func repairTypeScriptImportTypes(root *tree_sitter.Node, content []byte) []byte {
-	if root == nil || !root.HasError() {
-		return nil
-	}
-	var repaired []byte
-	cursor := root.Walk()
-	defer cursor.Close()
-	for {
-		current := cursor.Node()
-		parent := current.Parent()
-		if current.IsError() && parent != nil && parent.Kind() == "type_annotation" && isAmbientInterfaceProperty(parent) {
-			start, end := int(current.StartByte()), int(current.EndByte())
-			if start >= 0 && end <= len(content) && start < end && typescriptImportType.Match(content[start:end]) {
-				// Only the import qualifier becomes a placeholder type identifier. Keep
-				// the qualified member and array syntax for the original type shape.
-				close := bytes.IndexByte(content[start:end], ')')
-				if repaired == nil {
-					repaired = bytes.Clone(content)
-				}
-				repaired[start] = 'T'
-				for offset := start + 1; offset <= start+close; offset++ {
-					repaired[offset] = ' '
-				}
-			}
-		}
-		if cursor.GotoFirstChild() {
-			continue
-		}
-		for {
-			if cursor.GotoNextSibling() {
-				break
-			}
-			if !cursor.GotoParent() {
-				return repaired
-			}
-		}
-	}
-}
-
-func isAmbientInterfaceProperty(annotation *tree_sitter.Node) bool {
-	parent := annotation.Parent()
-	if parent == nil || parent.Kind() != "property_signature" {
-		return false
-	}
-	parent = parent.Parent()
-	if parent == nil || parent.Kind() != "interface_body" {
-		return false
-	}
-	for parent = parent.Parent(); parent != nil; parent = parent.Parent() {
-		if parent.Kind() == "ambient_declaration" {
-			return true
-		}
-	}
-	return false
 }

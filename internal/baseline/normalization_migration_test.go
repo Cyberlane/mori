@@ -2,6 +2,7 @@ package baseline
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,7 +14,13 @@ import (
 
 func TestExplicitNormalizationMigrationRetainsDecisions(t *testing.T) {
 	t.Parallel()
-	if normalize.Version != 13 {
+	for _, version := range []int{12, 13} {
+		t.Run(fmt.Sprint(version), func(t *testing.T) { testExplicitNormalizationMigration(t, version) })
+	}
+}
+
+func testExplicitNormalizationMigration(t *testing.T, priorVersion int) {
+	if normalize.Version != 14 {
 		t.Fatal("review explicit migration support when normalization advances")
 	}
 	path := filepath.Join(t.TempDir(), "baseline.json")
@@ -30,7 +37,7 @@ func TestExplicitNormalizationMigrationRetainsDecisions(t *testing.T) {
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
 	}
-	doc.NormalizationVersion = 12
+	doc.NormalizationVersion = priorVersion
 	old, err := json.Marshal(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +70,7 @@ func TestExplicitNormalizationMigrationRetainsDecisions(t *testing.T) {
 	if !reflect.DeepEqual(set.Entries(), migrated.Entries()) {
 		t.Fatal("migration changed decisions or metadata")
 	}
-	for _, version := range []int{11, 14, 999} {
+	for _, version := range []int{11, 15, 999} {
 		doc.NormalizationVersion = version
 		raw, err = json.Marshal(doc)
 		if err != nil {

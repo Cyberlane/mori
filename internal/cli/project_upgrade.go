@@ -26,7 +26,7 @@ import (
 )
 
 const projectUpgradePlanVersion = 2
-const projectConfigSchemaVersion = 1
+const projectConfigSchemaVersion = 2
 
 type projectUpgradePlan struct {
 	Version       int                       `json:"version"`

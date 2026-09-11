@@ -4,6 +4,9 @@ Start with the guide that matches what you are trying to do.
 
 ## Learn Mori
 
+- [Choose a useful first review](guides/first-review.md): library scopes, test noise,
+  and checking that useful matches remain.
+
 - [Getting started](getting-started.md) — install, first scan, profiles, and
   coverage checks.
 - [Reviewing results](guides/reviewing-results.md) — selection, focus,
@@ -12,6 +15,9 @@ Start with the guide that matches what you are trying to do.
   identities, and explanatory evidence.
 
 ## Use Mori in a project
+
+- [Support reports](guides/support.md): capture, inspect and voluntarily share
+  diagnostics without including source.
 
 - [Project configuration](configuration.md) — every `.mori.json` field and
   ignore-file behavior.

@@ -17,7 +17,7 @@ import (
 // Version identifies the normalization contract used to build feature bags.
 // Bump it whenever the selected comparison-unit contract, feature vocabulary,
 // weights, canonical mappings, or semantic-hint list changes.
-const Version = 13
+const Version = 14
 
 const (
 	maxOrderedCallFeatures = 8
