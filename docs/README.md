@@ -37,6 +37,7 @@ Start with the guide that matches what you are trying to do.
 - [Machine integration](machine-integration.md)
 - [Architecture](architecture.md)
 - [Adding a language](adding-a-language.md)
+- [Quality and performance acceptance](guides/regression-testing.md)
 - [Contributing](../CONTRIBUTING.md)
 
 Mori's results are structural review evidence. They do not prove semantic or

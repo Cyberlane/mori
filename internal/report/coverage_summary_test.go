@@ -25,3 +25,23 @@ func TestConciseReportsDiscloseUnsupportedSource(t *testing.T) {
 		})
 	}
 }
+
+func TestHumanReportsShareAggregateCoverage(t *testing.T) {
+	t.Parallel()
+	value := model.Report{Coverage: model.CoverageSummary{
+		SupportedFiles: 60, AnalyzedFiles: 58, FragmentFiles: 40,
+		ZeroFragmentFiles: 18, WarningCount: 50, ParseDiagnosticCount: 229,
+	}}
+	for name, render := range map[string]func(io.Writer, model.Report) error{"agent": Agent, "compact": Compact, "text": Text} {
+		t.Run(name, func(t *testing.T) {
+			var out bytes.Buffer
+			if err := render(&out, value); err != nil {
+				t.Fatal(err)
+			}
+			want := "coverage: 58/60 supported file(s) analyzed; 40 fragment file(s); 18 zero-fragment file(s); 50 warning(s); 229 parse diagnostic(s)"
+			if strings.Count(out.String(), want) != 1 {
+				t.Fatalf("coverage summary absent or repeated: %s", out.String())
+			}
+		})
+	}
+}

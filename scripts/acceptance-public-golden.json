@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "reference_version": "mori 0.33.0 (dbcfa1051e29, 2026-09-11T00:14:14Z, darwin/arm64)",
+  "reference_binary_sha256": "a2680dfcb87b3cba4eaa04c7332cd6cf9b5da9953db33ba86faa547da41cc6d7",
+  "workloads": {
+    "click": {
+      "corpus_revision": "d4ecb8a89a52ad3faacf3f1c65065d08c1d11c14",
+      "counts": {
+        "leading_groups": 25,
+        "leading_test_story_groups": 0,
+        "files": 16,
+        "fragments": 504,
+        "candidate_pairs": 13787,
+        "location_pairs": 148,
+        "match_groups": 55,
+        "warnings": 0,
+        "parse_diagnostics": 0,
+        "test_files": 0,
+        "story_files": 0,
+        "test_fragments": 0,
+        "story_fragments": 0,
+        "zero_fragment_files": 1,
+        "generated_excluded_files": 0,
+        "truncated": false
+      },
+      "identity_sha256": "46017dbb75e9a94b907c294fca4f8655a85f7f21d8add7a21656266688b513df"
+    },
+    "chi": {
+      "corpus_revision": "71307f9b7e4e9527638bc951c42b782cd1560331",
+      "counts": {
+        "leading_groups": 25,
+        "leading_test_story_groups": 0,
+        "files": 73,
+        "fragments": 342,
+        "candidate_pairs": 7035,
+        "location_pairs": 600,
+        "match_groups": 56,
+        "warnings": 0,
+        "parse_diagnostics": 0,
+        "test_files": 0,
+        "story_files": 0,
+        "test_fragments": 0,
+        "story_fragments": 0,
+        "zero_fragment_files": 22,
+        "generated_excluded_files": 0,
+        "truncated": false
+      },
+      "identity_sha256": "34f02c03a02516b06da6e0ab1ab4eb81c5ed0b0bc80cf2240af6e6dd4d93a0c0"
+    },
+    "lodash": {
+      "corpus_revision": "f299b52f39486275a9e6483b60a410e06520c538",
+      "counts": {
+        "leading_groups": 25,
+        "leading_test_story_groups": 0,
+        "files": 26,
+        "fragments": 714,
+        "candidate_pairs": 32654,
+        "location_pairs": 496,
+        "match_groups": 255,
+        "warnings": 0,
+        "parse_diagnostics": 0,
+        "test_files": 0,
+        "story_files": 0,
+        "test_fragments": 0,
+        "story_fragments": 0,
+        "zero_fragment_files": 10,
+        "generated_excluded_files": 0,
+        "truncated": false
+      },
+      "identity_sha256": "ff07d3e5f1bca3a6ae4db0592f1187535fe20738ba50ca47f1c9a12b1eca8590"
+    },
+    "tanstack-query": {
+      "corpus_revision": "ebe996d70dd46b4f3c926b3cc9671a88bfdae349",
+      "counts": {
+        "leading_groups": 25,
+        "leading_test_story_groups": 0,
+        "files": 452,
+        "fragments": 1404,
+        "candidate_pairs": 110552,
+        "location_pairs": 1738,
+        "match_groups": 364,
+        "warnings": 0,
+        "parse_diagnostics": 0,
+        "test_files": 0,
+        "story_files": 0,
+        "test_fragments": 0,
+        "story_fragments": 0,
+        "zero_fragment_files": 270,
+        "generated_excluded_files": 0,
+        "truncated": false
+      },
+      "identity_sha256": "e3887b9de9ace1df30c871478ed8c6f6bdaab42d37117da51e871cfd463cc102"
+    }
+  }
+}

@@ -124,3 +124,5 @@ jobs:
           "$binary" support bundle --session "$PWD/support-session.json" --output "$PWD/mori-support.zip"
           "$binary" support inspect "$PWD/mori-support.zip" > "$PWD/support-preview.json"
           test -s "$PWD/support-preview.json"
+          # Rehearse adversarial workloads using the downloaded binary, not a rebuild.
+          python3 ../scripts/acceptance.py --binary "$PWD/$binary" --output acceptance.json

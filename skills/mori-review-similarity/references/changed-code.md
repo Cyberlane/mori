@@ -195,3 +195,9 @@ coverage, including advisory mode. Never call excluded files analyzed.
 test paths plus positively evidenced Rust tests/test-only ancestors. Unrecognized
 code remains in production selection; this is not test-framework inference.
 Inspect excluded fragment counts and use `all` when both categories matter.
+
+Review ranking may disclose `repeated-small-wrapper(-7)` for small same-name
+call wrappers repeated across four or more directories. This changes shortlist
+priority only. It is not an intentional-duplication decision, and it never
+authorizes accepting a baseline entry without review. Inspect lower-ranked
+groups when wrapper behavior, permissions or error handling matter.

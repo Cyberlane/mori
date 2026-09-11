@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Cyberlane/mori/main/schemas/mori-scan-plan-v1.schema.json",
+  "title": "Mori scan workload plan v1",
+  "description": "Discovery and parsing evidence with candidate enumeration but no similarity scoring. Not a scan report, baseline authority, or proof of a clean review. Package pair counts are upper bounds before language, size, and overlap filtering. Source changes invalidate the estimate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact",
+    "schema_version",
+    "analysis_performed",
+    "requested_paths",
+    "configuration",
+    "files",
+    "fragments",
+    "candidate_pairs",
+    "exceeds_pair_limit",
+    "coverage",
+    "warnings",
+    "packages"
+  ],
+  "properties": {
+    "artifact": {
+      "const": "mori-scan-plan"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "analysis_performed": {
+      "const": false
+    },
+    "requested_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "configuration": {
+      "$ref": "mori-report-v22.schema.json#/$defs/configuration"
+    },
+    "files": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fragments": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "candidate_pairs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exceeds_pair_limit": {
+      "type": "boolean"
+    },
+    "coverage": {
+      "$ref": "mori-report-v22.schema.json#/$defs/coverage"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "mori-report-v22.schema.json#/$defs/warning"
+      }
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "root",
+          "files",
+          "fragments",
+          "pair_upper_bound"
+        ],
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "files": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fragments": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pair_upper_bound": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

@@ -12,6 +12,14 @@ import (
 // sourceCoverageSummary describes discovery separately from parser coverage.
 // Counts include only the selected discovery surface, never the whole repository.
 func sourceCoverageSummary(w io.Writer, value model.Report) error {
+	if _, err := fmt.Fprintf(w,
+		"coverage: %d/%d supported file(s) analyzed; %d fragment file(s); %d zero-fragment file(s); %d warning(s); %d parse diagnostic(s)\n",
+		value.Coverage.AnalyzedFiles, value.Coverage.SupportedFiles,
+		value.Coverage.FragmentFiles, value.Coverage.ZeroFragmentFiles,
+		value.Coverage.WarningCount, value.Coverage.ParseDiagnosticCount,
+	); err != nil {
+		return err
+	}
 	languages := map[string]int{}
 	for _, file := range value.FileCoverage {
 		languages[file.Language]++

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "repositories": [
+    {
+      "name": "click",
+      "url": "https://github.com/pallets/click.git",
+      "revision": "d4ecb8a89a52ad3faacf3f1c65065d08c1d11c14",
+      "root": "src"
+    },
+    {
+      "name": "chi",
+      "url": "https://github.com/go-chi/chi.git",
+      "revision": "71307f9b7e4e9527638bc951c42b782cd1560331",
+      "root": "."
+    },
+    {
+      "name": "lodash",
+      "url": "https://github.com/lodash/lodash.git",
+      "revision": "f299b52f39486275a9e6483b60a410e06520c538",
+      "root": "."
+    },
+    {
+      "name": "tanstack-query",
+      "url": "https://github.com/TanStack/query.git",
+      "revision": "ebe996d70dd46b4f3c926b3cc9671a88bfdae349",
+      "root": "packages",
+      "required_languages": [
+        "typescript",
+        "tsx"
+      ]
+    }
+  ]
+}

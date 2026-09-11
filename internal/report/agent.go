@@ -101,18 +101,6 @@ func Agent(writer io.Writer, value model.Report) error {
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(
-		writer,
-		"coverage: %d/%d supported file(s) analyzed; %d fragment file(s); %d zero-fragment file(s); %d warning(s); %d parse diagnostic(s)\n",
-		value.Coverage.AnalyzedFiles,
-		value.Coverage.SupportedFiles,
-		value.Coverage.FragmentFiles,
-		value.Coverage.ZeroFragmentFiles,
-		value.Coverage.WarningCount,
-		value.Coverage.ParseDiagnosticCount,
-	); err != nil {
-		return err
-	}
 	if err := sourceCoverageSummary(writer, value); err != nil {
 		return err
 	}

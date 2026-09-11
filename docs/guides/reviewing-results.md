@@ -51,6 +51,16 @@ mori scan --ranking review .
 Review ranking prioritizes disclosed source-location signals before ordinary
 structural ordering. It does not change scores, fingerprints, or eligibility.
 
+In development builds after v0.33.0, repeated small call wrappers lose the
+name/repetition boost when the same name occurs in at least four directories.
+The signal is `repeated-small-wrapper(-7)`. Both representative fragments must
+have at most 80 normalized tokens, a call, no nested functions, and no explicit
+branching, looping, binding, assignment or arithmetic nodes. This is a
+conservative presentation heuristic, not evidence that the duplication is
+intentional. Short date calculations and validation branches retain their
+normal priority. Use structural ranking or explicit priority paths to review
+deprioritized groups. No findings are automatically accepted or removed.
+
 Projects can add deterministic presentation-only path priority:
 
 ```sh

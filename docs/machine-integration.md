@@ -264,3 +264,13 @@ unbounded extraction are not supported. Inspect the canonical payload before
 sharing. New files request mode 0600 on POSIX; Windows access follows inherited
 directory ACLs rather than a Mori-managed per-user ACL. See [support collection](guides/support.md) for workflow and failure
 handling; a diagnostic session never grants baseline or receipt acceptance.
+
+## Workload plans
+
+`mori plan --format json [scan options] [roots]` emits the separate
+[`mori-scan-plan` schema 1](../schemas/mori-scan-plan-v1.schema.json) artifact.
+It parses source and enumerates eligible candidates but never scores similarities.
+Do not parse it as a scan report or use it as baseline/receipt evidence. A count
+above the configured pair cap sets `exceeds_pair_limit` rather than failing the
+plan. Coverage policies still determine coverage failures. See
+[workload planning](guides/workload-planning.md) for limits and scope tradeoffs.

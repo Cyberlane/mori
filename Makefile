@@ -4,7 +4,7 @@ GO ?= go
 ACTIONLINT_VERSION := v1.7.12
 GOVULNCHECK_VERSION := v1.6.0
 
-.PHONY: actionlint build check corpus dogfood editors-check fmt fmt-check policy-test scan-example test tidy-check vet vuln workflow-dogfood
+.PHONY: acceptance acceptance-public actionlint build check corpus dogfood editors-check fmt fmt-check policy-test scan-example test tidy-check vet vuln workflow-dogfood
 
 build:
 	mkdir -p bin
@@ -16,6 +16,13 @@ dogfood: build
 corpus:
 	$(GO) run ./internal/cmd/corpuseval >/dev/null
 	$(GO) run ./internal/cmd/corpuseval corpus/actionability >/dev/null
+
+acceptance: build
+	python3 scripts/acceptance.py
+	python3 scripts/test-acceptance.py
+
+acceptance-public: build
+	python3 scripts/acceptance.py --public-corpus --size 1000 --repeats 5
 
 fmt:
 	gofmt -w cmd internal examples corpus/code corpus/actionability/code
@@ -55,4 +62,4 @@ policy-test:
 scan-example:
 	$(GO) run ./cmd/mori scan --threshold 0.70 --cross-language-only examples/email-validation
 
-check: fmt-check tidy-check vet test workflow-dogfood corpus build editors-check policy-test actionlint vuln
+check: fmt-check tidy-check vet test workflow-dogfood corpus acceptance editors-check policy-test actionlint vuln
