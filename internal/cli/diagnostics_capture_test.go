@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"context"
-	"github.com/Cyberlane/mori/internal/model"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/support"
 )
 

@@ -61,7 +61,7 @@ The session schema is an explicit allowlist, not a redacted scan report:
 | Tool | Validated Mori version/revision and modified-build flag, operating system, architecture, Go version and report/normalization/config/contract schema versions. Arbitrary build labels become `unknown`. |
 | Outcome | Status and optional fixed failure stage/code; no raw error message. |
 | Settings | Numeric scan limits, threshold, built-in profile/domain/dialect/selection/ranking names and boolean policies. Named scope, roots, exclusions, priority paths and language-pair selections are represented only by selection flags or counts. |
-| Counts | An explicit report-availability flag distinguishes unavailable evidence from measured zero counts. Files, fragments, candidate/location pairs, match groups, warnings, parse diagnostics, test/story files and fragments, test/story presence in at most 25 leading retained groups, zero-fragment files, generated exclusions, truncation and test/story participation in at most 25 leading retained groups. |
+| Counts | An explicit report-availability flag distinguishes unavailable evidence from measured zero counts. Files, fragments, candidate/location pairs, match groups, warnings, parse diagnostics, test/story files and fragments, test/story presence in at most 25 leading retained groups, zero-fragment files, generated exclusions and truncation. |
 | Phases | Available elapsed milliseconds for fixed phase names; missing phases are not invented. |
 | Languages | Built-in language IDs and aggregate file/fragment counts. |
 | Reviewed findings | Optional bounded rank/classification pairs. |

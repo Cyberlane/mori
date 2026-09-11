@@ -15,6 +15,7 @@ import (
 	"github.com/Cyberlane/mori/internal/config"
 	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/normalize"
+	"github.com/Cyberlane/mori/internal/pathutil"
 	"github.com/Cyberlane/mori/internal/projectcontract"
 	"github.com/Cyberlane/mori/internal/support"
 )
@@ -22,16 +23,17 @@ import (
 // Runtime-only capture state never enters a report, receipt, or feedback store.
 // Only the explicit allowlist built in session is persisted.
 type scanDiagnostics struct {
-	ctx           context.Context
-	path          string
-	started       time.Time
-	stage, reason string
-	requested     scanOptions
-	effective     *scanOptions
-	paths         []string
-	result        *model.Report
-	discovery     time.Duration
-	timings       analyzer.PhaseTimings
+	ctx               context.Context
+	path              string
+	started           time.Time
+	stage, reason     string
+	requested         scanOptions
+	effective         *scanOptions
+	paths             []string
+	result            *model.Report
+	discovery         time.Duration
+	discoveryObserved bool
+	timings           analyzer.PhaseTimings
 }
 
 func (d *scanDiagnostics) finish(code int, stderr io.Writer) {
@@ -182,8 +184,9 @@ func (d *scanDiagnostics) session(code int) support.Session {
 	for _, phase := range []struct {
 		name     string
 		duration time.Duration
-	}{{"discovery", d.discovery}, {"parse", d.timings.Parse}, {"compare", d.timings.Compare}} {
-		if phase.duration > 0 {
+		observed bool
+	}{{"discovery", d.discovery, d.discoveryObserved}, {"parse", d.timings.Parse, d.timings.ParseObserved}, {"compare", d.timings.Compare, d.timings.CompareObserved}} {
+		if phase.observed {
 			s.Phases = append(s.Phases, support.Phase{Name: phase.name, Milliseconds: phase.duration.Milliseconds()})
 		}
 	}
@@ -243,8 +246,8 @@ func (d *scanDiagnostics) session(code int) support.Session {
 // Report paths can be absolute or parent-relative when scanning explicit roots.
 // Ignore their ancestor directory names, which may not belong to the project.
 func diagnosticPathClass(path string) string {
-	path = filepath.ToSlash(path)
-	if filepath.IsAbs(path) || path == ".." || strings.HasPrefix(path, "../") {
+	path = pathutil.PortableSlash(path)
+	if pathutil.IsRooted(path) || path == ".." || strings.HasPrefix(path, "../") {
 		path = filepath.Base(path)
 	}
 	if strings.Contains(path, ".stories.") || strings.Contains("/"+path, "/stories/") || strings.Contains("/"+path, "/__stories__/") {

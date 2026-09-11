@@ -1,10 +1,10 @@
 package parser
 
 import (
-	"path/filepath"
 	"strings"
 	"unicode"
 
+	"github.com/Cyberlane/mori/internal/pathutil"
 	"github.com/Cyberlane/mori/internal/source"
 	ts "github.com/tree-sitter/go-tree-sitter"
 )
@@ -17,10 +17,10 @@ func isTestFragment(node *ts.Node, content []byte, file source.File) bool {
 	if classification == "" {
 		classification = file.DisplayPath
 	}
-	path := filepath.ToSlash(classification)
+	path := pathutil.PortableSlash(classification)
 	parts := strings.Split(path, "/")
 	for _, part := range parts[:len(parts)-1] {
-		if filepath.IsAbs(classification) || parts[0] == ".." {
+		if pathutil.IsRooted(classification) || parts[0] == ".." {
 			break
 		}
 		if part == "test" || part == "tests" || part == "__tests__" {

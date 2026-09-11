@@ -26,7 +26,10 @@ const (
 )
 
 // PhaseTimings records opt-in wall times without changing deterministic reports.
-type PhaseTimings struct{ Parse, Compare time.Duration }
+type PhaseTimings struct {
+	Parse, Compare                 time.Duration
+	ParseObserved, CompareObserved bool
+}
 
 // Options controls parsing concurrency and pair selection.
 type Options struct {
@@ -169,6 +172,7 @@ func Analyze(
 	var parseStarted time.Time
 	if options.Timings != nil {
 		parseStarted = time.Now()
+		options.Timings.ParseObserved = true
 	}
 	parseFinished := false
 	defer func() {
@@ -265,6 +269,7 @@ func Analyze(
 	var compareStarted time.Time
 	if options.Timings != nil {
 		compareStarted = time.Now()
+		options.Timings.CompareObserved = true
 	}
 	defer func() {
 		if options.Timings != nil {

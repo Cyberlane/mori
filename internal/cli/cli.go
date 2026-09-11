@@ -2380,6 +2380,7 @@ func executeScan(
 	var discoveryStarted time.Time
 	if options.diagnostics != nil {
 		discoveryStarted = time.Now()
+		options.diagnostics.discoveryObserved = true
 	}
 	defer func() {
 		if options.diagnostics != nil && options.diagnostics.stage == "discovery" {

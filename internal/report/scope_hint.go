@@ -3,10 +3,10 @@ package report
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 
 	"github.com/Cyberlane/mori/internal/model"
+	"github.com/Cyberlane/mori/internal/pathutil"
 )
 
 // The hint describes a bounded sample of retained locations, not precision or
@@ -42,10 +42,10 @@ func scopeHint(w io.Writer, value model.Report) error {
 }
 
 func conventionalReviewTestPath(path string) bool {
-	path = filepath.ToSlash(path)
+	path = pathutil.PortableSlash(path)
 	parts := strings.Split(path, "/")
 	// Absolute and parent-relative paths may include unrelated ancestor names.
-	if !filepath.IsAbs(path) && parts[0] != ".." {
+	if !pathutil.IsRooted(path) && parts[0] != ".." {
 		for _, part := range parts[:len(parts)-1] {
 			switch part {
 			case "test", "tests", "__tests__", "spec", "specs", "stories", "__stories__":

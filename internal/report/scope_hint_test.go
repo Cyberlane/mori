@@ -57,7 +57,8 @@ func TestScopeHintPathBoundaries(t *testing.T) {
 		"src/__tests__/a.ts": true, "src/a.stories.tsx": true,
 		"packages/runtime-test/src/main.ts": false, "src/test_helpers.ts": false,
 		"/tmp/tests/project/src/a.ts": false, "../tests/project/src/a.ts": false,
-		"src/[route]/new.test.ts": true,
+		"src/[route]/new.test.ts":   true,
+		"C:/tests/project/src/a.ts": false, `\\server\tests\project\src\a.ts`: false, "/tmp/tests/project/src/a.test.ts": true,
 	} {
 		if got := conventionalReviewTestPath(path); got != want {
 			t.Errorf("%s = %v, want %v", path, got, want)

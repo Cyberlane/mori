@@ -64,7 +64,7 @@ func TestTestPathSelectionIsBounded(t *testing.T) {
 		path string
 		want bool
 	}{
-		{"src/__tests__/helper.ts", true}, {"tests/helper.ts", true}, {"src/main.test.ts", true}, {"src/main.spec.ts", true}, {"src/runtime-test/helper.ts", false}, {"src/testHelpers.ts", false}, {"src/test.ts", false}, {"src/stories/main.ts", false}, {"/home/tests/project/src/main.ts", false}, {"../tests/project/src/main.ts", false},
+		{"src/__tests__/helper.ts", true}, {"tests/helper.ts", true}, {"src/main.test.ts", true}, {"src/main.spec.ts", true}, {"src/runtime-test/helper.ts", false}, {"src/testHelpers.ts", false}, {"src/test.ts", false}, {"src/stories/main.ts", false}, {`C:\foo.test.dir\main.ts`, false}, {`C:\x\main.test.ts`, true}, {"/home/tests/project/src/main.ts", false}, {"C:/tests/project/src/main.ts", false}, {`\\server\tests\project\src\main.ts`, false}, {"/home/tests/project/src/main.test.ts", true}, {"../tests/project/src/main.ts", false},
 	} {
 		if got := isTestFragment(nil, nil, source.File{DisplayPath: c.path, Language: spec}); got != c.want {
 			t.Errorf("%s: %v", c.path, got)
