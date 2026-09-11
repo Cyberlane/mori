@@ -5,8 +5,8 @@
 <link rel="stylesheet" href="../site.css"></head>
 <body><a class="skip" href="#content">Skip to content</a>
 <header><a class="brand" href="../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
-<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
-<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html" aria-current="page">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<div class="development" role="note"><strong>Mori v0.33.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/support.html">Collecting a support bundle</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html" aria-current="page">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
 <main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../source/docs/machine-integration.md">Markdown source ↗</a></div>
 <h1 id="machine-and-editor-integration">Machine and editor integration</h1>
 <p>Mori exposes deterministic complete evidence and bounded projections for
@@ -39,7 +39,7 @@ values, and path-to-placeholder mappings are not emitted. Redaction changes
 presentation only, not scores, fingerprints, counts, or schema version.</p>
 <h2 id="versioned-json-contract">Versioned JSON contract</h2>
 <p>Schema 22 is described by the Draft 2020-12 artifact at
-<a href="https://github.com/Cyberlane/mori/blob/main/schemas/mori-report-v22.schema.json"><code>schemas/mori-report-v22.schema.json</code></a>.
+<a href="https://github.com/Cyberlane/mori/blob/dbcfa1051e2954cee4972403486f11b1fb61eb1c/schemas/mori-report-v22.schema.json"><code>schemas/mori-report-v22.schema.json</code></a>.
 Official releases include the same file and its SHA-256 checksum.
 Consumers should select a validator that supports Draft 2020-12, require
 <code>schema_version</code> to equal <code>22</code>, and reject or explicitly handle unknown report
@@ -184,6 +184,76 @@ projects may package it directly or use the contract from another IDE.</p>
 <p>The repository also packages this client as a release asset. Marketplace and
 Open VSX publication remain separate maintainer actions because they require
 store credentials and acceptance of each registry's current terms.</p>
+<h2 id="support-session-contract">Support session contract</h2>
+<p><code>mori scan --diagnostics session.json [options] [paths...]</code> explicitly requests
+one local, source-free diagnostic session. Place the option before other options
+when collecting early argument failures. It follows the normal options-before-
+paths grammar and is written on command return; hard process termination may
+leave no session. Capture warnings do not change the scan's exit code. Session destinations must
+be new files; a failed write does not replace an earlier session.</p>
+<p><code>mori support inspect &lt;session.json|support.zip&gt;</code> validates and prints canonical
+session JSON, not the raw input. <code>mori support bundle --session &lt;session.json&gt;
+--output &lt;new.zip&gt;</code> explicitly creates a new local ZIP, previews canonical JSON
+on stdout and writes a local-creation notice to stderr. Repeated
+<code>--finding RANK:CLASSIFICATION</code> adds up to 25 unique reviewed ranks; labels are
+<code>useful</code>, <code>intentional</code>, <code>false-positive</code>, and <code>uncertain</code>, with no free text.
+Inspection and bundle creation exit 0 on success, 2 for command usage errors,
+and 1 for invalid evidence or I/O errors. They never upload data.</p>
+<p><a href="https://github.com/Cyberlane/mori/blob/dbcfa1051e2954cee4972403486f11b1fb61eb1c/schemas/mori-support-session-v1.schema.json">Support schema 1</a> is separate
+from scan-report, baseline, receipt and feedback
+schemas. Its top-level fields are <code>schema_version</code>, <code>tool</code>, <code>status</code>, <code>failure</code>,
+<code>settings</code>, <code>report_available</code>, <code>counts</code>, <code>phases</code>, <code>languages</code>, and optional <code>reviewed_findings</code>.
+<code>report_available</code> distinguishes unavailable measurements from measured zero counts.
+When false, counts remain zero, languages are empty and reviewed findings are
+not accepted. A true value does not imply complete analysis.
+<code>settings</code> may be null when configuration was not resolved; <code>failure</code> is null
+for success. Unknown fields are rejected rather than copied or ignored.</p>
+<ul>
+<li><code>tool</code>: <code>modified</code>, <code>version</code>, <code>revision</code>, <code>goos</code>, <code>goarch</code>, <code>go_version</code>, <code>report_schema</code>,
+  <code>normalization_version</code>, <code>config_schema</code>, <code>contract_schema</code>. Build strings
+  must match fixed known formats; arbitrary development labels become <code>unknown</code>.</li>
+<li><code>status</code>: <code>success</code>, <code>error</code>, <code>usage</code>, <code>findings</code>, <code>coverage</code>, <code>upgrade</code>, or
+  <code>cancelled</code>. Optional <code>failure</code> contains only fixed <code>code</code> and <code>stage</code> values.
+  Stages: <code>arguments</code>, <code>validation</code>, <code>configuration</code>, <code>project</code>, <code>baseline</code>, <code>discovery</code>,
+  <code>analysis</code>, <code>receipt</code>, <code>output</code>, <code>coverage</code>. Codes: <code>error</code>, <code>usage</code>,
+  <code>findings</code>, <code>coverage</code>, <code>upgrade</code>, <code>cancelled</code>, <code>resource-limit</code>, <code>parse</code>,
+  <code>configuration</code>, <code>invalid-arguments</code>, <code>io</code>, <code>unknown</code>.</li>
+<li><code>settings</code>: <code>profile</code>, <code>threshold</code>, <code>min_tokens</code>, <code>max_groups</code>,
+  <code>max_occurrences</code>, <code>max_pairs</code>, <code>max_file_bytes</code>, <code>workers</code>,
+  <code>comparison_domain</code>, <code>sql_dialect</code>, <code>fragment_selection</code>, <code>ranking</code>,
+  <code>same_language_only</code>, <code>cross_language_only</code>, <code>embedded_sql</code>,
+  <code>statement_blocks</code>, <code>block_statements</code>, <code>max_blocks_per_function</code>,
+  <code>exclude_generated</code>, <code>respect_ignore</code>, <code>fail_on_match</code>, <code>require_coverage</code>,
+  <code>min_file_coverage</code>, <code>max_zero_fragment_files</code>, <code>fail_on_warning</code>,
+  <code>fail_on_parse_diagnostic</code>, <code>scope_selected</code>, <code>root_count</code>,
+  <code>exclude_pattern_count</code>, <code>priority_path_count</code>, <code>language_pair_count</code>,
+  <code>baseline_enabled</code>. No actual paths, scope names, globs or config JSON.</li>
+<li><code>counts</code>: <code>files</code>, <code>fragments</code>, <code>candidate_pairs</code>, <code>location_pairs</code>,
+  <code>match_groups</code>, <code>warnings</code>, <code>parse_diagnostics</code>, <code>test_files</code>, <code>story_files</code>,
+  <code>test_fragments</code>, <code>story_fragments</code>, <code>zero_fragment_files</code>,
+  <code>generated_excluded_files</code>, <code>truncated</code>, <code>leading_groups</code>,
+  <code>leading_test_story_groups</code>. The leading-group sample contains at most 25
+  retained groups; the test/story count uses bounded path conventions and is
+  not a measured false-positive rate.</li>
+<li><code>phases</code>: at most five unique entries, each <code>name</code> and <code>milliseconds</code>.
+  Fixed names are <code>total</code>, <code>discovery</code>, <code>parse</code>, <code>compare</code>, and <code>analysis</code>.</li>
+<li><code>languages</code>: unique built-in <code>language</code> IDs with numeric <code>files</code> and
+  <code>fragments</code> totals.</li>
+<li><code>reviewed_findings</code>: optional <code>{ "rank": 7, "classification": "intentional" }</code>
+  entries, sorted by rank. Unique ranks range from 1 to 1,000,000.</li>
+</ul>
+<p>Counts and numeric limits are nonnegative signed 64-bit integers up to
+9,223,372,036,854,775,807; <code>max_zero_fragment_files</code> also accepts -1. Threshold
+and minimum file coverage are finite values from 0 to 1. JSON consumers must
+preserve integer precision rather than coercing large limits to floating-point
+numbers. Phase timings range
+from 0 through 604,800,000 milliseconds (seven days).</p>
+<p>Session input is bounded to 64 KiB, bundle input to 128 KiB. ZIP contents are
+exactly <code>session.json</code> and a fixed <code>README.txt</code>; arbitrary members, symlinks and
+unbounded extraction are not supported. Inspect the canonical payload before
+sharing. New files request mode 0600 on POSIX; Windows access follows inherited
+directory ACLs rather than a Mori-managed per-user ACL. See <a href="guides/support.html">support collection</a> for workflow and failure
+handling; a diagnostic session never grants baseline or receipt acceptance.</p>
 <footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
 <aside class="contents"><strong>On this page</strong><div class="toc">
 <ul>
@@ -193,6 +263,7 @@ store credentials and acceptance of each registry's current terms.</p>
 <li><a href="#unsaved-buffer-overlays">Unsaved-buffer overlays</a></li>
 <li><a href="#language-server-protocol">Language Server Protocol</a></li>
 <li><a href="#vs-code-client">VS Code client</a></li>
+<li><a href="#support-session-contract">Support session contract</a></li>
 </ul>
 </div>
 </aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

@@ -13,7 +13,7 @@ spec.loader.exec_module(docs)
 
 
 class BuildDocsTest(unittest.TestCase):
-    def test_repository_site_preserves_links_assets_and_development_status(self):
+    def test_repository_site_preserves_links_assets_and_release_status(self):
         with tempfile.TemporaryDirectory(prefix="mori-docs-test-") as directory:
             output = Path(directory)
             report = docs.build(docs.ROOT, output, "main")
@@ -29,8 +29,8 @@ class BuildDocsTest(unittest.TestCase):
             self.assertIn('https://github.com/Cyberlane/mori/blob/main/LICENSE', overview)
             for page in output.rglob("*.html"):
                 self.assertIn("Markdown source", page.read_text())
-                self.assertIn("Development documentation", page.read_text())
-                self.assertIn("not yet included in stable", page.read_text())
+                self.assertIn("Mori v0.33.0 documentation", page.read_text())
+                self.assertIn("v0.33.0 or later", page.read_text())
             page = output / "index.html"
             page.write_text(page.read_text() + '<a href="docs/getting-started.html#missing-heading">Broken</a>')
             with self.assertRaisesRegex(ValueError, "Missing site anchor"):

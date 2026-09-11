@@ -1,9 +1,8 @@
 # Choose a useful first review
 
-> Development build: the library suggestions, growing test-pattern policy, and
-> next-command guidance on this page are not included in stable v0.32.0. Check
-> `mori version` and `mori setup --help` before following them. Existing releases
-> can still use explicit source roots and manually configured named scopes.
+> Requires Mori v0.33.0 or later for library suggestions, growing test-pattern
+> policy and next-command guidance. Check `mori version` before following them.
+> Earlier releases can use explicit roots and manually configured named scopes.
 
 A broad scan can surface hundreds of similar test callbacks. This is often a
 scope problem. A high structural score does not establish that two functions

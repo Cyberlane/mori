@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Collecting a support bundle · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Mori v0.33.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="support.html" aria-current="page">Collecting a support bundle</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/support.md">Markdown source ↗</a></div>
+<h1 id="collecting-a-support-bundle">Collecting a support bundle</h1>
+<p>Mori can record a small local diagnostic session for a scan you want help with.
+Collection is explicit for each invocation. Creating a bundle is a separate
+command, and neither command uploads anything or attaches source code.</p>
+<h2 id="record-inspect-then-bundle">Record, inspect, then bundle</h2>
+<p>Requires Mori v0.33.0 or later. To investigate a problem, repeat the same scan
+with the same options and paths, adding <code>--diagnostics</code> first. This preserves the
+workload that caused the problem and captures later argument errors. For example:</p>
+<pre><code class="language-sh">mori scan --diagnostics session.json --profile review --format agent packages/core/src
+mori support inspect session.json
+mori support bundle --session session.json --output mori-support.zip
+mori support inspect mori-support.zip
+</code></pre>
+<p>The scan retains its normal exit code, including findings, coverage failures and
+candidate-pair limits. A session write failure produces a sanitized warning; it
+does not turn a successful scan into a failure or hide an existing scan failure.
+Use a new session filename for each scan; an existing file is not overwritten.
+If writing fails, inspect the warning before using any older file at that path.
+Sessions are written when the command returns. A hard kill, out-of-memory
+termination or system crash can prevent creation of the session.</p>
+<p><code>support inspect</code> prints only the validated session payload as canonical JSON.
+It does not print arbitrary contents from an input file. <code>support bundle</code> prints
+the same session JSON to standard output and confirms local creation on standard
+error. Existing output files are never overwritten. Choose a new filename for
+each bundle.</p>
+<p>Inspect the result before attaching it to an issue or sending it through your
+chosen channel. Sharing is your separate action. Mori does not select a recipient,
+open a network connection or enable ongoing feedback collection.</p>
+<h2 id="add-reviewed-finding-labels">Add reviewed finding labels</h2>
+<p>Optionally annotate several shortlist ranks while creating a bundle:</p>
+<pre><code class="language-sh">mori support bundle --session session.json --output reviewed-support.zip \
+  --finding 2:useful --finding 7:intentional --finding 9:uncertain
+</code></pre>
+<p>Labels are <code>useful</code>, <code>intentional</code>, <code>false-positive</code> or <code>uncertain</code>. At most 25
+unique ranks are allowed, from 1 to 1,000,000. Ranks refer to the shortlist you
+reviewed; Mori does not attach the matching code, paths or identities. There is
+no free-text comment field. The input session is unchanged; the labels are added
+to the exported bundle. Labels already present in a session count toward the
+limit and cannot be replaced by repeating the same rank. Sessions without report
+evidence cannot accept reviewed findings.</p>
+<h2 id="what-can-be-shared">What can be shared</h2>
+<p>The session schema is an explicit allowlist, not a redacted scan report:</p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Allowed information</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tool</td>
+<td>Validated Mori version/revision and modified-build flag, operating system, architecture, Go version and report/normalization/config/contract schema versions. Arbitrary build labels become <code>unknown</code>.</td>
+</tr>
+<tr>
+<td>Outcome</td>
+<td>Status and optional fixed failure stage/code; no raw error message.</td>
+</tr>
+<tr>
+<td>Settings</td>
+<td>Numeric scan limits, threshold, built-in profile/domain/dialect/selection/ranking names and boolean policies. Named scope, roots, exclusions, priority paths and language-pair selections are represented only by selection flags or counts.</td>
+</tr>
+<tr>
+<td>Counts</td>
+<td>An explicit report-availability flag distinguishes unavailable evidence from measured zero counts. Files, fragments, candidate/location pairs, match groups, warnings, parse diagnostics, test/story files and fragments, test/story presence in at most 25 leading retained groups, zero-fragment files, generated exclusions and truncation.</td>
+</tr>
+<tr>
+<td>Phases</td>
+<td>Available elapsed milliseconds for fixed phase names; missing phases are not invented.</td>
+</tr>
+<tr>
+<td>Languages</td>
+<td>Built-in language IDs and aggregate file/fragment counts.</td>
+</tr>
+<tr>
+<td>Reviewed findings</td>
+<td>Optional bounded rank/classification pairs.</td>
+</tr>
+</tbody>
+</table>
+<p>No source text, snippets, function names, filenames, directory paths, project or
+scope names, command-line arguments, environment variables, raw diagnostics,
+config contents, match identities, timestamps, Git repository URLs, authentication
+material or arbitrary attachments are included. Exact counts and tool metadata
+remain visible, so inspect the payload before sharing it.</p>
+<h2 id="limits-and-troubleshooting">Limits and troubleshooting</h2>
+<ul>
+<li>Session JSON is limited to 64 KiB; a ZIP is limited to 128 KiB.</li>
+<li>New files request mode 0600 on POSIX. On Windows, use a destination with
+  appropriate inherited directory ACLs; Mori does not provision a separate
+  per-user ACL.</li>
+<li>A bundle has exactly <code>session.json</code> and a fixed <code>README.txt</code>. Inspection does
+  not extract files into the filesystem. Keep the Mori-generated ZIP unchanged;
+  edited or recompressed archives are not accepted.</li>
+<li>Unknown fields, invalid enums/counts, malformed JSON, unapproved archive
+  members, duplicate annotations and symbolic-link inputs/outputs are rejected.</li>
+<li><code>support inspect -- --unusual-name.json</code> handles a filename beginning with <code>-</code>.</li>
+<li>If no session exists after an argument failure, move <code>--diagnostics</code> before
+  the invalid option and retry. It must still precede positional scan paths.</li>
+<li>If a session exists but inspection rejects it, retain it locally and rerun
+  using the same Mori version. Do not turn an arbitrary scan report or edited
+  source-containing JSON into a bundle by renaming it.</li>
+<li>A resource-limit outcome is incomplete analysis. Its counts help diagnose
+  scope; the session is not a complete ranking, baseline or review receipt.</li>
+<li>Leading test/story counts describe path-based participation among up to 25
+  retained groups. They do not establish a false-positive rate.</li>
+</ul>
+<p>The <a href="../machine-integration.html#support-session-contract">machine contract</a>
+documents serialized fields. Local support sessions and
+<a href="feedback.html">opt-in feedback</a> are separate mechanisms.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#record-inspect-then-bundle">Record, inspect, then bundle</a></li>
+<li><a href="#add-reviewed-finding-labels">Add reviewed finding labels</a></li>
+<li><a href="#what-can-be-shared">What can be shared</a></li>
+<li><a href="#limits-and-troubleshooting">Limits and troubleshooting</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

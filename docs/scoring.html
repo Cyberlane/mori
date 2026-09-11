@@ -5,8 +5,8 @@
 <link rel="stylesheet" href="../site.css"></head>
 <body><a class="skip" href="#content">Skip to content</a>
 <header><a class="brand" href="../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
-<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
-<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html" aria-current="page">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<div class="development" role="note"><strong>Mori v0.33.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/support.html">Collecting a support bundle</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html" aria-current="page">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
 <main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../source/docs/scoring.md">Markdown source ↗</a></div>
 <h1 id="scoring-contract">Scoring contract</h1>
 <p>森 (<em>mori</em>) compares normalized AST feature <strong>multisets</strong>. Counts matter: a
@@ -376,7 +376,7 @@ that contain an exact hunk-intersecting fragment. It also corrects the public
 receipt-evidence contract to the current receipt schema 2. Baseline schema
 remained 4 and normalization remained 12. The schema-20 contract is
 published as
-<a href="https://github.com/Cyberlane/mori/blob/main/schemas/mori-report-v20.schema.json"><code>schemas/mori-report-v20.schema.json</code></a>.
+<a href="https://github.com/Cyberlane/mori/blob/dbcfa1051e2954cee4972403486f11b1fb61eb1c/schemas/mori-report-v20.schema.json"><code>schemas/mori-report-v20.schema.json</code></a>.
 <code>focused_only</code> is recorded for report reproducibility but is not added to the
 schema-4 baseline profile digest: accepted scored identities remain valid when
 untouched-to-untouched pairs are omitted from a staged run.</p>
@@ -485,7 +485,7 @@ alter similarity or fingerprints. Separately, normalization 13 records corrected
 Swift optional-type/nil-coalescing grammar; formerly repaired expressions can
 change fingerprints when synthetic grouping nodes disappear. Baseline schema 4
 remains unchanged, but prior normalization acceptance needs review. See
-<a href="https://github.com/Cyberlane/mori/blob/main/schemas/mori-report-v21.schema.json">the schema-21 artifact</a> and
+<a href="https://github.com/Cyberlane/mori/blob/dbcfa1051e2954cee4972403486f11b1fb61eb1c/schemas/mori-report-v21.schema.json">the schema-21 artifact</a> and
 <a href="guides/review-policy.html">review policies</a>. Timing and feedback are separate
 opt-in local records and never affect deterministic analysis or acceptance.</p>
 <h3 id="schema-22-explicit-fragment-selection">Schema 22: explicit fragment selection</h3>
@@ -494,7 +494,7 @@ opt-in local records and never affect deterministic analysis or acceptance.</p>
 Default selection remains <code>all</code>; opt-in test/production selection changes the
 comparison universe and its compatibility evidence, not the meaning of a
 similarity score. Current normalization is 14; prior accepted identities need
-review before migration. See <a href="https://github.com/Cyberlane/mori/blob/main/schemas/mori-report-v22.schema.json">the current schema</a>
+review before migration. See <a href="https://github.com/Cyberlane/mori/blob/dbcfa1051e2954cee4972403486f11b1fb61eb1c/schemas/mori-report-v22.schema.json">the current schema</a>
 and <a href="guides/parser-compatibility.html">parser compatibility</a>.</p>
 <footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
 <aside class="contents"><strong>On this page</strong><div class="toc">

@@ -5,8 +5,8 @@
 <link rel="stylesheet" href="site.css"></head>
 <body><a class="skip" href="#content">Skip to content</a>
 <header><a class="brand" href="index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
-<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
-<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="docs/index.html">Mori documentation</a><a href="docs/guides/first-review.html">Choose a useful first review</a><a href="docs/getting-started.html">Getting started</a><a href="index.html" aria-current="page">Overview</a><a href="CHANGELOG.html">Changelog</a><a href="CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="SECURITY.html">Security policy</a><a href="docs/adding-a-language.html">Adding a language</a><a href="docs/architecture.html">Architecture</a><a href="docs/configuration.html">Project configuration and ignore handling</a><a href="docs/guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="docs/guides/editors-and-agents.html">Editors and coding agents</a><a href="docs/guides/feedback.html">Opt-in local feedback</a><a href="docs/guides/parser-compatibility.html">Parser compatibility</a><a href="docs/guides/project-upgrade.html">Project contract and upgrade</a><a href="docs/guides/publishing-docs.html">Building and publishing documentation</a><a href="docs/guides/review-policy.html">Choose the review policy</a><a href="docs/guides/reviewing-results.html">Reviewing Mori results</a><a href="docs/guides/sql.html">SQL and embedded SQL</a><a href="docs/guides/staged-cache.html">Opt-in staged analysis cache</a><a href="docs/guides/usability-rollout.html">Roll out smoother reviews</a><a href="docs/machine-integration.html">Machine and editor integration</a><a href="docs/reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="docs/scan-selection.html">Scan selection controls</a><a href="docs/scoring.html">Scoring contract</a><a href="editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<div class="development" role="note"><strong>Mori v0.33.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="docs/index.html">Mori documentation</a><a href="docs/guides/first-review.html">Choose a useful first review</a><a href="docs/getting-started.html">Getting started</a><a href="index.html" aria-current="page">Overview</a><a href="CHANGELOG.html">Changelog</a><a href="CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="SECURITY.html">Security policy</a><a href="docs/adding-a-language.html">Adding a language</a><a href="docs/architecture.html">Architecture</a><a href="docs/configuration.html">Project configuration and ignore handling</a><a href="docs/guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="docs/guides/editors-and-agents.html">Editors and coding agents</a><a href="docs/guides/feedback.html">Opt-in local feedback</a><a href="docs/guides/parser-compatibility.html">Parser compatibility</a><a href="docs/guides/project-upgrade.html">Project contract and upgrade</a><a href="docs/guides/publishing-docs.html">Building and publishing documentation</a><a href="docs/guides/review-policy.html">Choose the review policy</a><a href="docs/guides/reviewing-results.html">Reviewing Mori results</a><a href="docs/guides/sql.html">SQL and embedded SQL</a><a href="docs/guides/staged-cache.html">Opt-in staged analysis cache</a><a href="docs/guides/support.html">Collecting a support bundle</a><a href="docs/guides/usability-rollout.html">Roll out smoother reviews</a><a href="docs/machine-integration.html">Machine and editor integration</a><a href="docs/reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="docs/scan-selection.html">Scan selection controls</a><a href="docs/scoring.html">Scoring contract</a><a href="editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
 <main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="source/README.md">Markdown source ↗</a></div>
 <p align="center">
   <img src="docs/assets/mori-hero.webp" alt="Mori forest-green banner with the forest kanji and the slogan Structural similarity, explained" width="100%">
@@ -15,7 +15,7 @@
 <h1 id="mori">Mori</h1>
 <p><a href="https://github.com/Cyberlane/mori/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Cyberlane/mori?color=0f766e" /></a>
 <a href="https://github.com/Cyberlane/mori/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Cyberlane/mori/actions/workflows/ci.yml/badge.svg" /></a>
-<a href="https://github.com/Cyberlane/mori/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-d97706.svg" /></a></p>
+<a href="https://github.com/Cyberlane/mori/blob/dbcfa1051e2954cee4972403486f11b1fb61eb1c/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-d97706.svg" /></a></p>
 <p>Mori finds source fragments with similar structure—even when they use different
 names or programming languages—and gives you an explainable shortlist to review.</p>
 <blockquote>
@@ -59,6 +59,16 @@ for CI and auditable reports.</p>
 <p>Each release also includes checksum-pinned Homebrew, Scoop, and WinGet manifest
 assets, an SPDX SBOM, and GitHub/Sigstore attestations. Package-index submission
 is intentionally separate, so verify the release asset before local use.</p>
+<h2 id="debugging-and-support">Debugging and support</h2>
+<p>Mori v0.33.0 can capture an optional, source-free diagnostic session for a scan.
+Put <code>--diagnostics</code> before other scan options so argument errors can be captured:</p>
+<pre><code class="language-sh">mori scan --diagnostics session.json --profile review .
+mori support bundle --session session.json --output mori-support.zip
+mori support inspect mori-support.zip
+</code></pre>
+<p>Inspect the bundle before attaching it to a support conversation. Nothing is
+uploaded automatically. See <a href="docs/guides/support.html">support reports</a> for the
+exact contents, limits, and optional reviewed-finding labels.</p>
 <h2 id="quick-start">Quick start</h2>
 <p>From a project root, inventory the source and preview a project setup:</p>
 <pre><code class="language-sh">mori inspect .
@@ -76,8 +86,7 @@ the exact command printed by setup. For an application scope, retain a first rev
 </code></pre>
 <p>Keep <code>review.json</code> local and inspect its coverage as well as both candidate
 locations. If you kept the inclusive configuration, omit <code>--scope application</code>.
-For very large layouts, choose a smaller source root before comparison. New
-library suggestions and future-proof test patterns require a development build.
+For very large layouts, choose a smaller source root before comparison. Library suggestions and future-proof test patterns require Mori v0.33.0 or later.
 See the <a href="https://cyberlane.github.io/mori/">published documentation</a> and
 <a href="docs/guides/first-review.html">focused first-review guide</a>.</p>
 <p>For a no-write trial:</p>
@@ -247,11 +256,12 @@ offline without counting exports as distinct projects.</p>
 corpus is regression evidence for its reviewed cases, not a universal accuracy
 claim.</p>
 <h2 id="license">License</h2>
-<p><a href="https://github.com/Cyberlane/mori/blob/main/LICENSE">MIT</a></p>
+<p><a href="https://github.com/Cyberlane/mori/blob/dbcfa1051e2954cee4972403486f11b1fb61eb1c/LICENSE">MIT</a></p>
 <footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
 <aside class="contents"><strong>On this page</strong><div class="toc">
 <ul>
 <li><a href="#install">Install</a></li>
+<li><a href="#debugging-and-support">Debugging and support</a></li>
 <li><a href="#quick-start">Quick start</a></li>
 <li><a href="#choose-a-workflow">Choose a workflow</a></li>
 <li><a href="#supported-source">Supported source</a></li>

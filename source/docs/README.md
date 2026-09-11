@@ -16,6 +16,9 @@ Start with the guide that matches what you are trying to do.
 
 ## Use Mori in a project
 
+- [Support reports](guides/support.md): capture, inspect and voluntarily share
+  diagnostics without including source.
+
 - [Project configuration](configuration.md) — every `.mori.json` field and
   ignore-file behavior.
 - [SQL and embedded SQL](guides/sql.md) — generic SQL, PostgreSQL, and opt-in

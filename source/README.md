@@ -38,6 +38,21 @@ Each release also includes checksum-pinned Homebrew, Scoop, and WinGet manifest
 assets, an SPDX SBOM, and GitHub/Sigstore attestations. Package-index submission
 is intentionally separate, so verify the release asset before local use.
 
+## Debugging and support
+
+Mori v0.33.0 can capture an optional, source-free diagnostic session for a scan.
+Put `--diagnostics` before other scan options so argument errors can be captured:
+
+```sh
+mori scan --diagnostics session.json --profile review .
+mori support bundle --session session.json --output mori-support.zip
+mori support inspect mori-support.zip
+```
+
+Inspect the bundle before attaching it to a support conversation. Nothing is
+uploaded automatically. See [support reports](docs/guides/support.md) for the
+exact contents, limits, and optional reviewed-finding labels.
+
 ## Quick start
 
 From a project root, inventory the source and preview a project setup:
@@ -63,8 +78,7 @@ mori scan --scope application --format agent --output review.json
 
 Keep `review.json` local and inspect its coverage as well as both candidate
 locations. If you kept the inclusive configuration, omit `--scope application`.
-For very large layouts, choose a smaller source root before comparison. New
-library suggestions and future-proof test patterns require a development build.
+For very large layouts, choose a smaller source root before comparison. Library suggestions and future-proof test patterns require Mori v0.33.0 or later.
 See the [published documentation](https://cyberlane.github.io/mori/) and
 [focused first-review guide](docs/guides/first-review.md).
 

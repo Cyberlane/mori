@@ -5,16 +5,50 @@
 <link rel="stylesheet" href="site.css"></head>
 <body><a class="skip" href="#content">Skip to content</a>
 <header><a class="brand" href="index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
-<div class="development" role="note"><strong>Development documentation</strong> · Guided library scopes and the improvements described here are not yet included in stable <strong>0.32</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
-<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="docs/index.html">Mori documentation</a><a href="docs/guides/first-review.html">Choose a useful first review</a><a href="docs/getting-started.html">Getting started</a><a href="index.html">Overview</a><a href="CHANGELOG.html" aria-current="page">Changelog</a><a href="CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="SECURITY.html">Security policy</a><a href="docs/adding-a-language.html">Adding a language</a><a href="docs/architecture.html">Architecture</a><a href="docs/configuration.html">Project configuration and ignore handling</a><a href="docs/guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="docs/guides/editors-and-agents.html">Editors and coding agents</a><a href="docs/guides/feedback.html">Opt-in local feedback</a><a href="docs/guides/parser-compatibility.html">Parser compatibility</a><a href="docs/guides/project-upgrade.html">Project contract and upgrade</a><a href="docs/guides/publishing-docs.html">Building and publishing documentation</a><a href="docs/guides/review-policy.html">Choose the review policy</a><a href="docs/guides/reviewing-results.html">Reviewing Mori results</a><a href="docs/guides/sql.html">SQL and embedded SQL</a><a href="docs/guides/staged-cache.html">Opt-in staged analysis cache</a><a href="docs/guides/usability-rollout.html">Roll out smoother reviews</a><a href="docs/machine-integration.html">Machine and editor integration</a><a href="docs/reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="docs/scan-selection.html">Scan selection controls</a><a href="docs/scoring.html">Scoring contract</a><a href="editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<div class="development" role="note"><strong>Mori v0.33.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="docs/index.html">Mori documentation</a><a href="docs/guides/first-review.html">Choose a useful first review</a><a href="docs/getting-started.html">Getting started</a><a href="index.html">Overview</a><a href="CHANGELOG.html" aria-current="page">Changelog</a><a href="CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="SECURITY.html">Security policy</a><a href="docs/adding-a-language.html">Adding a language</a><a href="docs/architecture.html">Architecture</a><a href="docs/configuration.html">Project configuration and ignore handling</a><a href="docs/guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="docs/guides/editors-and-agents.html">Editors and coding agents</a><a href="docs/guides/feedback.html">Opt-in local feedback</a><a href="docs/guides/parser-compatibility.html">Parser compatibility</a><a href="docs/guides/project-upgrade.html">Project contract and upgrade</a><a href="docs/guides/publishing-docs.html">Building and publishing documentation</a><a href="docs/guides/review-policy.html">Choose the review policy</a><a href="docs/guides/reviewing-results.html">Reviewing Mori results</a><a href="docs/guides/sql.html">SQL and embedded SQL</a><a href="docs/guides/staged-cache.html">Opt-in staged analysis cache</a><a href="docs/guides/support.html">Collecting a support bundle</a><a href="docs/guides/usability-rollout.html">Roll out smoother reviews</a><a href="docs/machine-integration.html">Machine and editor integration</a><a href="docs/reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="docs/scan-selection.html">Scan selection controls</a><a href="docs/scoring.html">Scoring contract</a><a href="editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
 <main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="source/CHANGELOG.md">Markdown source ↗</a></div>
 <h1 id="changelog">Changelog</h1>
 <p>All notable changes to 森 (<em>mori</em>) will be documented in this file.</p>
 <p>The format follows <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/Cyberlane/mori/compare/v0.32.0...HEAD">Unreleased</a></h2>
-<h2 id="0320---2026-09-10"><a href="https://github.com/Cyberlane/mori/compare/v0.31.0...v0.32.0">0.32.0</a> - 2026-09-10</h2>
+<h2 id="unreleased"><a href="https://github.com/Cyberlane/mori/compare/v0.33.0...HEAD">Unreleased</a></h2>
+<h2 id="0330---2026-09-11"><a href="https://github.com/Cyberlane/mori/compare/v0.32.0...v0.33.0">0.33.0</a> - 2026-09-11</h2>
 <h3 id="added">Added</h3>
+<ul>
+<li>Explicit per-scan diagnostic sessions and inspectable support bundles for
+  debugging. Collection is off by default, export is separate, and no upload
+  service or source attachment is included.</li>
+<li>Guided library scopes, copyable post-setup scan commands, future matching
+  test/story exclusions, and bounded scope hints for noisy first reviews.</li>
+<li>Production/test fragment selection, including supported Rust test attributes,
+  with excluded-fragment counts and explicit coverage reasons.</li>
+<li>A separate incomplete-scan artifact for candidate-pair limits, and an original
+  provisional actionability corpus with positive and nearby negative examples.</li>
+<li>Published documentation with focused review and support-report instructions.</li>
+</ul>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li>Command argument validation and help handling, so flags after positional
+  roots no longer silently select unintended scan paths.</li>
+<li>JavaScript, TypeScript, TSX and Java grammar compatibility gaps, with visible
+  parse diagnostics retained for unsupported syntax.</li>
+<li>VS Code handling of cancelled, stale, malformed and unsaved-buffer results.</li>
+<li>Recognition of narrowly identified generated gperf source and deterministic
+  source snapshot handling.</li>
+</ul>
+<h3 id="changed">Changed</h3>
+<ul>
+<li>Report schema advances to 22 and configuration schema to 2. Normalization
+  advances to 14, so prior accepted identities need explicit migration review.
+  Supported prior official project contracts remain upgradeable. Project-contract
+  schema stays 1, baseline schema stays 4, and receipt schema stays 2.</li>
+<li>Support sessions introduce their own version-1 sharing contract. Existing
+  coarse feedback sharing remains schema 1 and retains its separate consent.</li>
+<li>Native release assets and published schemas include the support-session schema.</li>
+</ul>
+<h2 id="0320---2026-09-10"><a href="https://github.com/Cyberlane/mori/compare/v0.31.0...v0.32.0">0.32.0</a> - 2026-09-10</h2>
+<h3 id="added_1">Added</h3>
 <ul>
 <li>Opt-in authenticated staged analysis reuse for unchanged snapshots, with
   private bounded cache storage and unchanged receipt/coverage enforcement.</li>
@@ -28,7 +62,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>Offline summaries of explicitly exported feedback, with separate scan and
   selected-finding counts and no automatic ranking changes or submission.</li>
 </ul>
-<h3 id="changed">Changed</h3>
+<h3 id="changed_1">Changed</h3>
 <ul>
 <li>Report schema advances to 21 to distinguish staged policy outcomes from
   analysis completeness. Hook contract advances to v2; configuration schema 1,
@@ -43,7 +77,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>Staged caching uses a bounded shared-location dictionary for larger reports
   and protected user-only Windows ACLs. CI covers all five release targets.</li>
 </ul>
-<h3 id="fixed">Fixed</h3>
+<h3 id="fixed_1">Fixed</h3>
 <ul>
 <li>Narrow TypeScript/TSX ambient-interface import-type compatibility repair,
   preserving source offsets and malformed-function exclusion.</li>
@@ -56,7 +90,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   without findings cannot be annotated as reviewed findings.</li>
 </ul>
 <h2 id="0310---2026-08-20"><a href="https://github.com/Cyberlane/mori/compare/v0.30.0...v0.31.0">0.31.0</a> - 2026-08-20</h2>
-<h3 id="added_1">Added</h3>
+<h3 id="added_2">Added</h3>
 <ul>
 <li>Added hunk-aware changed and staged focus, so canonical staged review parses
   the full repository but scores only pairs that contain an exact changed-line
@@ -69,7 +103,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   upgrade plans, safe managed-skill migration, and <code>mori hook pre-commit</code> as a
   thin canonical staged-review adapter.</li>
 </ul>
-<h3 id="changed_1">Changed</h3>
+<h3 id="changed_2">Changed</h3>
 <ul>
 <li>The embedded review skill is now a concise router with task-specific
   references, one-scan evidence reuse, and local project-upgrade guidance.</li>
@@ -83,7 +117,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   standard-library security fixes.</li>
 </ul>
 <h2 id="0300---2026-08-13"><a href="https://github.com/Cyberlane/mori/compare/v0.29.0...v0.30.0">0.30.0</a> - 2026-08-13</h2>
-<h3 id="added_2">Added</h3>
+<h3 id="added_3">Added</h3>
 <ul>
 <li>Added <code>mori review staged check</code> and <code>mori review staged acknowledge</code> as one
   canonical immutable-index workflow. Both commands now share focused-file
@@ -98,13 +132,13 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   boundary. Report schema remains 19, baseline schema remains 4, and
   normalization remains 12.</li>
 </ul>
-<h3 id="changed_2">Changed</h3>
+<h3 id="changed_3">Changed</h3>
 <ul>
 <li>The earlier <code>mori review acknowledge --staged ...</code> form remains compatible
   but now points users toward the canonical staged-review workflow.</li>
 </ul>
 <h2 id="0290---2026-08-11"><a href="https://github.com/Cyberlane/mori/compare/v0.28.1...v0.29.0">0.29.0</a> - 2026-08-11</h2>
-<h3 id="added_3">Added</h3>
+<h3 id="added_4">Added</h3>
 <ul>
 <li>Baseline schema 4 adds <code>false-positive</code> as a durable review classification.
   Schema-3 baselines remain readable for suppression with their profile
@@ -123,7 +157,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   would not justify a safe scoring change.</li>
 </ul>
 <h2 id="0281---2026-08-11"><a href="https://github.com/Cyberlane/mori/compare/v0.28.0...v0.28.1">0.28.1</a> - 2026-08-11</h2>
-<h3 id="fixed_1">Fixed</h3>
+<h3 id="fixed_2">Fixed</h3>
 <ul>
 <li>Staged scans now load configured or explicit baselines from the same
   stage-zero Git-index snapshot as source, ignore rules, and configuration.
@@ -132,7 +166,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   remained 18, baseline schema remained 3, and normalization remained 12.</li>
 </ul>
 <h2 id="0280---2026-08-10"><a href="https://github.com/Cyberlane/mori/compare/v0.27.0...v0.28.0">0.28.0</a> - 2026-08-10</h2>
-<h3 id="added_4">Added</h3>
+<h3 id="added_5">Added</h3>
 <ul>
 <li>Added immutable <code>--staged</code> scans that read tracked source, ignore rules, and
   configuration from one Git-index snapshot, record its digest, and exclude
@@ -144,7 +178,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   <code>mori project upgrade --check|--dry-run|--apply</code> for coordinated local
   version-pin and Agent Skill maintenance with recoverable backups.</li>
 </ul>
-<h3 id="changed_3">Changed</h3>
+<h3 id="changed_4">Changed</h3>
 <ul>
 <li>Review ranking no longer treats generic entry-point, constructor, or
   anonymous callable names as distinctive same-name evidence.</li>
@@ -155,7 +189,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   schema remains version 3 and normalization remains version 12.</li>
 </ul>
 <h2 id="0270---2026-08-10"><a href="https://github.com/Cyberlane/mori/compare/v0.26.0...v0.27.0">0.27.0</a> - 2026-08-10</h2>
-<h3 id="added_5">Added</h3>
+<h3 id="added_6">Added</h3>
 <ul>
 <li>Added guided <code>mori setup</code> and <code>mori configure</code> flows with safe previews,
   explicit writes, strict answer files, and a read-only JSON protocol for
@@ -177,7 +211,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>Added a compact new-user README, task-oriented documentation, a Mori favicon,
   and responsive forest-themed project artwork.</li>
 </ul>
-<h3 id="changed_4">Changed</h3>
+<h3 id="changed_5">Changed</h3>
 <ul>
 <li>Normalization now uses version 12, with canonical mappings required by the
   newly supported grammars. Existing baselines require deliberate review and
@@ -188,7 +222,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   and representative provenance attestations before completion.</li>
 </ul>
 <h2 id="0260---2026-08-10"><a href="https://github.com/Cyberlane/mori/compare/v0.25.0...v0.26.0">0.26.0</a> - 2026-08-10</h2>
-<h3 id="added_6">Added</h3>
+<h3 id="added_7">Added</h3>
 <ul>
 <li>Added PHP support for <code>.php</code> and <code>.phtml</code> using the official Tree-sitter PHP
   grammar, covering implemented functions, methods, anonymous functions, and
@@ -200,7 +234,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   malformed-source and legacy-header coverage, and both language IDs to the
   reference VS Code client.</li>
 </ul>
-<h3 id="changed_5">Changed</h3>
+<h3 id="changed_6">Changed</h3>
 <ul>
 <li>Normalization now uses version 11, with canonical PHP/Hack syntax mappings
   and curated PHP standard-library operation aliases. Existing baselines
@@ -209,7 +243,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   version 3.</li>
 </ul>
 <h2 id="0250---2026-08-10"><a href="https://github.com/Cyberlane/mori/compare/v0.24.0...v0.25.0">0.25.0</a> - 2026-08-10</h2>
-<h3 id="added_7">Added</h3>
+<h3 id="added_8">Added</h3>
 <ul>
 <li>Added Java support for implemented methods, constructors, compact
   constructors, and lambdas using the official Tree-sitter Java grammar.</li>
@@ -220,7 +254,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   malformed-source coverage, and both languages to the reference VS Code
   client.</li>
 </ul>
-<h3 id="changed_6">Changed</h3>
+<h3 id="changed_7">Changed</h3>
 <ul>
 <li>Normalization now uses version 10, with canonical Java/C# syntax mappings,
   transparent redundant parentheses, and a bounded anonymous member shape for
@@ -229,7 +263,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   remains version 17 and baseline schema remains version 3.</li>
 </ul>
 <h2 id="0240---2026-08-10"><a href="https://github.com/Cyberlane/mori/compare/v0.23.0...v0.24.0">0.24.0</a> - 2026-08-10</h2>
-<h3 id="added_8">Added</h3>
+<h3 id="added_9">Added</h3>
 <ul>
 <li>Added a redistributable ten-case labeled calibration corpus spanning code,
   shell, generic SQL, and PostgreSQL, with deterministic precision-at-k,
@@ -244,7 +278,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>Added a dependency-free reference VS Code extension and a published Draft
   2020-12 JSON Schema for the machine-readable report contract.</li>
 </ul>
-<h3 id="changed_7">Changed</h3>
+<h3 id="changed_8">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 17 and record the optional
   stdin overlay path. Normalization remains version 9 and baseline schema
@@ -252,25 +286,25 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   unchanged.</li>
 </ul>
 <h2 id="0230---2026-08-10"><a href="https://github.com/Cyberlane/mori/compare/v0.22.0...v0.23.0">0.23.0</a> - 2026-08-10</h2>
-<h3 id="added_9">Added</h3>
+<h3 id="added_10">Added</h3>
 <ul>
 <li>Added low-weight canonical statement-position features and bounded anonymous
   callee-role features that distinguish calls exchanged between control and
   linear positions without serializing callee names or name digests.</li>
 </ul>
-<h3 id="changed_8">Changed</h3>
+<h3 id="changed_9">Changed</h3>
 <ul>
 <li>Normalization now uses version 9. Existing baselines require deliberate
   review and regeneration because fingerprints and scores can change. Report
   schema remains version 16 and baseline schema remains version 3.</li>
 </ul>
 <h2 id="0220---2026-08-10"><a href="https://github.com/Cyberlane/mori/compare/v0.21.0...v0.22.0">0.22.0</a> - 2026-08-10</h2>
-<h3 id="added_10">Added</h3>
+<h3 id="added_11">Added</h3>
 <ul>
 <li>Added exact weighted intersection/union evidence and bounded deterministic
   profile-aligned directional feature differences for every retained group.</li>
 </ul>
-<h3 id="changed_9">Changed</h3>
+<h3 id="changed_10">Changed</h3>
 <ul>
 <li>Text output now labels 100% as normalized feature identity and explicitly
   states that it is not proof of semantic or behavioral equivalence.</li>
@@ -279,7 +313,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   fingerprints, and acceptance compatibility are unchanged.</li>
 </ul>
 <h2 id="0210---2026-08-10"><a href="https://github.com/Cyberlane/mori/compare/v0.20.0...v0.21.0">0.21.0</a> - 2026-08-10</h2>
-<h3 id="added_11">Added</h3>
+<h3 id="added_12">Added</h3>
 <ul>
 <li>Added selective <code>baseline add</code>, <code>baseline remove</code>, and <code>baseline edit</code>
   operations with durable review notes and classifications.</li>
@@ -288,7 +322,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   complete baseline operations. Digests include exact loaded ignore-file paths
   and SHA-256 content evidence.</li>
 </ul>
-<h3 id="changed_10">Changed</h3>
+<h3 id="changed_11">Changed</h3>
 <ul>
 <li><code>baseline update</code> is now preview-only unless <code>--accept-all</code> is explicit, and
   retained entries preserve their review metadata.</li>
@@ -297,7 +331,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   before mutation. Normalization remains version 8.</li>
 </ul>
 <h2 id="0200---2026-08-10"><a href="https://github.com/Cyberlane/mori/compare/v0.19.1...v0.20.0">0.20.0</a> - 2026-08-10</h2>
-<h3 id="added_12">Added</h3>
+<h3 id="added_13">Added</h3>
 <ul>
 <li>Added <code>--min-file-coverage</code>, <code>--max-zero-fragment-files</code>,
   <code>--fail-on-warning</code>, and <code>--fail-on-parse-diagnostic</code>, with equivalent strict
@@ -308,13 +342,13 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   every zero-fragment supported file. Linked-worktree <code>.git</code> control files are
   treated as VCS metadata rather than unsupported source.</li>
 </ul>
-<h3 id="changed_11">Changed</h3>
+<h3 id="changed_12">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 14. Normalization remains
   version 8 and baseline schema remains version 2.</li>
 </ul>
 <h2 id="0191---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.19.0...v0.19.1">0.19.1</a> - 2026-08-09</h2>
-<h3 id="fixed_2">Fixed</h3>
+<h3 id="fixed_3">Fixed</h3>
 <ul>
 <li>Recognized the standard SwiftProtobuf generated-source header so
   <code>--exclude-generated</code> omits compiler-generated <code>.pb.swift</code> files without
@@ -325,7 +359,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   are still accepted only when they reduce parser diagnostics.</li>
 </ul>
 <h2 id="0190---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.18.0...v0.19.0">0.19.0</a> - 2026-08-09</h2>
-<h3 id="added_13">Added</h3>
+<h3 id="added_14">Added</h3>
 <ul>
 <li>Added explicit <code>--embedded-sql</code> extraction for direct string arguments to a
   bounded set of Go database method names. Extracted queries use the selected
@@ -336,7 +370,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   with configurable statement-window and per-function bounds, duplicate-span
   removal, direct function-parent linkage, and same-file overlap suppression.</li>
 </ul>
-<h3 id="changed_12">Changed</h3>
+<h3 id="changed_13">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 13 and record every embedded
   SQL and statement-block option. Normalization version 8 covers the expanded
@@ -344,7 +378,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   regenerated. Baseline schema remains version 2.</li>
 </ul>
 <h2 id="0180---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.17.1...v0.18.0">0.18.0</a> - 2026-08-09</h2>
-<h3 id="added_14">Added</h3>
+<h3 id="added_15">Added</h3>
 <ul>
 <li>Added source-free literal-position evidence to match groups. Reports disclose
   bounded difference counts without serializing literal values or digests and
@@ -352,14 +386,14 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>Added repeatable <code>--priority-path GLOB=WEIGHT</code> and <code>priority_paths</code>
   configuration for deterministic, presentation-only project review priority.</li>
 </ul>
-<h3 id="changed_13">Changed</h3>
+<h3 id="changed_14">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 12 for literal evidence and
   effective priority-path rules. Normalization remains version 7 and baseline
   schema remains version 2.</li>
 </ul>
 <h2 id="0171---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.17.0...v0.17.1">0.17.1</a> - 2026-08-09</h2>
-<h3 id="fixed_3">Fixed</h3>
+<h3 id="fixed_4">Fixed</h3>
 <ul>
 <li>Recognized exact Typeshare generated-source headers, including multiline
   block comments, so <code>--exclude-generated</code> can omit those files without
@@ -370,7 +404,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   reduce diagnostics; nearby malformed syntax remains visible.</li>
 </ul>
 <h2 id="0170---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.16.0...v0.17.0">0.17.0</a> - 2026-08-09</h2>
-<h3 id="added_15">Added</h3>
+<h3 id="added_16">Added</h3>
 <ul>
 <li>Added <code>review</code>, <code>explore</code>, and <code>sql</code> scan profiles with deterministic
   defaults and explicit config/CLI precedence.</li>
@@ -378,7 +412,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   stdout-only inspection, no-clobber creation, and explicit forced replacement
   of regular files.</li>
 </ul>
-<h3 id="changed_14">Changed</h3>
+<h3 id="changed_15">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 11 and record the selected
   scan profile. Normalization remains version 7 and baseline schema remains
@@ -387,7 +421,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   <code>review</code> profile while keeping project exclusions explicit.</li>
 </ul>
 <h2 id="0160---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.15.0...v0.16.0">0.16.0</a> - 2026-08-09</h2>
-<h3 id="added_16">Added</h3>
+<h3 id="added_17">Added</h3>
 <ul>
 <li>Added whole-file <code>script</code> fragments for Bash/POSIX shell and Zsh. Script
   fragments cover top-level executable statements while excluding function
@@ -396,7 +430,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   normalization.</li>
 <li><code>mori languages</code> now lists every fragment kind emitted by each grammar.</li>
 </ul>
-<h3 id="changed_15">Changed</h3>
+<h3 id="changed_16">Changed</h3>
 <ul>
 <li>Normalization version 7 introduces shell script comparison units. Existing
   baselines must be reviewed and regenerated. Report schema remains version 10.</li>
@@ -406,20 +440,20 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   when it discloses separately analyzed functions.</li>
 </ul>
 <h2 id="0150---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.14.0...v0.15.0">0.15.0</a> - 2026-08-09</h2>
-<h3 id="added_17">Added</h3>
+<h3 id="added_18">Added</h3>
 <ul>
 <li>Added opt-in <code>--ranking review</code> / <code>ranking: "review"</code> ordering with explicit
   <code>review_priority</code> and <code>review_signals</code> for cross-file, cross-directory,
   same-name, and repeated-location evidence.</li>
 </ul>
-<h3 id="changed_16">Changed</h3>
+<h3 id="changed_17">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 10 and record the effective
   ranking mode. Review ranking changes presentation order only; structural
   scores, normalization version 6, fingerprints, and baselines are unchanged.</li>
 </ul>
 <h2 id="0140---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.13.0...v0.14.0">0.14.0</a> - 2026-08-09</h2>
-<h3 id="added_18">Added</h3>
+<h3 id="added_19">Added</h3>
 <ul>
 <li>Added deterministic per-file coverage inventories to JSON reports, including
   fragment, skipped-fragment, and parse-diagnostic counts for every analyzed
@@ -428,7 +462,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   <code>--exclude-generated</code> / <code>exclude_generated</code> filtering. Excluded generated
   files remain visible in the per-file coverage inventory.</li>
 </ul>
-<h3 id="changed_17">Changed</h3>
+<h3 id="changed_18">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 9. Text reports summarize
   files that produced no comparison fragments at the configured token floor.
@@ -440,13 +474,13 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   generated-source classification and exclusion.</li>
 </ul>
 <h2 id="0130---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.12.0...v0.13.0">0.13.0</a> - 2026-08-09</h2>
-<h3 id="added_19">Added</h3>
+<h3 id="added_20">Added</h3>
 <ul>
 <li>Added repeatable <code>--changed-worktree PATH=REVISION</code> focus for nested and
   sibling Git worktrees with independently resolved revisions and local
   working-tree state.</li>
 </ul>
-<h3 id="changed_18">Changed</h3>
+<h3 id="changed_19">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 8 and record deterministic
   per-worktree focus provenance. Normalization remains version 6 and existing
@@ -455,14 +489,14 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   explicit multi-worktree and submodule review.</li>
 </ul>
 <h2 id="0120---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.11.0...v0.12.0">0.12.0</a> - 2026-08-09</h2>
-<h3 id="added_20">Added</h3>
+<h3 id="added_21">Added</h3>
 <ul>
 <li>Added explicit <code>--sql-dialect postgresql</code> and <code>sql_dialect</code> configuration
   with a dedicated PostgreSQL 18.3 parser for top-level query comparison.</li>
 <li>Added checksum-pinned PostgreSQL generated-source provenance and
   positive/nearby-negative query fixtures.</li>
 </ul>
-<h3 id="changed_19">Changed</h3>
+<h3 id="changed_20">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 7 and record the effective
   SQL dialect.</li>
@@ -472,14 +506,14 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   separate profiles for mixed-dialect repositories.</li>
 </ul>
 <h2 id="0110---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.10.0...v0.11.0">0.11.0</a> - 2026-08-09</h2>
-<h3 id="added_21">Added</h3>
+<h3 id="added_22">Added</h3>
 <ul>
 <li>Added Swift function similarity for <code>.swift</code> files, covering implemented
   functions, initializers, deinitializers, and closures with a pinned,
   checksum-verified generated Tree-sitter grammar.</li>
 <li>Added Swift-to-Go positive and nearby negative validation fixtures.</li>
 </ul>
-<h3 id="changed_20">Changed</h3>
+<h3 id="changed_21">Changed</h3>
 <ul>
 <li>Normalization version 5 maps Swift declarations, expressions, arguments,
   identifiers, and control transfers into the shared code vocabulary. Existing
@@ -487,13 +521,13 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>The bundled review skill now describes Swift comparison boundaries and the
   required warning disclosure.</li>
 </ul>
-<h3 id="fixed_4">Fixed</h3>
+<h3 id="fixed_5">Fixed</h3>
 <ul>
 <li>Function fragments nested below explicit parser error nodes are now rejected
   instead of being scored from recovered malformed syntax.</li>
 </ul>
 <h2 id="0100---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.9.0...v0.10.0">0.10.0</a> - 2026-08-09</h2>
-<h3 id="added_22">Added</h3>
+<h3 id="added_23">Added</h3>
 <ul>
 <li>Added dedicated Bash/POSIX-shell and Zsh function parsers with <code>.sh</code>,
   <code>.bash</code>, and <code>.zsh</code> discovery.</li>
@@ -502,7 +536,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>Added shebang interpreter names to <code>mori languages</code> and help for
   <code>mori languages --help</code>.</li>
 </ul>
-<h3 id="changed_21">Changed</h3>
+<h3 id="changed_22">Changed</h3>
 <ul>
 <li>Normalization version 4 aligns shell word, variable-reference, and glob node
   vocabulary across the Bash and Zsh grammars. Existing baselines must be
@@ -511,7 +545,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   coverage.</li>
 </ul>
 <h2 id="090---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.8.0...v0.9.0">0.9.0</a> - 2026-08-09</h2>
-<h3 id="added_23">Added</h3>
+<h3 id="added_24">Added</h3>
 <ul>
 <li>Added deterministic coverage warnings for scans with no supported files or
   no extracted comparison fragments.</li>
@@ -519,7 +553,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   setting, which exit with status 4 when a scan cannot support a similarity
   assessment.</li>
 </ul>
-<h3 id="changed_22">Changed</h3>
+<h3 id="changed_23">Changed</h3>
 <ul>
 <li>Corrected the schema-6 example, clarified release source-date formatting,
   labeled abridged output, and linked the scan-selection contract directly.</li>
@@ -534,13 +568,13 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>Nested-worktree focus errors now identify the repository-relative boundary
   and recommend a separate scan or explicit focus paths.</li>
 </ul>
-<h3 id="fixed_5">Fixed</h3>
+<h3 id="fixed_6">Fixed</h3>
 <ul>
 <li><code>mori skill --help</code>, <code>mori skill -h</code>, and <code>mori skill help</code> now print skill
   usage successfully instead of reporting an unknown skill command.</li>
 </ul>
 <h2 id="080---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.7.0...v0.8.0">0.8.0</a> - 2026-08-09</h2>
-<h3 id="added_24">Added</h3>
+<h3 id="added_25">Added</h3>
 <ul>
 <li>Direct <code>--comparison-domain</code> filtering, applied before parsing and recorded
   in schema-6 reports and project configuration.</li>
@@ -549,7 +583,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>A detailed scan-selection contract covering validation, execution,
   compatibility, diagnostics, and verification.</li>
 </ul>
-<h3 id="changed_23">Changed</h3>
+<h3 id="changed_24">Changed</h3>
 <ul>
 <li>The bundled review skill now starts with code-only same-language scans and a
   40-token cross-language floor, while reserving 12 tokens for broad
@@ -557,43 +591,43 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>Parse warnings now describe potentially incomplete comparison coverage
   without claiming that non-comparison DDL fragments were invalid or skipped.</li>
 </ul>
-<h3 id="fixed_6">Fixed</h3>
+<h3 id="fixed_7">Fixed</h3>
 <ul>
 <li>Code and SQL findings no longer need to share one root ranking when a
   comparison domain is selected.</li>
 </ul>
 <h2 id="070---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.6.1...v0.7.0">0.7.0</a> - 2026-08-09</h2>
-<h3 id="added_25">Added</h3>
+<h3 id="added_26">Added</h3>
 <ul>
 <li>Byte-preserving parser support for SQLC and SQLite <code>LIMIT</code>/<code>OFFSET</code>
   parameters and SQLite <code>ON CONFLICT</code> column targets.</li>
 </ul>
-<h3 id="changed_24">Changed</h3>
+<h3 id="changed_25">Changed</h3>
 <ul>
 <li>Normalization version 3 classifies recovered pagination placeholders as
   parameters while preserving schema version 5 and existing code features;
   existing baselines must be reviewed and regenerated.</li>
 </ul>
-<h3 id="fixed_7">Fixed</h3>
+<h3 id="fixed_8">Fixed</h3>
 <ul>
 <li>Recognized raw ampersands in JSX text no longer invalidate otherwise valid
   JavaScript or TSX function fragments; malformed JSX expressions still fail
   closed.</li>
 </ul>
 <h2 id="061---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.6.0...v0.6.1">0.6.1</a> - 2026-08-09</h2>
-<h3 id="fixed_8">Fixed</h3>
+<h3 id="fixed_9">Fixed</h3>
 <ul>
 <li>Clarified that version-pinned source builds can lack revision and source-date
   metadata, and limited provenance-incomplete reports to explicitly disclosed
   exploratory review.</li>
 </ul>
 <h2 id="060---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.5.0...v0.6.0">0.6.0</a> - 2026-08-09</h2>
-<h3 id="added_26">Added</h3>
+<h3 id="added_27">Added</h3>
 <ul>
 <li>Top-level SQL query similarity for <code>.sql</code> files, including SQLC display
   names, query-specific structural normalization, and visible parse recovery.</li>
 </ul>
-<h3 id="changed_25">Changed</h3>
+<h3 id="changed_26">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 5 with explicit comparison
   domains and fragment kinds; normalization version 2 adds SQL features while
@@ -602,27 +636,27 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   review safety guidance.</li>
 </ul>
 <h2 id="050---2026-08-09"><a href="https://github.com/Cyberlane/mori/compare/v0.4.1...v0.5.0">0.5.0</a> - 2026-08-09</h2>
-<h3 id="added_27">Added</h3>
+<h3 id="added_28">Added</h3>
 <ul>
 <li>Deterministic tool provenance in schema-4 JSON reports, including full source
   revision, build state, platform, Go version, and normalization version.</li>
 <li>Repeatable explicit path focus and local Git changed-file focus with exact
   group metadata, focused-first bounded retrieval, and a focused CI policy.</li>
 </ul>
-<h3 id="changed_26">Changed</h3>
+<h3 id="changed_27">Changed</h3>
 <ul>
 <li>The bundled review skill now validates report provenance and uses Mori's
   native changed-file focus without narrowing the scan to changed files.</li>
 </ul>
 <h2 id="041---2026-08-08"><a href="https://github.com/Cyberlane/mori/compare/v0.4.0...v0.4.1">0.4.1</a> - 2026-08-08</h2>
-<h3 id="changed_27">Changed</h3>
+<h3 id="changed_28">Changed</h3>
 <ul>
 <li>Clarified explicit binary-path use, mutually exclusive cross-language
   filters, and project configuration before baselining in the bundled review
   skill.</li>
 </ul>
 <h2 id="040---2026-08-08"><a href="https://github.com/Cyberlane/mori/compare/v0.3.0...v0.4.0">0.4.0</a> - 2026-08-08</h2>
-<h3 id="added_28">Added</h3>
+<h3 id="added_29">Added</h3>
 <ul>
 <li>Strict <code>.mori.json</code> project configuration with reproducible effective-option
   metadata.</li>
@@ -635,7 +669,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>Structured parse diagnostics, nested-fragment metadata, and concise shared
   shape summaries.</li>
 </ul>
-<h3 id="changed_28">Changed</h3>
+<h3 id="changed_29">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 3 and group qualifying
   source-location pairs by stable content-pair identity.</li>
@@ -645,19 +679,19 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   explains configuration, baseline scope, parser, and nested-function limits.</li>
 </ul>
 <h2 id="030---2026-08-08"><a href="https://github.com/Cyberlane/mori/compare/v0.2.1...v0.3.0">0.3.0</a> - 2026-08-08</h2>
-<h3 id="added_29">Added</h3>
+<h3 id="added_30">Added</h3>
 <ul>
 <li>Stable fragment and match identities for review workflows.</li>
 <li>Versioned baseline update, scan suppression, and stale-entry pruning.</li>
 </ul>
-<h3 id="changed_29">Changed</h3>
+<h3 id="changed_30">Changed</h3>
 <ul>
 <li>Machine-readable reports now use schema version 2 and include stable
   fragment/match identities and baseline suppression counts.</li>
 <li>Updated the CodeQL workflow actions to v4.37.4.</li>
 </ul>
 <h2 id="021---2026-08-02"><a href="https://github.com/Cyberlane/mori/compare/v0.2.0...v0.2.1">0.2.1</a> - 2026-08-02</h2>
-<h3 id="changed_30">Changed</h3>
+<h3 id="changed_31">Changed</h3>
 <ul>
 <li>Upgraded the Tree-sitter Go binding to 0.25.0 and compatible ABI-15 grammar
   releases for Go, JavaScript, Python, and Rust.</li>
@@ -667,7 +701,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
   changes are reviewed together.</li>
 </ul>
 <h2 id="020---2026-08-02"><a href="https://github.com/Cyberlane/mori/compare/v0.1.0...v0.2.0">0.2.0</a> - 2026-08-02</h2>
-<h3 id="added_30">Added</h3>
+<h3 id="added_31">Added</h3>
 <ul>
 <li>Official <code>mori-review-similarity</code> Agent Skill for evidence-led duplicate and
   refactoring review.</li>
@@ -676,7 +710,7 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <li>Deterministic platform-neutral Agent Skill archive in each release.</li>
 </ul>
 <h2 id="010---2026-08-01"><a href="https://github.com/Cyberlane/mori/releases/tag/v0.1.0">0.1.0</a> - 2026-08-01</h2>
-<h3 id="added_31">Added</h3>
+<h3 id="added_32">Added</h3>
 <ul>
 <li>Go CLI with deterministic text and JSON reports.</li>
 <li>Tree-sitter adapters for Go, JavaScript/JSX, TypeScript/TSX, Python, and Rust.</li>
@@ -688,190 +722,196 @@ and releases use <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioni
 <aside class="contents"><strong>On this page</strong><div class="toc">
 <ul>
 <li><a href="#unreleased">Unreleased</a></li>
-<li><a href="#0320---2026-09-10">0.32.0 - 2026-09-10</a><ul>
+<li><a href="#0330---2026-09-11">0.33.0 - 2026-09-11</a><ul>
 <li><a href="#added">Added</a></li>
-<li><a href="#changed">Changed</a></li>
 <li><a href="#fixed">Fixed</a></li>
+<li><a href="#changed">Changed</a></li>
+</ul>
+</li>
+<li><a href="#0320---2026-09-10">0.32.0 - 2026-09-10</a><ul>
+<li><a href="#added_1">Added</a></li>
+<li><a href="#changed_1">Changed</a></li>
+<li><a href="#fixed_1">Fixed</a></li>
 </ul>
 </li>
 <li><a href="#0310---2026-08-20">0.31.0 - 2026-08-20</a><ul>
-<li><a href="#added_1">Added</a></li>
-<li><a href="#changed_1">Changed</a></li>
-</ul>
-</li>
-<li><a href="#0300---2026-08-13">0.30.0 - 2026-08-13</a><ul>
 <li><a href="#added_2">Added</a></li>
 <li><a href="#changed_2">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0290---2026-08-11">0.29.0 - 2026-08-11</a><ul>
+<li><a href="#0300---2026-08-13">0.30.0 - 2026-08-13</a><ul>
 <li><a href="#added_3">Added</a></li>
-</ul>
-</li>
-<li><a href="#0281---2026-08-11">0.28.1 - 2026-08-11</a><ul>
-<li><a href="#fixed_1">Fixed</a></li>
-</ul>
-</li>
-<li><a href="#0280---2026-08-10">0.28.0 - 2026-08-10</a><ul>
-<li><a href="#added_4">Added</a></li>
 <li><a href="#changed_3">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0270---2026-08-10">0.27.0 - 2026-08-10</a><ul>
+<li><a href="#0290---2026-08-11">0.29.0 - 2026-08-11</a><ul>
+<li><a href="#added_4">Added</a></li>
+</ul>
+</li>
+<li><a href="#0281---2026-08-11">0.28.1 - 2026-08-11</a><ul>
+<li><a href="#fixed_2">Fixed</a></li>
+</ul>
+</li>
+<li><a href="#0280---2026-08-10">0.28.0 - 2026-08-10</a><ul>
 <li><a href="#added_5">Added</a></li>
 <li><a href="#changed_4">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0260---2026-08-10">0.26.0 - 2026-08-10</a><ul>
+<li><a href="#0270---2026-08-10">0.27.0 - 2026-08-10</a><ul>
 <li><a href="#added_6">Added</a></li>
 <li><a href="#changed_5">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0250---2026-08-10">0.25.0 - 2026-08-10</a><ul>
+<li><a href="#0260---2026-08-10">0.26.0 - 2026-08-10</a><ul>
 <li><a href="#added_7">Added</a></li>
 <li><a href="#changed_6">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0240---2026-08-10">0.24.0 - 2026-08-10</a><ul>
+<li><a href="#0250---2026-08-10">0.25.0 - 2026-08-10</a><ul>
 <li><a href="#added_8">Added</a></li>
 <li><a href="#changed_7">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0230---2026-08-10">0.23.0 - 2026-08-10</a><ul>
+<li><a href="#0240---2026-08-10">0.24.0 - 2026-08-10</a><ul>
 <li><a href="#added_9">Added</a></li>
 <li><a href="#changed_8">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0220---2026-08-10">0.22.0 - 2026-08-10</a><ul>
+<li><a href="#0230---2026-08-10">0.23.0 - 2026-08-10</a><ul>
 <li><a href="#added_10">Added</a></li>
 <li><a href="#changed_9">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0210---2026-08-10">0.21.0 - 2026-08-10</a><ul>
+<li><a href="#0220---2026-08-10">0.22.0 - 2026-08-10</a><ul>
 <li><a href="#added_11">Added</a></li>
 <li><a href="#changed_10">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0200---2026-08-10">0.20.0 - 2026-08-10</a><ul>
+<li><a href="#0210---2026-08-10">0.21.0 - 2026-08-10</a><ul>
 <li><a href="#added_12">Added</a></li>
 <li><a href="#changed_11">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0191---2026-08-09">0.19.1 - 2026-08-09</a><ul>
-<li><a href="#fixed_2">Fixed</a></li>
-</ul>
-</li>
-<li><a href="#0190---2026-08-09">0.19.0 - 2026-08-09</a><ul>
+<li><a href="#0200---2026-08-10">0.20.0 - 2026-08-10</a><ul>
 <li><a href="#added_13">Added</a></li>
 <li><a href="#changed_12">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0180---2026-08-09">0.18.0 - 2026-08-09</a><ul>
+<li><a href="#0191---2026-08-09">0.19.1 - 2026-08-09</a><ul>
+<li><a href="#fixed_3">Fixed</a></li>
+</ul>
+</li>
+<li><a href="#0190---2026-08-09">0.19.0 - 2026-08-09</a><ul>
 <li><a href="#added_14">Added</a></li>
 <li><a href="#changed_13">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0171---2026-08-09">0.17.1 - 2026-08-09</a><ul>
-<li><a href="#fixed_3">Fixed</a></li>
-</ul>
-</li>
-<li><a href="#0170---2026-08-09">0.17.0 - 2026-08-09</a><ul>
+<li><a href="#0180---2026-08-09">0.18.0 - 2026-08-09</a><ul>
 <li><a href="#added_15">Added</a></li>
 <li><a href="#changed_14">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0160---2026-08-09">0.16.0 - 2026-08-09</a><ul>
+<li><a href="#0171---2026-08-09">0.17.1 - 2026-08-09</a><ul>
+<li><a href="#fixed_4">Fixed</a></li>
+</ul>
+</li>
+<li><a href="#0170---2026-08-09">0.17.0 - 2026-08-09</a><ul>
 <li><a href="#added_16">Added</a></li>
 <li><a href="#changed_15">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0150---2026-08-09">0.15.0 - 2026-08-09</a><ul>
+<li><a href="#0160---2026-08-09">0.16.0 - 2026-08-09</a><ul>
 <li><a href="#added_17">Added</a></li>
 <li><a href="#changed_16">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0140---2026-08-09">0.14.0 - 2026-08-09</a><ul>
+<li><a href="#0150---2026-08-09">0.15.0 - 2026-08-09</a><ul>
 <li><a href="#added_18">Added</a></li>
 <li><a href="#changed_17">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0130---2026-08-09">0.13.0 - 2026-08-09</a><ul>
+<li><a href="#0140---2026-08-09">0.14.0 - 2026-08-09</a><ul>
 <li><a href="#added_19">Added</a></li>
 <li><a href="#changed_18">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0120---2026-08-09">0.12.0 - 2026-08-09</a><ul>
+<li><a href="#0130---2026-08-09">0.13.0 - 2026-08-09</a><ul>
 <li><a href="#added_20">Added</a></li>
 <li><a href="#changed_19">Changed</a></li>
 </ul>
 </li>
-<li><a href="#0110---2026-08-09">0.11.0 - 2026-08-09</a><ul>
+<li><a href="#0120---2026-08-09">0.12.0 - 2026-08-09</a><ul>
 <li><a href="#added_21">Added</a></li>
 <li><a href="#changed_20">Changed</a></li>
-<li><a href="#fixed_4">Fixed</a></li>
 </ul>
 </li>
-<li><a href="#0100---2026-08-09">0.10.0 - 2026-08-09</a><ul>
+<li><a href="#0110---2026-08-09">0.11.0 - 2026-08-09</a><ul>
 <li><a href="#added_22">Added</a></li>
 <li><a href="#changed_21">Changed</a></li>
-</ul>
-</li>
-<li><a href="#090---2026-08-09">0.9.0 - 2026-08-09</a><ul>
-<li><a href="#added_23">Added</a></li>
-<li><a href="#changed_22">Changed</a></li>
 <li><a href="#fixed_5">Fixed</a></li>
 </ul>
 </li>
-<li><a href="#080---2026-08-09">0.8.0 - 2026-08-09</a><ul>
+<li><a href="#0100---2026-08-09">0.10.0 - 2026-08-09</a><ul>
+<li><a href="#added_23">Added</a></li>
+<li><a href="#changed_22">Changed</a></li>
+</ul>
+</li>
+<li><a href="#090---2026-08-09">0.9.0 - 2026-08-09</a><ul>
 <li><a href="#added_24">Added</a></li>
 <li><a href="#changed_23">Changed</a></li>
 <li><a href="#fixed_6">Fixed</a></li>
 </ul>
 </li>
-<li><a href="#070---2026-08-09">0.7.0 - 2026-08-09</a><ul>
+<li><a href="#080---2026-08-09">0.8.0 - 2026-08-09</a><ul>
 <li><a href="#added_25">Added</a></li>
 <li><a href="#changed_24">Changed</a></li>
 <li><a href="#fixed_7">Fixed</a></li>
 </ul>
 </li>
-<li><a href="#061---2026-08-09">0.6.1 - 2026-08-09</a><ul>
+<li><a href="#070---2026-08-09">0.7.0 - 2026-08-09</a><ul>
+<li><a href="#added_26">Added</a></li>
+<li><a href="#changed_25">Changed</a></li>
 <li><a href="#fixed_8">Fixed</a></li>
 </ul>
 </li>
-<li><a href="#060---2026-08-09">0.6.0 - 2026-08-09</a><ul>
-<li><a href="#added_26">Added</a></li>
-<li><a href="#changed_25">Changed</a></li>
+<li><a href="#061---2026-08-09">0.6.1 - 2026-08-09</a><ul>
+<li><a href="#fixed_9">Fixed</a></li>
 </ul>
 </li>
-<li><a href="#050---2026-08-09">0.5.0 - 2026-08-09</a><ul>
+<li><a href="#060---2026-08-09">0.6.0 - 2026-08-09</a><ul>
 <li><a href="#added_27">Added</a></li>
 <li><a href="#changed_26">Changed</a></li>
 </ul>
 </li>
-<li><a href="#041---2026-08-08">0.4.1 - 2026-08-08</a><ul>
+<li><a href="#050---2026-08-09">0.5.0 - 2026-08-09</a><ul>
+<li><a href="#added_28">Added</a></li>
 <li><a href="#changed_27">Changed</a></li>
 </ul>
 </li>
-<li><a href="#040---2026-08-08">0.4.0 - 2026-08-08</a><ul>
-<li><a href="#added_28">Added</a></li>
+<li><a href="#041---2026-08-08">0.4.1 - 2026-08-08</a><ul>
 <li><a href="#changed_28">Changed</a></li>
 </ul>
 </li>
-<li><a href="#030---2026-08-08">0.3.0 - 2026-08-08</a><ul>
+<li><a href="#040---2026-08-08">0.4.0 - 2026-08-08</a><ul>
 <li><a href="#added_29">Added</a></li>
 <li><a href="#changed_29">Changed</a></li>
 </ul>
 </li>
-<li><a href="#021---2026-08-02">0.2.1 - 2026-08-02</a><ul>
+<li><a href="#030---2026-08-08">0.3.0 - 2026-08-08</a><ul>
+<li><a href="#added_30">Added</a></li>
 <li><a href="#changed_30">Changed</a></li>
 </ul>
 </li>
+<li><a href="#021---2026-08-02">0.2.1 - 2026-08-02</a><ul>
+<li><a href="#changed_31">Changed</a></li>
+</ul>
+</li>
 <li><a href="#020---2026-08-02">0.2.0 - 2026-08-02</a><ul>
-<li><a href="#added_30">Added</a></li>
+<li><a href="#added_31">Added</a></li>
 </ul>
 </li>
 <li><a href="#010---2026-08-01">0.1.0 - 2026-08-01</a><ul>
-<li><a href="#added_31">Added</a></li>
+<li><a href="#added_32">Added</a></li>
 </ul>
 </li>
 </ul>

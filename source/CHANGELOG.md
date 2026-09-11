@@ -7,6 +7,41 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-09-11
+
+### Added
+
+- Explicit per-scan diagnostic sessions and inspectable support bundles for
+  debugging. Collection is off by default, export is separate, and no upload
+  service or source attachment is included.
+- Guided library scopes, copyable post-setup scan commands, future matching
+  test/story exclusions, and bounded scope hints for noisy first reviews.
+- Production/test fragment selection, including supported Rust test attributes,
+  with excluded-fragment counts and explicit coverage reasons.
+- A separate incomplete-scan artifact for candidate-pair limits, and an original
+  provisional actionability corpus with positive and nearby negative examples.
+- Published documentation with focused review and support-report instructions.
+
+### Fixed
+
+- Command argument validation and help handling, so flags after positional
+  roots no longer silently select unintended scan paths.
+- JavaScript, TypeScript, TSX and Java grammar compatibility gaps, with visible
+  parse diagnostics retained for unsupported syntax.
+- VS Code handling of cancelled, stale, malformed and unsaved-buffer results.
+- Recognition of narrowly identified generated gperf source and deterministic
+  source snapshot handling.
+
+### Changed
+
+- Report schema advances to 22 and configuration schema to 2. Normalization
+  advances to 14, so prior accepted identities need explicit migration review.
+  Supported prior official project contracts remain upgradeable. Project-contract
+  schema stays 1, baseline schema stays 4, and receipt schema stays 2.
+- Support sessions introduce their own version-1 sharing contract. Existing
+  coarse feedback sharing remains schema 1 and retains its separate consent.
+- Native release assets and published schemas include the support-session schema.
+
 ## [0.32.0] - 2026-09-10
 
 ### Added
@@ -716,7 +751,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.32.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.33.0...HEAD
+[0.33.0]: https://github.com/Cyberlane/mori/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/Cyberlane/mori/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/Cyberlane/mori/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/Cyberlane/mori/compare/v0.29.0...v0.30.0

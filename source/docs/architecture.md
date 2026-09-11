@@ -345,3 +345,13 @@ Each runner tests, builds, and creates one deterministic archive. A final job
 downloads the archives, writes SHA-256 checksums, creates or reuses a draft
 release, uploads the complete asset set, and then publishes. This ordering is
 compatible with GitHub immutable releases.
+
+
+## Self-review coverage
+
+The repository's self-review policy permits six analyzed files without comparison
+fragments at its 40-token floor. This includes the data-only support session
+types, which have no function boundaries, plus the existing small platform and
+report/embed helpers. These files remain visible in file coverage. Minimum file
+coverage remains 90 percent, and warnings still fail the self-review policy.
+Revisit the individual reasons when the file set changes.

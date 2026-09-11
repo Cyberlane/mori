@@ -189,3 +189,78 @@ projects may package it directly or use the contract from another IDE.
 The repository also packages this client as a release asset. Marketplace and
 Open VSX publication remain separate maintainer actions because they require
 store credentials and acceptance of each registry's current terms.
+
+## Support session contract
+
+`mori scan --diagnostics session.json [options] [paths...]` explicitly requests
+one local, source-free diagnostic session. Place the option before other options
+when collecting early argument failures. It follows the normal options-before-
+paths grammar and is written on command return; hard process termination may
+leave no session. Capture warnings do not change the scan's exit code. Session destinations must
+be new files; a failed write does not replace an earlier session.
+
+`mori support inspect <session.json|support.zip>` validates and prints canonical
+session JSON, not the raw input. `mori support bundle --session <session.json>
+--output <new.zip>` explicitly creates a new local ZIP, previews canonical JSON
+on stdout and writes a local-creation notice to stderr. Repeated
+`--finding RANK:CLASSIFICATION` adds up to 25 unique reviewed ranks; labels are
+`useful`, `intentional`, `false-positive`, and `uncertain`, with no free text.
+Inspection and bundle creation exit 0 on success, 2 for command usage errors,
+and 1 for invalid evidence or I/O errors. They never upload data.
+
+[Support schema 1](../schemas/mori-support-session-v1.schema.json) is separate
+from scan-report, baseline, receipt and feedback
+schemas. Its top-level fields are `schema_version`, `tool`, `status`, `failure`,
+`settings`, `report_available`, `counts`, `phases`, `languages`, and optional `reviewed_findings`.
+`report_available` distinguishes unavailable measurements from measured zero counts.
+When false, counts remain zero, languages are empty and reviewed findings are
+not accepted. A true value does not imply complete analysis.
+`settings` may be null when configuration was not resolved; `failure` is null
+for success. Unknown fields are rejected rather than copied or ignored.
+
+- `tool`: `modified`, `version`, `revision`, `goos`, `goarch`, `go_version`, `report_schema`,
+  `normalization_version`, `config_schema`, `contract_schema`. Build strings
+  must match fixed known formats; arbitrary development labels become `unknown`.
+- `status`: `success`, `error`, `usage`, `findings`, `coverage`, `upgrade`, or
+  `cancelled`. Optional `failure` contains only fixed `code` and `stage` values.
+  Stages: `arguments`, `validation`, `configuration`, `project`, `baseline`, `discovery`,
+  `analysis`, `receipt`, `output`, `coverage`. Codes: `error`, `usage`,
+  `findings`, `coverage`, `upgrade`, `cancelled`, `resource-limit`, `parse`,
+  `configuration`, `invalid-arguments`, `io`, `unknown`.
+- `settings`: `profile`, `threshold`, `min_tokens`, `max_groups`,
+  `max_occurrences`, `max_pairs`, `max_file_bytes`, `workers`,
+  `comparison_domain`, `sql_dialect`, `fragment_selection`, `ranking`,
+  `same_language_only`, `cross_language_only`, `embedded_sql`,
+  `statement_blocks`, `block_statements`, `max_blocks_per_function`,
+  `exclude_generated`, `respect_ignore`, `fail_on_match`, `require_coverage`,
+  `min_file_coverage`, `max_zero_fragment_files`, `fail_on_warning`,
+  `fail_on_parse_diagnostic`, `scope_selected`, `root_count`,
+  `exclude_pattern_count`, `priority_path_count`, `language_pair_count`,
+  `baseline_enabled`. No actual paths, scope names, globs or config JSON.
+- `counts`: `files`, `fragments`, `candidate_pairs`, `location_pairs`,
+  `match_groups`, `warnings`, `parse_diagnostics`, `test_files`, `story_files`,
+  `test_fragments`, `story_fragments`, `zero_fragment_files`,
+  `generated_excluded_files`, `truncated`, `leading_groups`,
+  `leading_test_story_groups`. The leading-group sample contains at most 25
+  retained groups; the test/story count uses bounded path conventions and is
+  not a measured false-positive rate.
+- `phases`: at most five unique entries, each `name` and `milliseconds`.
+  Fixed names are `total`, `discovery`, `parse`, `compare`, and `analysis`.
+- `languages`: unique built-in `language` IDs with numeric `files` and
+  `fragments` totals.
+- `reviewed_findings`: optional `{ "rank": 7, "classification": "intentional" }`
+  entries, sorted by rank. Unique ranks range from 1 to 1,000,000.
+
+Counts and numeric limits are nonnegative signed 64-bit integers up to
+9,223,372,036,854,775,807; `max_zero_fragment_files` also accepts -1. Threshold
+and minimum file coverage are finite values from 0 to 1. JSON consumers must
+preserve integer precision rather than coercing large limits to floating-point
+numbers. Phase timings range
+from 0 through 604,800,000 milliseconds (seven days).
+
+Session input is bounded to 64 KiB, bundle input to 128 KiB. ZIP contents are
+exactly `session.json` and a fixed `README.txt`; arbitrary members, symlinks and
+unbounded extraction are not supported. Inspect the canonical payload before
+sharing. New files request mode 0600 on POSIX; Windows access follows inherited
+directory ACLs rather than a Mori-managed per-user ACL. See [support collection](guides/support.md) for workflow and failure
+handling; a diagnostic session never grants baseline or receipt acceptance.
