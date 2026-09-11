@@ -126,3 +126,23 @@ classified separately from source-verified duplication.
 Baseline mutation refuses failed coverage policy, truncated reports, and
 warnings unless every reviewed warning kind is explicitly allowed. Never use a
 baseline merely to hide noisy or out-of-scope source.
+
+### Accept several reviewed identities in one scan
+
+Batch acceptance is available in Mori v0.34.0 or later.
+
+Repeat `--identity` to accept a reviewed batch using one complete validation scan
+and one atomic baseline write:
+
+```sh
+mori baseline add --baseline mori-baseline.json \
+  --identity <first-reviewed-id> --identity <second-reviewed-id> \
+  --classification intentional .
+```
+
+Every identity must exist in the active scan. If any identity is missing, nothing
+is written. Duplicate identities are accepted once. The supplied note and
+classification apply to every selected identity, so use separate batches for
+different decisions. Inspect each finding before accepting it. Existing baseline
+profile mismatches are rejected after discovery, before parsing or comparison.
+This changes no baseline document schema.

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Plan a large scan · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Mori v0.34.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="regression-testing.html">Quality and performance acceptance</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="support.html">Collecting a support bundle</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="workload-planning.html" aria-current="page">Plan a large scan</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/workload-planning.md">Markdown source ↗</a></div>
+<h1 id="plan-a-large-scan">Plan a large scan</h1>
+<p><code>mori plan</code> is available in Mori v0.34.0 or later.</p>
+<p>Use <code>mori plan</code> before a large scan to understand its comparison workload:</p>
+<pre><code class="language-sh">mori plan --profile review --fragment-selection production .
+mori plan --profile review --fragment-selection production packages/api
+</code></pre>
+<p>Planning discovers and parses the selected source, then counts eligible candidate
+pairs without calculating similarity scores. It uses the same language, token,
+size, ignore and fragment-selection rules as a scan. It succeeds when the count
+exceeds <code>--max-pairs</code> and reports that condition so you can narrow the scope.
+It still takes time to parse source and enumerate candidates.</p>
+<p>The output groups selected files by <code>apps/&lt;name&gt;</code>, <code>packages/&lt;name&gt;</code>, or their
+first directory. Per-root pair counts are upper bounds before language, size and
+overlap filtering. They are not the results of independent package scans.
+Separate package scans omit cross-package matches. A named scope pointing at
+<code>.</code> does not narrow the workload. Use concrete roots in a named scope or command
+when that tradeoff fits your review.</p>
+<p>The plan shows effective configuration, coverage, warning and parse-diagnostic
+counts. Coverage policies still apply. No similarity findings are produced,
+baselines are not loaded, and finding-based exit policies are not evaluated.
+A successful plan never certifies a clean review. It cannot be used to accept
+baseline identities or issue a review receipt. Source changes require a new plan.</p>
+<h2 id="machine-readable-plans">Machine-readable plans</h2>
+<pre><code class="language-sh">mori plan --format json --redact-paths --scope product
+</code></pre>
+<p>The separate <code>mori-scan-plan</code> artifact uses schema 1, published in
+<a href="https://github.com/Cyberlane/mori/blob/v0.34.0/schemas/mori-scan-plan-v1.schema.json"><code>mori-scan-plan-v1.schema.json</code></a>.
+<code>analysis_performed</code> is always false, meaning no similarity analysis was run.
+<code>candidate_pairs</code> is the eligible whole-selection count, and
+<code>exceeds_pair_limit</code> compares it with the effective configured cap.</p>
+<p>Only text and JSON formats are supported. Planning does not support staged or
+focused input, diagnostic exports, receipts or report-output files. Without
+<code>--parse-cache</code> it writes only to standard output and standard error. Managed project compatibility
+checks still apply. Ordinary output includes source/configuration paths, so use
+<code>--redact-paths</code> when appropriate and inspect output before sharing.</p>
+<h2 id="reuse-parsing-between-commands">Reuse parsing between commands</h2>
+<p>Explicitly enable local parsing reuse on both commands:</p>
+<pre><code class="language-sh">mori plan --parse-cache --profile review --fragment-selection production .
+mori scan --parse-cache --profile review --fragment-selection production .
+</code></pre>
+<p>Mori still discovers files and reads current source bytes on every invocation.
+Cached extraction is bound to those bytes, paths, language, extraction settings,
+and the exact executable. Scoring, ranking, candidate limits, coverage policies
+and baseline validation run normally. A plan is never reused as acceptance
+or proof of a clean scan. Changes to ignores or roots are applied by fresh
+source discovery before any cached extraction is considered.</p>
+<p>The opt-in cache stores normalized features, fragment locations, literal hashes
+and diagnostics under the platform user cache directory at
+<code>mori/parse-cache-v1</code>. It does not store source text or upload anything. Treat
+this local metadata as private. Entries are authenticated and stored with
+private permissions outside the current working directory and selected source
+roots. Each of 1,024 slots holds at most 256 KiB, with one bounded pending file
+per slot during writes. Collisions, oversized entries, corruption, unavailable
+storage and concurrent writes can cause cache misses. A miss falls back to
+normal parsing and does not alter policy.</p>
+<p>The flag is off by default and does not persist in project configuration.
+Omit it to stop using the cache. Delete that Mori cache subdirectory to remove
+its local entries. This is separate from staged review's <code>--cache</code>, which reuses
+an authenticated complete report for an unchanged immutable index snapshot.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#machine-readable-plans">Machine-readable plans</a></li>
+<li><a href="#reuse-parsing-between-commands">Reuse parsing between commands</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

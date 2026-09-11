@@ -5,8 +5,8 @@
 <link rel="stylesheet" href="../../site.css"></head>
 <body><a class="skip" href="#content">Skip to content</a>
 <header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
-<div class="development" role="note"><strong>Mori v0.33.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
-<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html" aria-current="page">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="support.html">Collecting a support bundle</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<div class="development" role="note"><strong>Mori v0.34.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="regression-testing.html">Quality and performance acceptance</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html" aria-current="page">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="support.html">Collecting a support bundle</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="workload-planning.html">Plan a large scan</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
 <main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/reviewing-results.md">Markdown source ↗</a></div>
 <h1 id="reviewing-mori-results">Reviewing Mori results</h1>
 <p>Mori produces a shortlist for source review. A high score means two normalized
@@ -42,6 +42,27 @@ function bodies before narrowing further.</p>
 </code></pre>
 <p>Review ranking prioritizes disclosed source-location signals before ordinary
 structural ordering. It does not change scores, fingerprints, or eligibility.</p>
+<p>In Mori v0.34.0 or later, repeated small call wrappers lose the
+name/repetition boost when the same name occurs in at least four directories.
+The signal is <code>repeated-small-wrapper(-7)</code>.</p>
+<p>Repeated short accessors, forwarding calls, throwing wrappers and single-assignment
+setters can also receive <code>repeated-small-boilerplate(-N)</code>. This requires at least
+three distinct source occurrences across two files. Both representative bodies
+must have at most 80 normalized tokens, no nested functions, and only a small
+straight-line operation shape. Arithmetic, branches, loops and bindings keep
+normal priority. The deduction is at most seven points, never makes the base
+priority negative, and does not stack with the existing wrapper deduction.
+Configured path priorities are added afterward.</p>
+<p>These are conservative presentation heuristics, not evidence that duplication
+is intentional. They help prevent repeated scaffolding from crowding the shortlist
+when lowering <code>--min-tokens</code>, but do not guarantee that every useful finding is
+retained. Use structural ranking, a larger <code>--max-groups</code>, or explicit priority
+paths to inspect deprioritized groups. No findings are automatically accepted or
+removed, and scores and identities are unchanged.</p>
+<p>Agent and compact reports mark groups whose retained occurrences exclude nested
+bodies with <code>outer body only: nested functions evaluated separately</code>. Inspect
+those separate functions before interpreting a high parent score. This warning
+uses existing JSON occurrence metadata and does not change the report schema.</p>
 <p>Projects can add deterministic presentation-only path priority:</p>
 <pre><code class="language-sh">mori scan --profile review --priority-path '**/auth/**=25' .
 </code></pre>

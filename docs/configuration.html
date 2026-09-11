@@ -5,8 +5,8 @@
 <link rel="stylesheet" href="../site.css"></head>
 <body><a class="skip" href="#content">Skip to content</a>
 <header><a class="brand" href="../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
-<div class="development" role="note"><strong>Mori v0.33.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
-<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html" aria-current="page">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/support.html">Collecting a support bundle</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<div class="development" role="note"><strong>Mori v0.34.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html" aria-current="page">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/regression-testing.html">Quality and performance acceptance</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/support.html">Collecting a support bundle</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="guides/workload-planning.html">Plan a large scan</a><a href="machine-integration.html">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
 <main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../source/docs/configuration.md">Markdown source ↗</a></div>
 <h1 id="project-configuration-and-ignore-handling">Project configuration and ignore handling</h1>
 <p>Mori can load one strict JSON configuration named <code>.mori.json</code>. It searches
@@ -129,6 +129,30 @@ The selection participates in baseline and receipt compatibility.</p>
 named scope for production-only exploration. This field advances the recorded
 configuration contract to schema 2; <code>.mori.json</code> still has no schema-version
 field and previously valid files remain readable.</p>
+<h3 id="classification-overrides">Classification overrides</h3>
+<p>Use <code>production_paths</code> to retain a shipped library such as <code>django/test</code> in
+production selection. Use <code>test_paths</code> for test code with unconventional names.
+Both accept arrays of exact file or directory paths, with directory-boundary
+prefix matching, not globs. Config paths resolve relative to the configuration
+file. Named scopes can replace either array, including with an empty array.
+Repeated <code>--production-path PATH</code> and <code>--test-path PATH</code> flags add command-line
+paths relative to the current working directory. Opposing overlapping rules
+are rejected. Overrides supersede conventional path and inline test rules,
+but do not bypass discovery, ignores, generated exclusions or parse failures.</p>
+<pre><code class="language-json">{
+  &quot;fragment_selection&quot;: &quot;production&quot;,
+  &quot;production_paths&quot;: [&quot;django/test&quot;],
+  &quot;test_paths&quot;: [&quot;tools/test-support&quot;]
+}
+</code></pre>
+<p>Effective configuration reports both optional arrays. Per-file excluded counts
+remain available for inspecting the result. The paths participate in baseline,
+receipt and staged-cache identity, and are redacted with other report paths.
+The configuration contract is now 3. Project-contract schema stays 1 and old
+contracts remain strictly readable and eligible for managed upgrade. Report 22
+and baseline 4 retain their versions: the optional arrays are additive and
+omitted when unused, preserving existing default-profile digests. Consumers
+using strict JSON Schema validation should refresh the current schema file.</p>
 <p><code>embedded_sql</code> is an explicit opt-in for direct string arguments to recognized
 Go database methods. It requires <code>comparison_domain</code> to be <code>sql-query</code> and uses
 the selected <code>sql_dialect</code>. Arbitrary strings, variables, concatenations, and
@@ -241,7 +265,10 @@ execution, compatibility, and reporting contract.</p>
 <ul>
 <li><a href="#profiles">Profiles</a></li>
 <li><a href="#fields">Fields</a></li>
-<li><a href="#named-scopes">Named scopes</a></li>
+<li><a href="#named-scopes">Named scopes</a><ul>
+<li><a href="#classification-overrides">Classification overrides</a></li>
+</ul>
+</li>
 <li><a href="#ignore-files">Ignore files</a></li>
 </ul>
 </div>

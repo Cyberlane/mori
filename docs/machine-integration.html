@@ -5,8 +5,8 @@
 <link rel="stylesheet" href="../site.css"></head>
 <body><a class="skip" href="#content">Skip to content</a>
 <header><a class="brand" href="../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
-<div class="development" role="note"><strong>Mori v0.33.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
-<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/support.html">Collecting a support bundle</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="machine-integration.html" aria-current="page">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<div class="development" role="note"><strong>Mori v0.34.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="index.html">Mori documentation</a><a href="guides/first-review.html">Choose a useful first review</a><a href="getting-started.html">Getting started</a><a href="../index.html">Overview</a><a href="../CHANGELOG.html">Changelog</a><a href="../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../SECURITY.html">Security policy</a><a href="adding-a-language.html">Adding a language</a><a href="architecture.html">Architecture</a><a href="configuration.html">Project configuration and ignore handling</a><a href="guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="guides/editors-and-agents.html">Editors and coding agents</a><a href="guides/feedback.html">Opt-in local feedback</a><a href="guides/parser-compatibility.html">Parser compatibility</a><a href="guides/project-upgrade.html">Project contract and upgrade</a><a href="guides/publishing-docs.html">Building and publishing documentation</a><a href="guides/regression-testing.html">Quality and performance acceptance</a><a href="guides/review-policy.html">Choose the review policy</a><a href="guides/reviewing-results.html">Reviewing Mori results</a><a href="guides/sql.html">SQL and embedded SQL</a><a href="guides/staged-cache.html">Opt-in staged analysis cache</a><a href="guides/support.html">Collecting a support bundle</a><a href="guides/usability-rollout.html">Roll out smoother reviews</a><a href="guides/workload-planning.html">Plan a large scan</a><a href="machine-integration.html" aria-current="page">Machine and editor integration</a><a href="reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="scan-selection.html">Scan selection controls</a><a href="scoring.html">Scoring contract</a><a href="../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
 <main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../source/docs/machine-integration.md">Markdown source ↗</a></div>
 <h1 id="machine-and-editor-integration">Machine and editor integration</h1>
 <p>Mori exposes deterministic complete evidence and bounded projections for
@@ -39,7 +39,7 @@ values, and path-to-placeholder mappings are not emitted. Redaction changes
 presentation only, not scores, fingerprints, counts, or schema version.</p>
 <h2 id="versioned-json-contract">Versioned JSON contract</h2>
 <p>Schema 22 is described by the Draft 2020-12 artifact at
-<a href="https://github.com/Cyberlane/mori/blob/dbcfa1051e2954cee4972403486f11b1fb61eb1c/schemas/mori-report-v22.schema.json"><code>schemas/mori-report-v22.schema.json</code></a>.
+<a href="https://github.com/Cyberlane/mori/blob/v0.34.0/schemas/mori-report-v22.schema.json"><code>schemas/mori-report-v22.schema.json</code></a>.
 Official releases include the same file and its SHA-256 checksum.
 Consumers should select a validator that supports Draft 2020-12, require
 <code>schema_version</code> to equal <code>22</code>, and reject or explicitly handle unknown report
@@ -199,7 +199,7 @@ on stdout and writes a local-creation notice to stderr. Repeated
 <code>useful</code>, <code>intentional</code>, <code>false-positive</code>, and <code>uncertain</code>, with no free text.
 Inspection and bundle creation exit 0 on success, 2 for command usage errors,
 and 1 for invalid evidence or I/O errors. They never upload data.</p>
-<p><a href="https://github.com/Cyberlane/mori/blob/dbcfa1051e2954cee4972403486f11b1fb61eb1c/schemas/mori-support-session-v1.schema.json">Support schema 1</a> is separate
+<p><a href="https://github.com/Cyberlane/mori/blob/v0.34.0/schemas/mori-support-session-v1.schema.json">Support schema 1</a> is separate
 from scan-report, baseline, receipt and feedback
 schemas. Its top-level fields are <code>schema_version</code>, <code>tool</code>, <code>status</code>, <code>failure</code>,
 <code>settings</code>, <code>report_available</code>, <code>counts</code>, <code>phases</code>, <code>languages</code>, and optional <code>reviewed_findings</code>.
@@ -254,6 +254,14 @@ unbounded extraction are not supported. Inspect the canonical payload before
 sharing. New files request mode 0600 on POSIX; Windows access follows inherited
 directory ACLs rather than a Mori-managed per-user ACL. See <a href="guides/support.html">support collection</a> for workflow and failure
 handling; a diagnostic session never grants baseline or receipt acceptance.</p>
+<h2 id="workload-plans">Workload plans</h2>
+<p><code>mori plan --format json [scan options] [roots]</code> emits the separate
+<a href="https://github.com/Cyberlane/mori/blob/v0.34.0/schemas/mori-scan-plan-v1.schema.json"><code>mori-scan-plan</code> schema 1</a> artifact.
+It parses source and enumerates eligible candidates but never scores similarities.
+Do not parse it as a scan report or use it as baseline/receipt evidence. A count
+above the configured pair cap sets <code>exceeds_pair_limit</code> rather than failing the
+plan. Coverage policies still determine coverage failures. See
+<a href="guides/workload-planning.html">workload planning</a> for limits and scope tradeoffs.</p>
 <footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
 <aside class="contents"><strong>On this page</strong><div class="toc">
 <ul>
@@ -264,6 +272,7 @@ handling; a diagnostic session never grants baseline or receipt acceptance.</p>
 <li><a href="#language-server-protocol">Language Server Protocol</a></li>
 <li><a href="#vs-code-client">VS Code client</a></li>
 <li><a href="#support-session-contract">Support session contract</a></li>
+<li><a href="#workload-plans">Workload plans</a></li>
 </ul>
 </div>
 </aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

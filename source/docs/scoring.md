@@ -313,7 +313,12 @@ same-named pair across directories, 2 for any cross-directory pair, 2 for a
 same-named pair across files, 1 for any cross-file pair, and 1 when the content
 identity represents multiple location pairs. The existing structural
 comparator breaks ties. This is a shortlist-ordering heuristic, not semantic
-or refactoring confidence.
+or refactoring confidence. Repeated small wrapper and straight-line boilerplate
+signals can reduce the base priority before configured path boosts. These
+presentation-only deductions preserve scores and identities. See
+[reviewing results](guides/reviewing-results.md#use-review-ranking) for their
+bounded conditions. The existing `review_signals` string list carries the
+explanation, so these additional signal values require no JSON schema change.
 
 Schema 12 also records effective `priority_paths`. Each matching configured
 rule adds its declared weight once per group and emits a

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quality and performance acceptance · Mori documentation</title>
+<meta name="description" content="Mori structural similarity documentation, usage guides and references.">
+<link rel="stylesheet" href="../../site.css"></head>
+<body><a class="skip" href="#content">Skip to content</a>
+<header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
+<div class="development" role="note"><strong>Mori v0.34.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="automation-and-baselines.html">Automation and reviewed baselines</a><a href="editors-and-agents.html">Editors and coding agents</a><a href="feedback.html">Opt-in local feedback</a><a href="parser-compatibility.html">Parser compatibility</a><a href="project-upgrade.html">Project contract and upgrade</a><a href="publishing-docs.html">Building and publishing documentation</a><a href="regression-testing.html" aria-current="page">Quality and performance acceptance</a><a href="review-policy.html">Choose the review policy</a><a href="reviewing-results.html">Reviewing Mori results</a><a href="sql.html">SQL and embedded SQL</a><a href="staged-cache.html">Opt-in staged analysis cache</a><a href="support.html">Collecting a support bundle</a><a href="usability-rollout.html">Roll out smoother reviews</a><a href="workload-planning.html">Plan a large scan</a><a href="../machine-integration.html">Machine and editor integration</a><a href="../reference/languages-and-parser-limits.html">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/guides/regression-testing.md">Markdown source ↗</a></div>
+<h1 id="quality-and-performance-acceptance">Quality and performance acceptance</h1>
+<p>Mori's acceptance checks exercise a built CLI as a separate process. They
+complement the labeled calibration corpus, workflow lifecycle tests and exact
+scoring tests. A successful benchmark is evidence for its workload, not a claim
+about every repository or semantic equivalence.</p>
+<h2 id="local-and-pull-request-checks">Local and pull-request checks</h2>
+<p>Run <code>make acceptance</code> with Go, a C compiler and Python 3 available. <code>make check</code>
+includes this small, offline suite and executable gate tests that deliberately
+corrupt scores, counts, timings, memory measurements and toolchain metadata. It creates repeated structures, mixed
+structures and malformed source in a temporary directory, runs each workload
+twice, compares complete JSON reports, checks extraction counts and verifies
+the candidate-pair safety limit. Temporary source is removed on success or failure.</p>
+<p>The machine-readable result is <code>dist/acceptance.json</code>. It includes the binary
+hash, platform, workload size, repeated wall times, report hashes, scan counts
+and diagnostic phase timings. Failed runs retain completed measurements and a
+violation list. POSIX runs measure per-process peak resident memory using
+<code>wait4</code>. Windows explicitly records memory measurement as unavailable. A
+5,000-function workload receives an interrupt after 200 milliseconds and must
+exit within five seconds. The artifact records the observed latency or that the
+scan completed before interruption. Windows console interruption is currently
+unavailable. This exercises process cancellation but does not prove which scan
+phase was active when the signal arrived. CI uploads this artifact even when checks fail.</p>
+<p>The existing <code>make corpus</code> evaluates reviewed positive, intentional and
+false-positive examples, including the actionability corpus. Performance
+improvements must pass those checks as well. The mixed workload repeats six different shapes and is not a corpus of entirely
+unrelated functions. Synthetic structural families are
+not human judgments about whether a real finding is useful.</p>
+<h2 id="public-repository-and-nightly-checks">Public repository and nightly checks</h2>
+<p>Run <code>make acceptance-public</code> to fetch the immutable Git revisions in
+<code>scripts/acceptance-corpus.json</code>. The initial corpus contains Click (Python),
+Chi (Go), Lodash (JavaScript) and TanStack Query (its TS/TSX <code>packages</code>
+monorepo scope). The TanStack case explicitly requires extraction from both
+TypeScript and TSX. Source is scanned, never built or executed.
+No repository package scripts or dependencies are installed. Checkouts are
+temporary and removed after the run, including on failure. Network access is
+required only for this explicit mode. The nightly workflow runs this larger
+suite and the labeled corpus.</p>
+<p>The manifest deliberately starts with tractable projects and a bounded public
+TS/TSX monorepo scope. It does not reproduce a private user's source.
+Add immutable revisions and measured bounded scopes as coverage expands.
+Do not silently change an existing revision when comparing performance.
+<code>acceptance-public-golden.json</code> pins counts and a digest of all finding
+identities, scores, occurrence counts and structural evidence. These are
+regression expectations, not semantic correctness labels.</p>
+<h2 id="controlled-performance-gates">Controlled performance gates</h2>
+<p>Shared GitHub runners record timing but do not fail for timing regressions.
+To enforce a timing budget, use a stable runner with the same OS, CPU, power
+settings, background load and toolchain. Collect at least five repetitions:</p>
+<pre><code class="language-sh">python3 scripts/acceptance.py --size 1000 --repeats 5 \
+  --runner-id benchmark-host-1 --output dist/before.json
+# Build the candidate binary, then run the same workload.
+python3 scripts/acceptance.py --size 1000 --repeats 5 \
+  --runner-id benchmark-host-1 --baseline dist/before.json \
+  --timing-gate --memory-gate --max-regression 0.20 --output dist/after.json
+</code></pre>
+<p>The timing gate compares median wall times. The optional <code>--memory-gate</code>
+compares median peak resident memory and rejects unavailable measurements. <code>--max-memory-regression</code> controls the memory tolerance (default 20%).
+Both gates reject incompatible environment and
+workload metadata, including the harness hash and Go version/target. Baseline comparison also fails
+on changed findings or counts, independently of the timing gate. Identity
+comparison ignores ranking order and paths and includes every reported group.
+Use <code>--allow-result-changes</code> only after reviewing a deliberate change. The
+artifact always retains before/after differences. Count comparisons include
+top-list test/story counts, so an intentional ranking change may require review
+even though identity comparisons ignore ranking order. Public golden updates require
+the same review. The 20% example is a starting tolerance, not a statistically
+established noise floor. Establish runner variance before tightening it. Timing
+samples include fresh CLI startup and ordinary OS filesystem caching. They do
+not measure a warmed Mori review-session cache or independently cold disk I/O.</p>
+<p>Use <code>--binary /path/to/mori</code> for an installed or unpacked release. The published
+release verification workflow runs the small suite on each native archive.</p>
+<h2 id="interpretation-and-remaining-coverage">Interpretation and remaining coverage</h2>
+<p>Counts and deterministic reports are hard checks. Timing is separate from
+ranking quality. The public corpus asserts successful extraction, repeatability and its pinned
+regression expectations, not a frozen list of semantically correct findings. Deliberate scoring or
+schema changes require reviewed result differences, not blindly updating hashes.</p>
+<p>This harness does not yet model useful-findings recall on a held-out large
+monorepo. Windows peak memory and interruption measurement are unavailable. Diagnostic sessions
+currently expose candidate counts and broad phase timing rather than every
+internal pruning or cache counter. Track these limitations when making speedup
+claims, and extend the same artifact schema explicitly when measurements grow.</p>
+<footer>Scores describe structural similarity; they do not prove behavioral equivalence.<br>Source stays local. <a href="https://github.com/Cyberlane/mori">Mori on GitHub</a></footer></main>
+<aside class="contents"><strong>On this page</strong><div class="toc">
+<ul>
+<li><a href="#local-and-pull-request-checks">Local and pull-request checks</a></li>
+<li><a href="#public-repository-and-nightly-checks">Public repository and nightly checks</a></li>
+<li><a href="#controlled-performance-gates">Controlled performance gates</a></li>
+<li><a href="#interpretation-and-remaining-coverage">Interpretation and remaining coverage</a></li>
+</ul>
+</div>
+</aside></div><script>const menu=document.querySelector("aside details"); const narrow=matchMedia("(max-width:900px)"); function sizeMenu(){menu.open=!narrow.matches;} sizeMenu(); narrow.addEventListener("change",sizeMenu);</script></body></html>

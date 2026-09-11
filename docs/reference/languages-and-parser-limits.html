@@ -5,8 +5,8 @@
 <link rel="stylesheet" href="../../site.css"></head>
 <body><a class="skip" href="#content">Skip to content</a>
 <header><a class="brand" href="../../index.html"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
-<div class="development" role="note"><strong>Mori v0.33.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
-<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="../guides/first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="../guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="../guides/editors-and-agents.html">Editors and coding agents</a><a href="../guides/feedback.html">Opt-in local feedback</a><a href="../guides/parser-compatibility.html">Parser compatibility</a><a href="../guides/project-upgrade.html">Project contract and upgrade</a><a href="../guides/publishing-docs.html">Building and publishing documentation</a><a href="../guides/review-policy.html">Choose the review policy</a><a href="../guides/reviewing-results.html">Reviewing Mori results</a><a href="../guides/sql.html">SQL and embedded SQL</a><a href="../guides/staged-cache.html">Opt-in staged analysis cache</a><a href="../guides/support.html">Collecting a support bundle</a><a href="../guides/usability-rollout.html">Roll out smoother reviews</a><a href="../machine-integration.html">Machine and editor integration</a><a href="languages-and-parser-limits.html" aria-current="page">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
+<div class="development" role="note"><strong>Mori v0.34.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation"><a href="../index.html">Mori documentation</a><a href="../guides/first-review.html">Choose a useful first review</a><a href="../getting-started.html">Getting started</a><a href="../../index.html">Overview</a><a href="../../CHANGELOG.html">Changelog</a><a href="../../CONTRIBUTING.html">Contributing to 森 (mori)</a><a href="../../SECURITY.html">Security policy</a><a href="../adding-a-language.html">Adding a language</a><a href="../architecture.html">Architecture</a><a href="../configuration.html">Project configuration and ignore handling</a><a href="../guides/automation-and-baselines.html">Automation and reviewed baselines</a><a href="../guides/editors-and-agents.html">Editors and coding agents</a><a href="../guides/feedback.html">Opt-in local feedback</a><a href="../guides/parser-compatibility.html">Parser compatibility</a><a href="../guides/project-upgrade.html">Project contract and upgrade</a><a href="../guides/publishing-docs.html">Building and publishing documentation</a><a href="../guides/regression-testing.html">Quality and performance acceptance</a><a href="../guides/review-policy.html">Choose the review policy</a><a href="../guides/reviewing-results.html">Reviewing Mori results</a><a href="../guides/sql.html">SQL and embedded SQL</a><a href="../guides/staged-cache.html">Opt-in staged analysis cache</a><a href="../guides/support.html">Collecting a support bundle</a><a href="../guides/usability-rollout.html">Roll out smoother reviews</a><a href="../guides/workload-planning.html">Plan a large scan</a><a href="../machine-integration.html">Machine and editor integration</a><a href="languages-and-parser-limits.html" aria-current="page">Languages and parser limits</a><a href="../scan-selection.html">Scan selection controls</a><a href="../scoring.html">Scoring contract</a><a href="../../editors/vscode/index.html">Mori Structural Review for VS Code</a></nav></details></aside>
 <main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="../../source/docs/reference/languages-and-parser-limits.md">Markdown source ↗</a></div>
 <h1 id="languages-and-parser-limits">Languages and parser limits</h1>
 <p>Run <code>mori languages</code> for the authoritative capabilities of the installed
@@ -234,6 +234,21 @@ recognized Swift forms and the upstream raw-ampersand JSX-text grammar issue.
 Additional bounded grammar corrections cover JavaScript/TypeScript import types,
 semicolonless generic interface overloads, keyword export aliases, and Java
 annotated varargs; see <a href="../guides/parser-compatibility.html">parser compatibility</a>.
+The maintained Go grammar accepts Go 1.26 <code>new(expression)</code> alongside existing
+<code>new(type)</code> and <code>make(type, ...)</code> forms. TypeScript/TSX accepts explicit <code>in</code>,
+<code>out</code>, and <code>in out</code> variance annotations. Swift accepts parenthesized expression
+range patterns such as <code>case (n / 2 + 1)...:</code>. These grammar changes preserve
+original source locations and keep nearby malformed syntax visible.</p>
+<p>C compatibility includes the named libgit2 <code>GIT_FORMAT_PRINTF</code> annotation and
+compound bodies for <code>git_vector_foreach</code> and
+<code>git_attr_file__foreach_matching_rule</code>. Mori parses their arguments and bodies
+without expanding macros or executing a preprocessor. This bounded support does
+not establish coverage of arbitrary C macros or generated functions.</p>
+<p>Flow is not a supported JavaScript dialect. For a JavaScript file with a leading
+<code>@flow</code> comment and parse errors, the warning names the unsupported dialect and
+retains diagnostic and skipped-fragment counts. Remaining valid JavaScript
+fragments can still be compared, but do not establish complete Flow coverage.
+Use <code>--fail-on-parse-diagnostic</code> when partial parsing must fail the scan.
 Other unsupported syntax remains visibly incomplete. The pinned Zsh grammar
 requires <code>:</code> for several glob-qualifier forms.</p>
 <p>The Hack parser is a checksum-pinned MIT snapshot from the archived
@@ -258,10 +273,19 @@ token floors can make them noisy.</p>
   and Python files named <code>test_*.py</code>.</li>
 <li>Rust <code>#[test]</code>, <code>#[tokio::test]</code>, and <code>#[async_std::test]</code> attributes, including
   arguments for the asynchronous test attributes.</li>
-<li>Rust <code>#[cfg(test)]</code> and compound predicates that necessarily require <code>test</code>,
+<li>
+<p>Rust <code>#[cfg(test)]</code> and compound predicates that necessarily require <code>test</code>,
   such as <code>all(test, not(loom))</code>. Every branch of an <code>any(...)</code> must require
-  <code>test</code> before it is classified as test-only.</li>
+  <code>test</code> before it is classified as test-only.</p>
+</li>
+<li>
+<p>C/C++ functions inside positive <code>#ifdef REDIS_TEST</code> or
+  <code>#if defined(REDIS_TEST)</code> branches. The alternate branch, negative guard and
+  disjunction with a production condition are not classified as tests.</p>
+</li>
 </ul>
+<p>Explicit classification path overrides take precedence over these conventions.
+See <a href="../configuration.html#classification-overrides">configuration</a>.</p>
 <p><code>cfg(any(test, feature = "production"))</code>, <code>cfg(not(test))</code>, and a function name
 merely containing <code>test</code> do not prove test-only membership. Unclassified units
 remain on the production side. Path conventions apply to every fragment in the

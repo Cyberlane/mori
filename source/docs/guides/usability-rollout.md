@@ -14,7 +14,7 @@ result; retain its outcome for the exact candidate commit. Do not substitute a
 cross-compile for a native CGO test.
 
 The report contract is schema 22 and the hook contract is v2. Configuration
-contract schema is 2; project-contract schema remains 1. Baseline and receipt
+contract schema is 3; project-contract schema remains 1. Baseline and receipt
 versions remain 4 and 2; normalization is 14. Setup-plan schema is 2, and the
 separate candidate-limit failure artifact uses failure schema 1.
 Prior normalization acceptance needs explicit review during migration.

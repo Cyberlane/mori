@@ -138,6 +138,35 @@ named scope for production-only exploration. This field advances the recorded
 configuration contract to schema 2; `.mori.json` still has no schema-version
 field and previously valid files remain readable.
 
+### Classification overrides
+
+Use `production_paths` to retain a shipped library such as `django/test` in
+production selection. Use `test_paths` for test code with unconventional names.
+Both accept arrays of exact file or directory paths, with directory-boundary
+prefix matching, not globs. Config paths resolve relative to the configuration
+file. Named scopes can replace either array, including with an empty array.
+Repeated `--production-path PATH` and `--test-path PATH` flags add command-line
+paths relative to the current working directory. Opposing overlapping rules
+are rejected. Overrides supersede conventional path and inline test rules,
+but do not bypass discovery, ignores, generated exclusions or parse failures.
+
+```json
+{
+  "fragment_selection": "production",
+  "production_paths": ["django/test"],
+  "test_paths": ["tools/test-support"]
+}
+```
+
+Effective configuration reports both optional arrays. Per-file excluded counts
+remain available for inspecting the result. The paths participate in baseline,
+receipt and staged-cache identity, and are redacted with other report paths.
+The configuration contract is now 3. Project-contract schema stays 1 and old
+contracts remain strictly readable and eligible for managed upgrade. Report 22
+and baseline 4 retain their versions: the optional arrays are additive and
+omitted when unused, preserving existing default-profile digests. Consumers
+using strict JSON Schema validation should refresh the current schema file.
+
 `embedded_sql` is an explicit opt-in for direct string arguments to recognized
 Go database methods. It requires `comparison_domain` to be `sql-query` and uses
 the selected `sql_dialect`. Arbitrary strings, variables, concatenations, and
