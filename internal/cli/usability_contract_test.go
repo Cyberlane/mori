@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,6 +16,12 @@ import (
 )
 
 func TestPriorUsabilityContractUpgradePreservesProjectPolicy(t *testing.T) {
+	for _, version := range []int{1, 2} {
+		t.Run(fmt.Sprint(version), func(t *testing.T) { testPriorUsabilityContractUpgradePreservesProjectPolicy(t, version) })
+	}
+}
+
+func testPriorUsabilityContractUpgradePreservesProjectPolicy(t *testing.T, version int) {
 	t.Parallel()
 	root := t.TempDir()
 	policy := []byte(`{"profile":"review","exclude":["fixtures/**"],"scopes":{"library":{"roots":["src"]}}}`)
@@ -30,7 +37,7 @@ func TestPriorUsabilityContractUpgradePreservesProjectPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	old.ConfigSchemaVersion = 1
+	old.ConfigSchemaVersion = version
 	old.ReportSchemaVersion = 21
 	old.NormalizationVersion = 13
 	raw, err := projectcontract.Marshal(old)
@@ -53,7 +60,7 @@ func TestPriorUsabilityContractUpgradePreservesProjectPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if current.SchemaVersion != 1 || current.ConfigSchemaVersion != 2 || current.ReportSchemaVersion != model.SchemaVersion || current.NormalizationVersion != normalize.Version || current.EmbeddedSkill.Digest != skillDigest {
+	if current.SchemaVersion != 1 || current.ConfigSchemaVersion != 3 || current.ReportSchemaVersion != model.SchemaVersion || current.NormalizationVersion != normalize.Version || current.EmbeddedSkill.Digest != skillDigest {
 		t.Fatalf("contract %+v", current)
 	}
 	after, err := os.ReadFile(filepath.Join(root, ".mori.json"))

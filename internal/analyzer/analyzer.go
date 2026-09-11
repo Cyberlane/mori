@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"path/filepath"
 	"sort"
@@ -33,6 +34,9 @@ type PhaseTimings struct {
 
 // Options controls parsing concurrency and pair selection.
 type Options struct {
+	ParseCache parser.Cache
+	// EstimateOnly counts eligible candidate pairs without scoring or applying MaxPairs.
+	EstimateOnly      bool
 	Timings           *PhaseTimings
 	Threshold         float64
 	MinTokens         int
@@ -58,6 +62,8 @@ type Options struct {
 	EmbeddedSQL       bool
 	SQLDialect        string
 	FragmentSelection string
+	ProductionPaths   []string
+	TestPaths         []string
 	StatementBlocks   bool
 	BlockStatements   int
 	MaxBlocksPerFunc  int
@@ -108,6 +114,8 @@ type matchCollector struct {
 	report           *model.Report
 	groups           map[string]*groupCandidate
 	suppressedGroups map[string]struct{}
+	repeatedBags     map[string]bool
+	scoreCache       map[[2]string]float64
 }
 
 // Analyze parses files and returns content-grouped pairs at or above the
@@ -201,10 +209,13 @@ func Analyze(
 					return
 				}
 				fragments, warnings, parserCoverage := parser.FileWithCoverage(ctx, job.file, parser.Options{
+					Cache:             options.ParseCache,
 					MinTokens:         options.MinTokens,
 					EmbeddedSQL:       options.EmbeddedSQL,
 					SQLDialect:        options.SQLDialect,
 					FragmentSelection: options.FragmentSelection,
+					ProductionPaths:   options.ProductionPaths,
+					TestPaths:         options.TestPaths,
 					StatementBlocks:   options.StatementBlocks,
 					BlockStatements:   options.BlockStatements,
 					MaxBlocksPerFunc:  options.MaxBlocksPerFunc,
@@ -287,6 +298,9 @@ func Analyze(
 		report:           &report,
 		groups:           make(map[string]*groupCandidate),
 		suppressedGroups: make(map[string]struct{}),
+	}
+	if !options.EstimateOnly {
+		collector.prepareScoreCache(fragments)
 	}
 	var compareErr error
 	if len(options.LanguagePairs) > 0 {
@@ -462,6 +476,9 @@ func domainAndFamilyKey(fragment model.Fragment) string {
 }
 
 func validateOptions(options Options) error {
+	if err := parser.ValidateSelectionPaths(options.ProductionPaths, options.TestPaths); err != nil {
+		return err
+	}
 	switch options.FragmentSelection {
 	case "", "all", "production", "tests":
 	default:
@@ -742,13 +759,16 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 	if overlappingStatementBlocks(left, right) {
 		return nil
 	}
-	if collector.options.MaxPairs > 0 &&
+	if !collector.options.EstimateOnly && collector.options.MaxPairs > 0 &&
 		collector.report.CandidatePairs >= collector.options.MaxPairs {
 		return &CandidateLimitError{Limit: collector.options.MaxPairs, Compared: collector.report.CandidatePairs}
 	}
 
 	collector.report.CandidatePairs++
-	score, _, _ := similarity.WeightedJaccard(left.Features, right.Features)
+	if collector.options.EstimateOnly {
+		return nil
+	}
+	score := collector.cachedScore(left, right)
 	if score < collector.options.Threshold {
 		return nil
 	}
@@ -785,6 +805,59 @@ func (collector *matchCollector) score(left model.Fragment, right model.Fragment
 	group.addFocusedOccurrence(left.Location, collector.options.FocusPaths, collector.options.FocusIntervals)
 	group.addFocusedOccurrence(right.Location, collector.options.FocusPaths, collector.options.FocusIntervals)
 	return nil
+}
+
+// Only repeated, exactly equal bags participate in the cache. Comparing bags
+// during preparation keeps truncated fingerprint collisions out of this cache.
+func (collector *matchCollector) prepareScoreCache(fragments []model.Fragment) {
+	collector.repeatedBags = make(map[string]bool)
+	seen := make(map[string]model.FeatureBag)
+	collisions := make(map[string]bool)
+	for _, fragment := range fragments {
+		if previous, exists := seen[fragment.Fingerprint]; exists {
+			if !maps.Equal(previous, fragment.Features) {
+				collisions[fragment.Fingerprint] = true
+			}
+			collector.repeatedBags[fragment.Fingerprint] = true
+		} else {
+			seen[fragment.Fingerprint] = fragment.Features
+		}
+	}
+	for id := range collisions {
+		delete(collector.repeatedBags, id)
+	}
+	collector.scoreCache = make(map[[2]string]float64)
+}
+
+func (collector *matchCollector) cachedScore(left, right model.Fragment) float64 {
+	key := [2]string{left.Fingerprint, right.Fingerprint}
+	if key[1] < key[0] {
+		key[0], key[1] = key[1], key[0]
+	}
+	cacheable := collector.repeatedBags[key[0]] && collector.repeatedBags[key[1]]
+	if cacheable {
+		if score, exists := collector.scoreCache[key]; exists {
+			return score
+		}
+	}
+	// Some direct collector callers supply synthetic fragments without totals.
+	leftTotal, rightTotal := left.FeatureCount, right.FeatureCount
+	if leftTotal == 0 {
+		for _, count := range left.Features {
+			leftTotal += count
+		}
+	}
+	if rightTotal == 0 {
+		for _, count := range right.Features {
+			rightTotal += count
+		}
+	}
+	score := similarity.AtLeast(left.Features, right.Features, leftTotal, rightTotal, collector.options.Threshold)
+	// Bound memory even for duplicate-heavy repositories with many distinct bags.
+	if cacheable && len(collector.scoreCache) < 65536 {
+		collector.scoreCache[key] = score
+	}
+	return score
 }
 
 func focusedLocation(location model.Location, paths map[string]struct{}, intervals map[string][]model.LineInterval) bool {
@@ -946,6 +1019,16 @@ func reviewPriority(candidate *groupCandidate, priorityPaths []model.PriorityPat
 	if candidate.locationPairs > 1 {
 		priority++
 		signals = append(signals, "repeated-location-pairs")
+	}
+	if repeatedSmallWrapper(candidate) {
+		// Repetition and a shared wrapper name are weak review evidence here.
+		// Keep the group visible and retain structural scores and identities.
+		priority -= 7
+		signals = append(signals, "repeated-small-wrapper(-7)")
+	} else if repeatedSmallBoilerplate(candidate) {
+		penalty := min(priority, 7)
+		priority -= penalty
+		signals = append(signals, fmt.Sprintf("repeated-small-boilerplate(-%d)", penalty))
 	}
 	for _, rule := range priorityPaths {
 		matched := false

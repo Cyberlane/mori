@@ -81,7 +81,8 @@ mori scan --comparison-domain sql-query --language-pair go,go .
 `--fragment-selection all|production|tests` selects fragments after parsing.
 The default `all` preserves the existing comparison universe. Test selection
 recognizes conventional test paths, explicit Rust test attributes, and
-unambiguously test-only conditional modules; unclassified fragments remain on
+unambiguously test-only conditional modules, and positive C/C++ `REDIS_TEST`
+preprocessor regions; unclassified fragments remain on
 the production side. See the [exact conventions](reference/languages-and-parser-limits.md#test-selection). This is syntax classification, not proof of application
 ownership. File exclusions remain separate and cannot isolate inline tests.
 
@@ -90,6 +91,10 @@ counts. Fragment selection does not turn intentionally excluded fragments into
 analyzed coverage. It participates in baseline and receipt compatibility;
 keep staged-gate policy inclusive unless the consequences are explicitly
 reviewed. See [configuration](configuration.md) for named scope overrides.
+
+Explicit `--production-path` and `--test-path` overrides can classify a shipped
+testing API or unconventional test directory. See
+[classification overrides](configuration.md#classification-overrides).
 
 ## Project configuration
 

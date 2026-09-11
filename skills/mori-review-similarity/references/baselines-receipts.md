@@ -72,3 +72,27 @@ normalization, or focused-identity change invalidates it.
 Receipt creation/use requires owner authorization. Direct commit
 authorization need not be re-requested, but honor standing project authorization for this action. Ask again only
 for unresolved owner decisions or when receipt authorization is absent.
+
+### Accept several reviewed identities in one scan
+
+Repeat `--identity` to accept a reviewed batch using one complete validation scan
+and one atomic baseline write:
+
+```sh
+mori baseline add --baseline mori-baseline.json \
+  --identity <first-reviewed-id> --identity <second-reviewed-id> \
+  --classification intentional .
+```
+
+Every identity must exist in the active scan. If any identity is missing, nothing
+is written. Duplicate identities are accepted once. The supplied note and
+classification apply to every selected identity, so use separate batches for
+different decisions. Inspect each finding before accepting it. Existing baseline
+profile mismatches are rejected after discovery, before parsing or comparison.
+This changes no baseline document schema.
+
+Before a potentially expensive scan, use `mori plan` with the same roots and
+selection options. It parses and counts candidates without scoring similarities,
+shows package workload bounds, and does not load or accept baselines. A successful
+plan is not review evidence. Narrowing to separate packages omits cross-package
+findings. Named scopes only reduce work when their roots or selection reduce work.

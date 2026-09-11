@@ -91,6 +91,8 @@ type Settings struct {
 	ScopeSelected         bool    `json:"scope_selected"`
 	RootCount             int64   `json:"root_count"`
 	ExcludePatternCount   int64   `json:"exclude_pattern_count"`
+	ProductionPathCount   int64   `json:"production_path_count,omitempty"`
+	TestPathCount         int64   `json:"test_path_count,omitempty"`
 	PriorityPathCount     int64   `json:"priority_path_count"`
 	LanguagePairCount     int64   `json:"language_pair_count"`
 	BaselineEnabled       bool    `json:"baseline_enabled"`

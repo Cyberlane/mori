@@ -579,6 +579,8 @@ func runConfigCommand(args []string, stdout, stderr io.Writer) int {
 }
 
 type effectiveConfiguration struct {
+	ProductionPaths   []string `json:"production_paths,omitempty"`
+	TestPaths         []string `json:"test_paths,omitempty"`
 	FragmentSelection string   `json:"fragment_selection"`
 	Profile           string   `json:"profile,omitempty"`
 	Threshold         float64  `json:"threshold"`
@@ -712,7 +714,7 @@ func projectConfiguration(root string) (config.Settings, string, bool, scanOptio
 
 func effectiveFromOptions(options scanOptions) effectiveConfiguration {
 	return effectiveConfiguration{
-		FragmentSelection: options.fragmentSelection, Profile: options.profile, Threshold: options.threshold, MinTokens: options.minTokens, MaxGroups: options.maxGroups, MaxOccurrences: options.maxOccurrences, MaxPairs: options.maxPairs, MaxFileBytes: options.maxFileBytes, Workers: options.workers, Format: options.format, ComparisonDomain: options.comparisonDomain, SQLDialect: options.sqlDialect, EmbeddedSQL: options.embeddedSQL, Ranking: options.ranking, SameLanguageOnly: options.sameLanguageOnly, CrossLanguageOnly: options.crossLanguageOnly, LanguagePairs: append([]string{}, options.languagePairs...), RequireCoverage: options.requireCoverage, MinFileCoverage: options.minFileCoverage, MaxZeroFiles: options.maxZeroFiles, FailOnWarning: options.failOnWarning, FailOnDiagnostic: options.failOnDiagnostic, ExcludeGenerated: options.excludeGenerated, Excludes: append([]string{}, options.excludes...), RespectIgnore: options.respectIgnore}
+		ProductionPaths: append([]string(nil), options.productionPaths...), TestPaths: append([]string(nil), options.testPaths...), FragmentSelection: options.fragmentSelection, Profile: options.profile, Threshold: options.threshold, MinTokens: options.minTokens, MaxGroups: options.maxGroups, MaxOccurrences: options.maxOccurrences, MaxPairs: options.maxPairs, MaxFileBytes: options.maxFileBytes, Workers: options.workers, Format: options.format, ComparisonDomain: options.comparisonDomain, SQLDialect: options.sqlDialect, EmbeddedSQL: options.embeddedSQL, Ranking: options.ranking, SameLanguageOnly: options.sameLanguageOnly, CrossLanguageOnly: options.crossLanguageOnly, LanguagePairs: append([]string{}, options.languagePairs...), RequireCoverage: options.requireCoverage, MinFileCoverage: options.minFileCoverage, MaxZeroFiles: options.maxZeroFiles, FailOnWarning: options.failOnWarning, FailOnDiagnostic: options.failOnDiagnostic, ExcludeGenerated: options.excludeGenerated, Excludes: append([]string{}, options.excludes...), RespectIgnore: options.respectIgnore}
 }
 
 func runInspect(ctx context.Context, args []string, stdout, stderr io.Writer) int {

@@ -313,11 +313,9 @@ module.exports = grammar({
       )),
     ),
 
-    attribute_specifier: $ => seq(
-      choice('__attribute__', '__attribute'),
-      '(',
-      $.argument_list,
-      ')',
+    attribute_specifier: $ => choice(
+      seq(choice('__attribute__', '__attribute'), '(', $.argument_list, ')'),
+      seq('GIT_FORMAT_PRINTF', '(', $.number_literal, ',', $.number_literal, ')'),
     ),
 
     attribute: $ => seq(
@@ -889,8 +887,10 @@ module.exports = grammar({
       )),
     )),
 
-    macro_iteration_statement: $ => seq(
-      alias('STRUCT_SECTION_FOREACH', $.identifier), '(', $.identifier, ',', $.identifier, ')', $.compound_statement,
+    macro_iteration_statement: $ => choice(
+      seq(alias('STRUCT_SECTION_FOREACH', $.identifier), '(', $.identifier, ',', $.identifier, ')', $.compound_statement),
+      seq(alias('git_vector_foreach', $.identifier), '(', $.expression, ',', $.identifier, ',', $.identifier, ')', $.compound_statement),
+      seq(alias('git_attr_file__foreach_matching_rule', $.identifier), '(', $.expression, ',', $.expression, ',', $.identifier, ',', $.identifier, ')', $.compound_statement),
     ),
 
     while_statement: $ => seq(

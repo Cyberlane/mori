@@ -25,7 +25,7 @@ import (
 )
 
 const stagedCacheMaxBytes = 16 * 1024 * 1024
-const stagedCacheRevision = 2
+const stagedCacheRevision = 3
 
 // Bound reconstruction independently of the serialized size.
 const stagedCacheMaxPairs = 1_000_000
@@ -132,6 +132,10 @@ func stagedAnalysisCacheKey(paths []string, options scanOptions, baselineDigest 
 			return "", fmt.Errorf("unsupported cache option %s", name)
 		}
 	}
+	// Selection resolves symlink aliases at use time. Bind those effective
+	// targets too, so retargeting a live alias cannot reuse stale classification.
+	values["productionPaths"] = selectionPolicyLabels(options.productionPaths)
+	values["testPaths"] = selectionPolicyLabels(options.testPaths)
 	payload := struct {
 		Revision      int
 		Executable    string

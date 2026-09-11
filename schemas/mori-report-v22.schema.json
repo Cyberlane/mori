@@ -1138,6 +1138,18 @@
             "production",
             "tests"
           ]
+        },
+        "production_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "test_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     }

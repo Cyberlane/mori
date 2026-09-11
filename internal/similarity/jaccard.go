@@ -31,6 +31,39 @@ func WeightedJaccard(left model.FeatureBag, right model.FeatureBag) (float64, in
 	return float64(intersection) / float64(union), intersection, union
 }
 
+// AtLeast scores positive feature multisets using their precomputed totals.
+// Rejected pairs return zero. Accepted pairs retain exactly the same division
+// as WeightedJaccard. The upper bound uses integer weights and the original
+// floating-point comparison, avoiding rounded threshold transformations.
+func AtLeast(left, right model.FeatureBag, leftTotal, rightTotal int, threshold float64) float64 {
+	if len(left) > len(right) {
+		left, right = right, left
+		leftTotal, rightTotal = rightTotal, leftTotal
+	}
+	intersection, remaining, visited := 0, leftTotal, 0
+	for feature, count := range left {
+		intersection += min(count, right[feature])
+		remaining -= count
+		visited++
+		if visited%8 == 0 {
+			upper := min(intersection+remaining, rightTotal)
+			union := leftTotal + rightTotal - upper
+			if union > 0 && float64(upper)/float64(union) < threshold {
+				return 0
+			}
+		}
+	}
+	union := leftTotal + rightTotal - intersection
+	if union == 0 {
+		return 0
+	}
+	score := float64(intersection) / float64(union)
+	if score < threshold {
+		return 0
+	}
+	return score
+}
+
 // Shape returns a compact, non-semantic summary of shared canonical structure.
 func Shape(left model.FeatureBag, right model.FeatureBag) []string {
 	type shapeFeature struct {

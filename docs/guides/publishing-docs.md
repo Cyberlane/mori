@@ -51,7 +51,7 @@ out of the publication tree. Review the artifact and obtain the normal project
 publication authorization before pushing it. Do not mix publication history with
 `main` or use deployment as evidence that a release was published.
 
-The current template labels the site **Mori v0.33.0 documentation**. Publish it
+The current template labels the site **Mori v0.34.0 documentation**. Publish it
 only after that release is available, and retain the minimum-version notice.
 Preserve that banner while the site describes unreleased behavior. Update it only
 when the corresponding release is verified, and make the documentation version

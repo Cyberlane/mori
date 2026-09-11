@@ -78,8 +78,8 @@ module publishes its generated parser through Git LFS and a release archive.
 The only substantial Hack grammar upstream is archived, so Mori pins its exact
 generated source commit and documents that maintenance boundary.
 Mori vendors the minimum generated sources and required headers under
-`internal/grammar/swift`, `internal/grammar/postgresql`, and
-`internal/grammar/hack`. Those packages
+`internal/grammar`, including maintained Go, TypeScript/TSX, C, and Swift
+compatibility grammars. Those packages
 record exact source commits, artifacts, licenses, ABIs, and SHA-256 digests;
 ordinary builds never download or regenerate them. A
 table-driven test calls `Parser.SetLanguage` for every entry; compilation alone

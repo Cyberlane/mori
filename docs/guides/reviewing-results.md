@@ -51,6 +51,31 @@ mori scan --ranking review .
 Review ranking prioritizes disclosed source-location signals before ordinary
 structural ordering. It does not change scores, fingerprints, or eligibility.
 
+In Mori v0.34.0 or later, repeated small call wrappers lose the
+name/repetition boost when the same name occurs in at least four directories.
+The signal is `repeated-small-wrapper(-7)`.
+
+Repeated short accessors, forwarding calls, throwing wrappers and single-assignment
+setters can also receive `repeated-small-boilerplate(-N)`. This requires at least
+three distinct source occurrences across two files. Both representative bodies
+must have at most 80 normalized tokens, no nested functions, and only a small
+straight-line operation shape. Arithmetic, branches, loops and bindings keep
+normal priority. The deduction is at most seven points, never makes the base
+priority negative, and does not stack with the existing wrapper deduction.
+Configured path priorities are added afterward.
+
+These are conservative presentation heuristics, not evidence that duplication
+is intentional. They help prevent repeated scaffolding from crowding the shortlist
+when lowering `--min-tokens`, but do not guarantee that every useful finding is
+retained. Use structural ranking, a larger `--max-groups`, or explicit priority
+paths to inspect deprioritized groups. No findings are automatically accepted or
+removed, and scores and identities are unchanged.
+
+Agent and compact reports mark groups whose retained occurrences exclude nested
+bodies with `outer body only: nested functions evaluated separately`. Inspect
+those separate functions before interpreting a high parent score. This warning
+uses existing JSON occurrence metadata and does not change the report schema.
+
 Projects can add deterministic presentation-only path priority:
 
 ```sh

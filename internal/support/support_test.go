@@ -299,3 +299,35 @@ func TestExactInt64CountsAndSettingsRoundTrip(t *testing.T) {
 		t.Fatal("int64 round trip lost precision")
 	}
 }
+
+func TestOptionalClassificationCountsPreserveOldSessionsAndRejectInvalidCounts(t *testing.T) {
+	original := fixture()
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(data, []byte("production_path_count")) || bytes.Contains(data, []byte("test_path_count")) {
+		t.Fatal("zero counts should preserve old session shape")
+	}
+	var old Session
+	if err := json.Unmarshal(data, &old); err != nil {
+		t.Fatal(err)
+	}
+	if err := Validate(old); err != nil {
+		t.Fatal(err)
+	}
+	original.Settings.ProductionPathCount = 2
+	original.Settings.TestPathCount = 1
+	if err := Validate(original); err != nil {
+		t.Fatal(err)
+	}
+	original.Settings.ProductionPathCount = -1
+	if err := Validate(original); err == nil {
+		t.Fatal("accepted negative production path count")
+	}
+	original.Settings.ProductionPathCount = 0
+	original.Settings.TestPathCount = -1
+	if err := Validate(original); err == nil {
+		t.Fatal("accepted negative test path count")
+	}
+}

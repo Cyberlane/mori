@@ -15,6 +15,9 @@ Mori's grammar change replaces the external nil-coalescing token in
 remains a nested optional type; whitespace-separated `as? T ?? fallback` remains
 a cast followed by nil coalescing. No expression precedence was changed. This
 also permits casts inside call arguments without adding synthetic parentheses.
+Parenthesized expressions use the same precedence as binding patterns, with
+an explicit ambiguity retained until a following range suffix distinguishes
+`case (n + 1)...` from tuple binding patterns.
 The scanner is unchanged from the original pinned artifact.
 
 To regenerate in a temporary directory, copy `grammar.js` and run:
@@ -30,8 +33,8 @@ and releases use the committed generated sources directly.
 SHA-256:
 
 ```text
-396a01dc8e8d3e911dbcfacc7adcb1aedcea921f1f7152dd30d7cb9406a80444  grammar.js
-ae59d95b8b4f1b4fd35b7e26def91344db9f7de24111618b26269a5cd7d31037  parser.c
+e8a81cb8bbd7ee8ab4652ecafe7849991377ae63fd5d06c29777a67f19f54da9  grammar.js
+cde85fddaa1f0579d840abe589538735eec1e7a917561eeed77d3b20843baf03  parser.c
 380edc27e2020e5ba2d6415c9f6c0065965771d60138ae53372858e7b1f92e3b  scanner.c
 180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2  tree_sitter/parser.h
 5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94  tree_sitter/array.h

@@ -420,3 +420,36 @@ func writeFixture(t *testing.T, path string, content string) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 }
+
+func TestAddManyWriteFailurePreservesCallerSet(t *testing.T) {
+	profile := testProfile(.7)
+	set, err := New(ScopeContent, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := model.Report{Threshold: .7, Groups: []model.MatchGroup{matchGroup("accept", "a.go", "b.go")}}
+	path := filepath.Join(t.TempDir(), "missing-parent", "baseline.json")
+	added, updated, err := AddMany(path, set, report, []string{"accept"}, nil, nil, profile)
+	if err == nil || added != 0 || updated != 0 || set.Has("accept") {
+		t.Fatalf("failed write mutated caller set: %d/%d %v %+v", added, updated, err, set.Entries())
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("failed write left file: %v", err)
+	}
+}
+
+func TestAddManyFailurePreservesCallerSet(t *testing.T) {
+	profile := testProfile(0.7)
+	set, err := New(ScopeContent, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := model.Report{Threshold: 0.7, Groups: []model.MatchGroup{matchGroup("accept", "left.go", "right.go")}}
+	// A directory cannot be atomically replaced with the baseline file.
+	if _, _, err := AddMany(t.TempDir(), set, report, []string{"accept"}, nil, nil, profile); err == nil {
+		t.Fatal("expected write failure")
+	}
+	if set.Has("accept") {
+		t.Fatal("failed write mutated caller acceptance")
+	}
+}

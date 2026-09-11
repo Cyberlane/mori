@@ -66,6 +66,8 @@ type ScanProfile struct {
 	SQLDialect        string       `json:"sql_dialect"`
 	EmbeddedSQL       bool         `json:"embedded_sql"`
 	FragmentSelection string       `json:"fragment_selection,omitempty"`
+	ProductionPaths   []string     `json:"production_paths,omitempty"`
+	TestPaths         []string     `json:"test_paths,omitempty"`
 	StatementBlocks   bool         `json:"statement_blocks"`
 	BlockStatements   int          `json:"block_statements"`
 	MaxBlocksPerFunc  int          `json:"max_blocks_per_function"`
@@ -227,6 +229,8 @@ func normalizedProfile(profile ScanProfile) ScanProfile {
 	if profile.FragmentSelection == "all" {
 		profile.FragmentSelection = ""
 	}
+	profile.ProductionPaths = uniqueSorted(profile.ProductionPaths)
+	profile.TestPaths = uniqueSorted(profile.TestPaths)
 	profile.LanguagePairs = uniqueSorted(profile.LanguagePairs)
 	profile.Excludes = uniqueSorted(profile.Excludes)
 	profile.IgnoreFiles = append([]IgnoreFile{}, profile.IgnoreFiles...)
@@ -382,11 +386,24 @@ func Add(
 	classification *string,
 	profile ScanProfile,
 ) (int, int, error) {
+	return AddMany(path, set, report, []string{identity}, note, classification, profile)
+}
+
+// AddMany accepts explicitly reviewed identities in one atomic write. Every
+// identity must exist in the complete report before any acceptance is persisted.
+func AddMany(path string, set Set, report model.Report, identities []string, note, classification *string, profile ScanProfile) (int, int, error) {
 	if report.Truncated {
 		return 0, 0, errors.New("cannot add to a baseline from a truncated report")
 	}
-	if identity == "" {
-		return 0, 0, errors.New("baseline identity cannot be empty")
+	if len(identities) == 0 {
+		return 0, 0, errors.New("baseline identities cannot be empty")
+	}
+	requested := make(map[string]bool, len(identities))
+	for _, identity := range identities {
+		if identity == "" {
+			return 0, 0, errors.New("baseline identity cannot be empty")
+		}
+		requested[identity] = false
 	}
 	if set.Legacy() {
 		return 0, 0, errors.New("legacy baseline must be explicitly migrated before mutation")
@@ -402,12 +419,28 @@ func Add(
 	candidates := entriesFromReport(report, set.scope)
 	added := 0
 	updated := 0
-	matched := 0
+	// Validate the entire batch before mutating even the in-memory set.
 	for _, candidate := range candidates {
-		if candidate.ID != identity {
+		if _, ok := requested[candidate.ID]; ok {
+			requested[candidate.ID] = true
+		}
+	}
+	for _, identity := range identities {
+		if !requested[identity] {
+			return 0, 0, fmt.Errorf("identity %q was not found in the active scan", identity)
+		}
+	}
+	// Stage updates separately so validation or filesystem errors leave the
+	// caller's shared Set unchanged, as well as the baseline on disk.
+	originalEntries := set.entries
+	set.entries = make(map[string]Entry, len(originalEntries))
+	for key, entry := range originalEntries {
+		set.entries[key] = entry
+	}
+	for _, candidate := range candidates {
+		if !requested[candidate.ID] {
 			continue
 		}
-		matched++
 		key := entryKey(set.scope, candidate.ID, candidate.Left, candidate.Right)
 		entry, exists := set.entries[key]
 		if !exists {
@@ -427,12 +460,13 @@ func Add(
 		}
 		set.entries[key] = entry
 	}
-	if matched == 0 {
-		return 0, 0, fmt.Errorf("identity %q was not found in the active scan", identity)
+	if err := writeEntries(path, set.Entries(), report.Threshold, set.scope, profile); err != nil {
+		return 0, 0, err
 	}
-	return added, updated, writeEntries(
-		path, set.Entries(), report.Threshold, set.scope, profile,
-	)
+	for key, entry := range set.entries {
+		originalEntries[key] = entry
+	}
+	return added, updated, nil
 }
 
 // Remove deletes every accepted entry using one content identity.

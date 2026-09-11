@@ -217,7 +217,7 @@ def build(root: Path, output: Path, source_ref: str) -> dict:
 <link rel="stylesheet" href="{relative(Path('site.css'))}"></head>
 <body><a class="skip" href="#content">Skip to content</a>
 <header><a class="brand" href="{relative(Path('index.html'))}"><span aria-hidden="true">森</span> Mori <small>Documentation</small></a><a href="https://github.com/Cyberlane/mori">GitHub ↗</a></header>
-<div class="development" role="note"><strong>Mori v0.33.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
+<div class="development" role="note"><strong>Mori v0.34.0 documentation</strong> · Library scopes and support bundles require <strong>v0.33.0 or later</strong>. Check <a href="https://github.com/Cyberlane/mori/releases/latest">release notes</a> against your installed version.</div>
 <div class="layout"><aside><details open><summary>Browse documentation</summary><nav aria-label="Documentation">{''.join(nav)}</nav></details></aside>
 <main id="content"><div class="page-meta">GUIDES &amp; REFERENCE <a href="{relative(Path('source') / source)}">Markdown source ↗</a></div>
 {''.join(rewrite.result)}

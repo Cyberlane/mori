@@ -144,6 +144,8 @@ module.exports = grammar({
     // The `class` modifier is legal in many of the same positions that a class declaration itself would be.
     [$._bodyless_function_declaration, $.property_modifier],
     [$.init_declaration, $.property_modifier],
+    // Keep parenthesized expression patterns available before range suffixes.
+    [$.tuple_expression, $._binding_pattern_with_expr],
     // Patterns, man
     [$._navigable_type_expression, $._case_pattern],
     [$._no_expr_pattern_already_bound, $._binding_pattern_no_expr],
@@ -973,7 +975,7 @@ module.exports = grammar({
       ),
     tuple_expression: ($) =>
       prec.right(
-        PRECS.tuple,
+        0,
         seq(
           "(",
           sep1Opt(

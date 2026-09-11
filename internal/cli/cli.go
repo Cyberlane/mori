@@ -24,6 +24,7 @@ import (
 	"github.com/Cyberlane/mori/internal/language"
 	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/normalize"
+	"github.com/Cyberlane/mori/internal/parser"
 	"github.com/Cyberlane/mori/internal/pathutil"
 	"github.com/Cyberlane/mori/internal/report"
 	"github.com/Cyberlane/mori/internal/reviewreceipt"
@@ -72,6 +73,8 @@ func RunWithInput(
 		return runFeedback(args[1:], stdout, stderr)
 	case "scan":
 		return runScan(ctx, args[1:], stdin, stdout, stderr)
+	case "plan":
+		return runPlan(ctx, args[1:], stdout, stderr)
 	case "explain":
 		return runExplain(ctx, args[1:], stdout, stderr)
 	case "setup":
@@ -122,74 +125,79 @@ func RunWithInput(
 }
 
 type scanOptions struct {
-	diagnosticsPath    string
-	diagnostics        *scanDiagnostics
-	profile            string
-	scope              string
-	scopeRoots         []string
-	scopeRootLabels    []string
-	excludes           stringList
-	languagePairs      stringList
-	comparisonDomain   string
-	sqlDialect         string
-	embeddedSQL        bool
-	fragmentSelection  string
-	statementBlocks    bool
-	blockStatements    int
-	maxBlocksPerFunc   int
-	ranking            string
-	priorityPaths      stringList
-	focusPaths         stringList
-	changedSince       string
-	changedWorktrees   stringList
-	threshold          float64
-	minTokens          int
-	maxGroups          int
-	maxOccurrences     int
-	maxPairs           int
-	maxFileBytes       int64
-	workers            int
-	format             string
-	outputPath         string
-	color              string
-	redactPaths        bool
-	sameLanguageOnly   bool
-	crossLanguageOnly  bool
-	failOnMatch        bool
-	failOnFocusedMatch bool
-	includeFocused     bool
-	requireFocus       bool
-	requireCoverage    bool
-	minFileCoverage    float64
-	maxZeroFiles       int
-	failOnWarning      bool
-	failOnDiagnostic   bool
-	excludeGenerated   bool
-	baselinePath       string
-	baselineScope      string
-	respectIgnore      bool
-	noIgnore           bool
-	requestedConfig    string
-	configPath         string
-	noConfig           bool
-	check              bool
-	acceptAll          bool
-	acceptProfile      bool
-	identity           string
-	note               string
-	noteSet            bool
-	classification     string
-	classificationSet  bool
-	allowedWarnings    stringList
-	stdinPath          string
-	stdinContent       []byte
-	staged             bool
-	stagedSnapshot     *vcs.IndexSnapshot
-	reviewReceiptPath  string
-	acceptFocused      bool
-	focusedOnly        bool
-	reviewPolicy       string
-	stagedCache        bool
+	diagnosticsPath        string
+	diagnostics            *scanDiagnostics
+	profile                string
+	scope                  string
+	scopeRoots             []string
+	scopeRootLabels        []string
+	excludes               stringList
+	languagePairs          stringList
+	comparisonDomain       string
+	sqlDialect             string
+	embeddedSQL            bool
+	fragmentSelection      string
+	productionPaths        stringList
+	testPaths              stringList
+	statementBlocks        bool
+	blockStatements        int
+	maxBlocksPerFunc       int
+	ranking                string
+	priorityPaths          stringList
+	focusPaths             stringList
+	changedSince           string
+	changedWorktrees       stringList
+	threshold              float64
+	minTokens              int
+	maxGroups              int
+	maxOccurrences         int
+	maxPairs               int
+	maxFileBytes           int64
+	workers                int
+	format                 string
+	outputPath             string
+	color                  string
+	redactPaths            bool
+	sameLanguageOnly       bool
+	crossLanguageOnly      bool
+	failOnMatch            bool
+	failOnFocusedMatch     bool
+	includeFocused         bool
+	requireFocus           bool
+	requireCoverage        bool
+	minFileCoverage        float64
+	maxZeroFiles           int
+	failOnWarning          bool
+	failOnDiagnostic       bool
+	excludeGenerated       bool
+	baselinePath           string
+	baselineScope          string
+	respectIgnore          bool
+	noIgnore               bool
+	requestedConfig        string
+	configPath             string
+	noConfig               bool
+	check                  bool
+	acceptAll              bool
+	acceptProfile          bool
+	identities             stringList
+	expectedBaselineDigest string
+	estimateOnly           bool
+	note                   string
+	noteSet                bool
+	classification         string
+	classificationSet      bool
+	allowedWarnings        stringList
+	stdinPath              string
+	stdinContent           []byte
+	staged                 bool
+	stagedSnapshot         *vcs.IndexSnapshot
+	reviewReceiptPath      string
+	acceptFocused          bool
+	focusedOnly            bool
+	reviewPolicy           string
+	stagedCache            bool
+	parseCache             bool
 }
 
 func defaultScanOptions() scanOptions {
@@ -215,6 +223,9 @@ func defaultScanOptions() scanOptions {
 
 func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string, allowReportOutput bool) {
 	flags.StringVar(&options.profile, "profile", options.profile, "scan profile: review, explore, or sql")
+	flags.Var(&options.productionPaths, "production-path", "classify a file or directory as production (repeatable)")
+	flags.Var(&options.testPaths, "test-path", "classify a file or directory as tests (repeatable)")
+	flags.BoolVar(&options.parseCache, "parse-cache", false, "reuse authenticated local parsing results after checking current source bytes")
 	flags.StringVar(&options.fragmentSelection, "fragment-selection", options.fragmentSelection, "fragment selection: all, production, or tests (conventional test paths and Rust test attributes)")
 	flags.StringVar(&options.scope, "scope", options.scope, "named project scope from .mori.json")
 	flags.Float64Var(&options.threshold, "threshold", options.threshold, "minimum weighted Jaccard score, from 0 to 1")
@@ -404,7 +415,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 		flags.BoolVar(&options.acceptProfile, "accept-profile", false, "explicitly accept the active scan profile")
 	}
 	if baselineAction == "add" {
-		flags.StringVar(&options.identity, "identity", "", "content-pair identity to accept")
+		flags.Var(&options.identities, "identity", "reviewed content-pair identity to accept (repeatable, one scan and atomic write)")
 		flags.StringVar(&options.note, "note", "", "durable human review note; an empty value clears it")
 		flags.StringVar(&options.classification, "classification", "", "durable review classification")
 	}
@@ -435,7 +446,12 @@ func parseScanOptions(
 	}
 	flags.Usage = func() {
 		fmt.Fprintf(trackedStderr, "Usage: mori %s [options] [path ...]\n", command)
-		fmt.Fprintln(trackedStderr, "\nScan functions and top-level SQL queries for structural similarity.")
+		if command == "plan" {
+			fmt.Fprintln(trackedStderr, "\nDiscover and parse source, then count eligible candidate pairs without scoring similarities.")
+			fmt.Fprintln(trackedStderr, "Plans support text or JSON output. Baselines and finding exit policies are not evaluated.")
+		} else {
+			fmt.Fprintln(trackedStderr, "\nScan functions and top-level SQL queries for structural similarity.")
+		}
 		fmt.Fprintln(trackedStderr, "Paths default to the current directory.")
 		fmt.Fprintln(trackedStderr, "\nOptions:")
 		flags.PrintDefaults()
@@ -851,6 +867,12 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	if settings.EmbeddedSQL != nil {
 		options.embeddedSQL = *settings.EmbeddedSQL
 	}
+	if settings.ProductionPaths != nil {
+		options.productionPaths = configSelectionPaths(base, settings.ProductionPaths)
+	}
+	if settings.TestPaths != nil {
+		options.testPaths = configSelectionPaths(base, settings.TestPaths)
+	}
 	if settings.FragmentSelection != "" {
 		options.fragmentSelection = settings.FragmentSelection
 	}
@@ -935,6 +957,9 @@ func resolveConfigPath(base string, path string) string {
 }
 
 func validateScanOptions(options scanOptions) error {
+	if _, _, err := resolvedSelectionPaths(options); err != nil {
+		return err
+	}
 	switch options.fragmentSelection {
 	case "", "all", "production", "tests":
 	default:
@@ -1138,6 +1163,9 @@ func runScanCommand(
 		return exitError
 	}
 	scanOptions := options
+	if baselineStatus == "loaded" {
+		scanOptions.expectedBaselineDigest = baselineDigest
+	}
 	if options.reviewReceiptPath != "" {
 		// Receipt validation must see every focused identity even when display
 		// retention is bounded.
@@ -1727,7 +1755,7 @@ func runBaselineAdd(ctx context.Context, args []string, stdout io.Writer, stderr
 	if !ok {
 		return code
 	}
-	if options.baselinePath == "" || options.identity == "" {
+	if options.baselinePath == "" || len(options.identities) == 0 {
 		return usageError(stderr, "--baseline and --identity are required for baseline add")
 	}
 	if err := rejectBaselineFocus(options, "add"); err != nil {
@@ -1744,6 +1772,9 @@ func runBaselineAdd(ctx context.Context, args []string, stdout io.Writer, stderr
 	set, found, err := loadOptionalBaseline(options.baselinePath)
 	if err != nil {
 		return commandError(stderr, "load baseline", err)
+	}
+	if found {
+		options.expectedBaselineDigest = set.ProfileDigest()
 	}
 	options.maxGroups = 0
 	options.maxOccurrences = 0
@@ -1783,11 +1814,11 @@ func runBaselineAdd(ctx context.Context, args []string, stdout io.Writer, stderr
 	if options.classificationSet {
 		classification = &options.classification
 	}
-	added, updated, err := baseline.Add(
+	added, updated, err := baseline.AddMany(
 		options.baselinePath,
 		set,
 		result,
-		options.identity,
+		options.identities,
 		note,
 		classification,
 		profile,
@@ -1798,7 +1829,7 @@ func runBaselineAdd(ctx context.Context, args []string, stdout io.Writer, stderr
 	if _, err := fmt.Fprintf(
 		stdout,
 		"baseline identity accepted: %s (%d new, %d refreshed)\n",
-		options.identity,
+		strings.Join(options.identities, ", "),
 		added,
 		updated,
 	); err != nil {
@@ -2259,6 +2290,8 @@ func baselineScanProfile(
 		SQLDialect:        dialect,
 		EmbeddedSQL:       options.embeddedSQL,
 		FragmentSelection: options.fragmentSelection,
+		ProductionPaths:   selectionPolicyLabels(options.productionPaths),
+		TestPaths:         selectionPolicyLabels(options.testPaths),
 		StatementBlocks:   options.statementBlocks,
 		BlockStatements:   options.blockStatements,
 		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
@@ -2449,6 +2482,9 @@ func executeScan(
 	if err != nil {
 		return model.Report{}, err
 	}
+	if options.expectedBaselineDigest != "" && options.expectedBaselineDigest != baseline.Digest(profile) {
+		return model.Report{}, fmt.Errorf("baseline scan profile %s differs from active profile %s; use matching scan options or run baseline migrate --accept-profile", options.expectedBaselineDigest, baseline.Digest(profile))
+	}
 	var changes []vcs.Changes
 	worktreeMode := false
 	if options.stagedSnapshot != nil {
@@ -2520,7 +2556,19 @@ func executeScan(
 		options.diagnostics.stage = "analysis"
 		timings = &options.diagnostics.timings
 	}
+	productionPaths, testPaths, err := resolvedSelectionPaths(options)
+	if err != nil {
+		return model.Report{}, err
+	}
+	var parseCache parser.Cache
+	if options.parseCache {
+		if cache, cacheErr := openParseCache(paths); cacheErr == nil {
+			parseCache = cache
+		}
+	}
 	result, err := analyzer.Analyze(ctx, discovered.Files, discovered.Warnings, analyzer.Options{
+		ParseCache:        parseCache,
+		EstimateOnly:      options.estimateOnly,
 		Timings:           timings,
 		Threshold:         options.threshold,
 		MinTokens:         options.minTokens,
@@ -2543,6 +2591,8 @@ func executeScan(
 		EmbeddedSQL:       options.embeddedSQL,
 		SQLDialect:        sqlDialect,
 		FragmentSelection: options.fragmentSelection,
+		ProductionPaths:   productionPaths,
+		TestPaths:         testPaths,
 		StatementBlocks:   options.statementBlocks,
 		BlockStatements:   options.blockStatements,
 		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
@@ -2566,6 +2616,8 @@ func executeScan(
 		SQLDialect:        sqlDialect,
 		EmbeddedSQL:       options.embeddedSQL,
 		FragmentSelection: options.fragmentSelection,
+		ProductionPaths:   append([]string(nil), options.productionPaths...),
+		TestPaths:         append([]string(nil), options.testPaths...),
 		StatementBlocks:   options.statementBlocks,
 		BlockStatements:   options.blockStatements,
 		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
@@ -3288,6 +3340,7 @@ func writeRootUsage(writer io.Writer) error {
 		"森 (mori) — cross-language structural similarity for source code\n",
 		"\nUsage:\n",
 		"  mori scan [options] [path ...]\n",
+		"  mori plan [scan options] [--format text|json] [path ...]\n",
 		"  mori explain <content-pair-id> [scan options] [path ...]\n",
 		"  mori setup [--agent [--format json]] [--answers <path|-> [--apply]] [directory]\n",
 		"  mori configure [--agent [--format json]] [--answers <path|-> [--apply]] [directory]\n",
