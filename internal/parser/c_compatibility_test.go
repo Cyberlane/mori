@@ -13,6 +13,10 @@ import (
 func TestCConsumerGrammarForms(t *testing.T) {
 	t.Parallel()
 	for name, content := range map[string]string{
+		"printf_annotation": `static int message(const char *fmt, ...) GIT_FORMAT_PRINTF(1, 2);
+int value(void) { return 1; }`,
+		"git_vector_iteration":        `int value(void) { git_vector_foreach(&items, index, item) { if (item->active) { return 1; } } return 0; }`,
+		"git_matching_rule_iteration": `int value(void) { git_attr_file__foreach_matching_rule(file, &path, index, rule) { if (rule->active) { return 1; } } return 0; }`,
 		"typed_widget_listener": `ZMK_DISPLAY_WIDGET_LISTENER(widget, struct status, update, get)
 int value(void) { return 1; }`,
 		"section_iteration": `int value(void) { STRUCT_SECTION_FOREACH(item_type, item) { if (item->active) { return 1; } } return 0; }`,
@@ -68,6 +72,10 @@ int value(void) { return 1; }`,
 func TestCConsumerGrammarKeepsMalformedSyntaxVisible(t *testing.T) {
 	t.Parallel()
 	for name, content := range map[string]string{
+		"printf_annotation_missing_argument": `static int message(const char *fmt, ...) GIT_FORMAT_PRINTF(1,);`,
+		"git_vector_missing_argument":        `int value(void) { git_vector_foreach(&items, , item) { return 1; } return 0; }`,
+		"git_iteration_broken_body":          `int value(void) { git_vector_foreach(&items, index, item) { return +; } return 0; }`,
+		"ordinary_call_without_semicolon":    `int value(void) { arbitrary(&items, index, item) { return 1; } return 0; }`,
 		"typed_widget_listener_missing_type": `ZMK_DISPLAY_WIDGET_LISTENER(widget, struct, update, get)
 int value(void) { return 1; }`,
 		"section_iteration_missing_argument": `int value(void) { STRUCT_SECTION_FOREACH(item_type,) { return 1; } return 0; }`,
@@ -114,7 +122,7 @@ int value(void) { return 1; }`,
 			if len(warnings) == 0 {
 				t.Fatal("malformed C has no warning")
 			}
-			if (name == "bad_initializer_branch" || name == "missing_endif") && len(fragments) != 0 {
+			if (name == "bad_initializer_branch" || name == "missing_endif" || name == "git_vector_missing_argument" || name == "git_iteration_broken_body") && len(fragments) != 0 {
 				t.Fatalf("invalid function scored: %+v", fragments)
 			}
 		})

@@ -1,6 +1,6 @@
 # Plan a large scan
 
-`mori plan` is available in development builds after v0.33.0.
+`mori plan` is available in Mori v0.34.0 or later.
 
 Use `mori plan` before a large scan to understand its comparison workload:
 
@@ -41,7 +41,38 @@ The separate `mori-scan-plan` artifact uses schema 1, published in
 `exceeds_pair_limit` compares it with the effective configured cap.
 
 Only text and JSON formats are supported. Planning does not support staged or
-focused input, diagnostic exports, receipts, report-output files or caches. It
-writes only to standard output and standard error. Managed project compatibility
+focused input, diagnostic exports, receipts or report-output files. Without
+`--parse-cache` it writes only to standard output and standard error. Managed project compatibility
 checks still apply. Ordinary output includes source/configuration paths, so use
 `--redact-paths` when appropriate and inspect output before sharing.
+
+## Reuse parsing between commands
+
+Explicitly enable local parsing reuse on both commands:
+
+```sh
+mori plan --parse-cache --profile review --fragment-selection production .
+mori scan --parse-cache --profile review --fragment-selection production .
+```
+
+Mori still discovers files and reads current source bytes on every invocation.
+Cached extraction is bound to those bytes, paths, language, extraction settings,
+and the exact executable. Scoring, ranking, candidate limits, coverage policies
+and baseline validation run normally. A plan is never reused as acceptance
+or proof of a clean scan. Changes to ignores or roots are applied by fresh
+source discovery before any cached extraction is considered.
+
+The opt-in cache stores normalized features, fragment locations, literal hashes
+and diagnostics under the platform user cache directory at
+`mori/parse-cache-v1`. It does not store source text or upload anything. Treat
+this local metadata as private. Entries are authenticated and stored with
+private permissions outside the current working directory and selected source
+roots. Each of 1,024 slots holds at most 256 KiB, with one bounded pending file
+per slot during writes. Collisions, oversized entries, corruption, unavailable
+storage and concurrent writes can cause cache misses. A miss falls back to
+normal parsing and does not alter policy.
+
+The flag is off by default and does not persist in project configuration.
+Omit it to stop using the cache. Delete that Mori cache subdirectory to remove
+its local entries. This is separate from staged review's `--cache`, which reuses
+an authenticated complete report for an unchanged immutable index snapshot.

@@ -129,7 +129,7 @@ baseline merely to hide noisy or out-of-scope source.
 
 ### Accept several reviewed identities in one scan
 
-Batch acceptance is available in development builds after v0.33.0.
+Batch acceptance is available in Mori v0.34.0 or later.
 
 Repeat `--identity` to accept a reviewed batch using one complete validation scan
 and one atomic baseline write:

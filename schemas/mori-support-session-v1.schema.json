@@ -649,6 +649,16 @@
         },
         "baseline_enabled": {
           "type": "boolean"
+        },
+        "production_path_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "test_path_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
         }
       },
       "required": [

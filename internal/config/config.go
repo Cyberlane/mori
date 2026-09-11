@@ -32,6 +32,8 @@ type Settings struct {
 	SQLDialect        string                   `json:"sql_dialect,omitempty"`
 	EmbeddedSQL       *bool                    `json:"embedded_sql,omitempty"`
 	FragmentSelection string                   `json:"fragment_selection,omitempty"`
+	ProductionPaths   []string                 `json:"production_paths,omitempty"`
+	TestPaths         []string                 `json:"test_paths,omitempty"`
 	StatementBlocks   *bool                    `json:"statement_blocks,omitempty"`
 	BlockStatements   *int                     `json:"block_statements,omitempty"`
 	MaxBlocksPerFunc  *int                     `json:"max_blocks_per_function,omitempty"`
@@ -70,6 +72,8 @@ type ScopeSettings struct {
 	SQLDialect        string   `json:"sql_dialect,omitempty"`
 	EmbeddedSQL       *bool    `json:"embedded_sql,omitempty"`
 	FragmentSelection string   `json:"fragment_selection,omitempty"`
+	ProductionPaths   []string `json:"production_paths,omitempty"`
+	TestPaths         []string `json:"test_paths,omitempty"`
 	StatementBlocks   *bool    `json:"statement_blocks,omitempty"`
 	BlockStatements   *int     `json:"block_statements,omitempty"`
 	MaxBlocksPerFunc  *int     `json:"max_blocks_per_function,omitempty"`
@@ -98,6 +102,7 @@ func (scope ScopeSettings) Settings() Settings {
 		MaxGroups: scope.MaxGroups, MaxOccurrences: scope.MaxOccurrences, MaxPairs: scope.MaxPairs,
 		MaxFileBytes: scope.MaxFileBytes, Workers: scope.Workers, Format: scope.Format,
 		ComparisonDomain: scope.ComparisonDomain, SQLDialect: scope.SQLDialect,
+		ProductionPaths: scope.ProductionPaths, TestPaths: scope.TestPaths,
 		EmbeddedSQL: scope.EmbeddedSQL, FragmentSelection: scope.FragmentSelection, StatementBlocks: scope.StatementBlocks,
 		BlockStatements: scope.BlockStatements, MaxBlocksPerFunc: scope.MaxBlocksPerFunc,
 		Ranking: scope.Ranking, PriorityPaths: scope.PriorityPaths,

@@ -41,13 +41,17 @@ type Coverage struct {
 // Options controls opt-in fragment extraction. Defaults preserve the
 // function- and query-level comparison contract used by earlier releases.
 type Options struct {
-	MinTokens         int
-	FragmentSelection string
-	EmbeddedSQL       bool
-	SQLDialect        string
-	StatementBlocks   bool
-	BlockStatements   int
-	MaxBlocksPerFunc  int
+	selectionPathsResolved bool
+	Cache                  Cache `json:"-"`
+	MinTokens              int
+	FragmentSelection      string
+	ProductionPaths        []string
+	TestPaths              []string
+	EmbeddedSQL            bool
+	SQLDialect             string
+	StatementBlocks        bool
+	BlockStatements        int
+	MaxBlocksPerFunc       int
 }
 
 // FileWithOptions parses one file using explicit bounded extraction options.
@@ -62,11 +66,12 @@ func FileWithOptions(
 
 // FileWithCoverage parses one file and also returns pre-filter coverage
 // evidence for strict file-coverage policies.
-func FileWithCoverage(
+func fileWithCoverageUncached(
 	ctx context.Context,
 	file source.File,
 	options Options,
 ) ([]model.Fragment, []model.Warning, Coverage) {
+	file, options = prepareSelectionPaths(file, options)
 	content, err := readSource(ctx, file)
 	if err != nil {
 		return nil, []model.Warning{{
@@ -139,7 +144,7 @@ func FileWithCoverage(
 		coverage.CandidateFragments++
 		if root.HasError() {
 			skippedFragments++
-		} else if excludeSelectedFragment(root, content, file, options.FragmentSelection, &coverage) {
+		} else if excludeSelectedFragment(root, content, file, options, &coverage) {
 			// Selection exclusions are counted separately from invalid and undersized fragments.
 		} else if included, err := appendFragment(
 			ctx,
@@ -178,11 +183,15 @@ func FileWithCoverage(
 	annotateNesting(fragments)
 	if root.HasError() {
 		diagnostics, total := parseDiagnostics(root, 5)
+		message := "syntax tree contains parse errors; comparison coverage may be incomplete"
+		if file.Language.ID == "javascript" && hasFlowPragma(root, content) {
+			message = "Flow-annotated JavaScript uses an unsupported dialect; syntax tree contains parse errors and comparison coverage may be incomplete"
+		}
 		warnings = append(warnings, model.Warning{
 			Kind:             "parse",
 			Path:             file.DisplayPath,
 			Language:         file.Language.ID,
-			Message:          "syntax tree contains parse errors; comparison coverage may be incomplete",
+			Message:          message,
 			TotalDiagnostics: total,
 			SkippedFragments: skippedFragments,
 			Diagnostics:      diagnostics,
@@ -221,7 +230,7 @@ func collect(
 		if accepted &&
 			(current.HasError() || hasInvalidAncestor(current)) {
 			(*skippedFragments)++
-		} else if accepted && !excludeSelectedFragment(current, content, file, options.FragmentSelection, coverage) {
+		} else if accepted && !excludeSelectedFragment(current, content, file, options, coverage) {
 			included, err := appendFragment(
 				ctx,
 				current,

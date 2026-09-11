@@ -35,6 +35,8 @@ func redactReportPaths(report *model.Report) {
 	for _, coverage := range report.FileCoverage {
 		add(coverage.Path)
 	}
+	addPaths(add, report.Configuration.ProductionPaths)
+	addPaths(add, report.Configuration.TestPaths)
 	add(report.Configuration.ConfigPath)
 	add(report.Configuration.BaselinePath)
 	add(report.Configuration.StdinPath)
@@ -101,6 +103,8 @@ func redactReportPaths(report *model.Report) {
 	report.Configuration.ConfigPath = replace(report.Configuration.ConfigPath)
 	report.Configuration.BaselinePath = replace(report.Configuration.BaselinePath)
 	report.Configuration.StdinPath = replace(report.Configuration.StdinPath)
+	replacePaths(replace, report.Configuration.ProductionPaths)
+	replacePaths(replace, report.Configuration.TestPaths)
 	replacePaths(replace, report.Configuration.IgnoreFiles)
 	for index := range report.Configuration.IgnoreEvidence {
 		report.Configuration.IgnoreEvidence[index].Path = replace(report.Configuration.IgnoreEvidence[index].Path)

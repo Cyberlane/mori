@@ -66,6 +66,8 @@ type ScanProfile struct {
 	SQLDialect        string       `json:"sql_dialect"`
 	EmbeddedSQL       bool         `json:"embedded_sql"`
 	FragmentSelection string       `json:"fragment_selection,omitempty"`
+	ProductionPaths   []string     `json:"production_paths,omitempty"`
+	TestPaths         []string     `json:"test_paths,omitempty"`
 	StatementBlocks   bool         `json:"statement_blocks"`
 	BlockStatements   int          `json:"block_statements"`
 	MaxBlocksPerFunc  int          `json:"max_blocks_per_function"`
@@ -227,6 +229,8 @@ func normalizedProfile(profile ScanProfile) ScanProfile {
 	if profile.FragmentSelection == "all" {
 		profile.FragmentSelection = ""
 	}
+	profile.ProductionPaths = uniqueSorted(profile.ProductionPaths)
+	profile.TestPaths = uniqueSorted(profile.TestPaths)
 	profile.LanguagePairs = uniqueSorted(profile.LanguagePairs)
 	profile.Excludes = uniqueSorted(profile.Excludes)
 	profile.IgnoreFiles = append([]IgnoreFile{}, profile.IgnoreFiles...)

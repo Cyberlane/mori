@@ -10,6 +10,10 @@ Mori vendors the grammar source and generated C needed for reproducible builds.
 
 Local changes:
 
+- Recognize the bounded libgit2 `GIT_FORMAT_PRINTF` annotation and compound
+  bodies for `git_vector_foreach` and `git_attr_file__foreach_matching_rule`.
+  Arguments and bodies remain parsed. Arbitrary calls do not become loops.
+
 - Preserve nested `#if` / `#ifdef` / alternative directives inside initializer
   lists when branch entries end in commas, without selecting a build branch.
 - Recognize static uppercase `*_DEFINE(...)` declarations with a semicolon and
@@ -32,8 +36,8 @@ SHA-256:
 
 ```text
 2e0110e07abef7c2548b26ec9d6969775617ca539a0dc8dbeeb14d6452c711d1  LICENSE
-3f102dcdfbab76b12b65326610c0fa9c3585bc19566b84d130e5ddaa3a8b2ef2  grammar.js
-a2d6955f4e875446e43e3c6f00cbd6f26e4517d22bb07c8e9687195973363b92  parser.c
+c67fd24cea0ea4d170c5b16577ad0675c04455a605da7505884f583a01475700  grammar.js
+db443d113b0c66d0f3ba83ecaa7536fac818a1f49bb60e30ab208f3805fa0ae6  parser.c
 9a823f24385fbb5fa06e52c258c726449c4e417a4476306589b6dcfaf9b831ee  tree-sitter.json
 b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea  tree_sitter/alloc.h
 5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94  tree_sitter/array.h

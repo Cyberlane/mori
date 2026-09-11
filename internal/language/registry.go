@@ -9,6 +9,7 @@ import (
 
 	tree_sitter_c "github.com/Cyberlane/mori/internal/grammar/c"
 	tree_sitter_gdscript "github.com/Cyberlane/mori/internal/grammar/gdscript"
+	tree_sitter_go "github.com/Cyberlane/mori/internal/grammar/golang"
 	tree_sitter_hack "github.com/Cyberlane/mori/internal/grammar/hack"
 	tree_sitter_java "github.com/Cyberlane/mori/internal/grammar/java"
 	tree_sitter_javascript "github.com/Cyberlane/mori/internal/grammar/javascript"
@@ -25,7 +26,6 @@ import (
 	tree_sitter_bash "github.com/tree-sitter/tree-sitter-bash/bindings/go"
 	tree_sitter_c_sharp "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
 	tree_sitter_cpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
-	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
 	tree_sitter_php "github.com/tree-sitter/tree-sitter-php/bindings/go"
 	tree_sitter_python "github.com/tree-sitter/tree-sitter-python/bindings/go"
 	tree_sitter_ruby "github.com/tree-sitter/tree-sitter-ruby/bindings/go"

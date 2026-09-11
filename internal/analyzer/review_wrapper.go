@@ -54,3 +54,60 @@ func smallCallWrapper(fragment model.Fragment) bool {
 	}
 	return true
 }
+
+// repeatedSmallBoilerplate is deliberately conservative: only repeated short
+// straight-line bodies qualify. A classification affects presentation, never
+// whether a match exists or is actionable. Names are not a blacklist.
+func repeatedSmallBoilerplate(candidate *groupCandidate) bool {
+	if !smallStraightLineBody(candidate.left) || !smallStraightLineBody(candidate.right) {
+		return false
+	}
+	files := make(map[string]struct{})
+	locations := make(map[model.Location]struct{})
+	for _, pair := range candidate.pathPairs {
+		for _, location := range []model.Location{pair.Left, pair.Right} {
+			files[location.Path] = struct{}{}
+			locations[location] = struct{}{}
+		}
+		if len(files) >= 2 && len(locations) >= 3 {
+			return true
+		}
+	}
+	return false
+}
+
+func smallStraightLineBody(fragment model.Fragment) bool {
+	if fragment.TokenCount <= 0 || fragment.TokenCount > 80 || fragment.NestedCount > 0 {
+		return false
+	}
+	operations := 0
+	for feature, count := range fragment.Features {
+		if count == 0 || !strings.HasPrefix(feature, "node:") {
+			continue
+		}
+		if strings.HasPrefix(feature, "node:operator:") && feature != "node:operator:assign" {
+			return false
+		}
+		if strings.HasPrefix(feature, "node:flow:") {
+			if feature != "node:flow:return" && feature != "node:flow:throw" {
+				return false
+			}
+			operations += count
+		}
+		if strings.HasPrefix(feature, "node:expression:") {
+			switch feature {
+			case "node:expression:call", "node:expression:member", "node:expression:assignment", "node:expression:new", "node:expression:subscript", "node:expression:parenthesized":
+			default:
+				return false
+			}
+		}
+		switch feature {
+		case "node:binding", "node:function:nested":
+			return false
+		case "node:expression:call", "node:expression:assignment", "node:expression:new", "node:statement:throw":
+			operations += count
+		}
+	}
+	// One accessor/setter, one call, or return/throw wrapping one call.
+	return operations > 0 && operations <= 2 && fragment.Features["node:expression:assignment"] <= 1
+}

@@ -60,7 +60,7 @@ The session schema is an explicit allowlist, not a redacted scan report:
 | --- | --- |
 | Tool | Validated Mori version/revision and modified-build flag, operating system, architecture, Go version and report/normalization/config/contract schema versions. Arbitrary build labels become `unknown`. |
 | Outcome | Status and optional fixed failure stage/code; no raw error message. |
-| Settings | Numeric scan limits, threshold, built-in profile/domain/dialect/selection/ranking names and boolean policies. Named scope, roots, exclusions, priority paths and language-pair selections are represented only by selection flags or counts. |
+| Settings | Numeric scan limits, threshold, built-in profile/domain/dialect/selection/ranking names and boolean policies. Named scope, roots, exclusions, production/test classification paths, priority paths and language-pair selections are represented only by selection flags or counts. |
 | Counts | An explicit report-availability flag distinguishes unavailable evidence from measured zero counts. Files, fragments, candidate/location pairs, match groups, warnings, parse diagnostics, test/story files and fragments, test/story presence in at most 25 leading retained groups, zero-fragment files, generated exclusions and truncation. |
 | Phases | Available elapsed milliseconds for fixed phase names; missing phases are not invented. |
 | Languages | Built-in language IDs and aggregate file/fragment counts. |
@@ -97,3 +97,10 @@ remain visible, so inspect the payload before sharing it.
 The [machine contract](../machine-integration.md#support-session-contract)
 documents serialized fields. Local support sessions and
 [opt-in feedback](feedback.md) are separate mechanisms.
+
+Classification overrides are represented only by optional numeric
+`production_path_count` and `test_path_count` settings. Zero counts are omitted.
+Paths are never included in support sessions. These are additive optional fields
+in support session schema 1, and current Mori accepts older sessions without them.
+Older strict readers may reject sessions containing the new fields, so use a
+current Mori build when importing them.

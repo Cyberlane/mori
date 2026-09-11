@@ -51,7 +51,7 @@ func Compact(writer io.Writer, report model.Report) error {
 		if _, err := fmt.Fprintf(
 			writer, "%d %.1f%% %s%s pairs=%d %s\n",
 			index+1, group.Similarity*100, terminalSafe(group.ID), focus,
-			group.LocationPairs, terminalSafe(locations),
+			group.LocationPairs, terminalSafe(locations)+nestedScoringBoundary(group),
 		); err != nil {
 			return err
 		}
@@ -94,4 +94,17 @@ func shortDigest(value string) string {
 		return value[:12]
 	}
 	return value
+}
+
+// Existing occurrence metadata supplies this presentation-only warning. JSON
+// fields and the report schema are unchanged.
+func nestedScoringBoundary(group model.MatchGroup) string {
+	for _, profile := range group.Profiles {
+		for _, occurrence := range profile.Occurrences {
+			if occurrence.NestedCount > 0 {
+				return "; outer body only: nested functions evaluated separately"
+			}
+		}
+	}
+	return ""
 }

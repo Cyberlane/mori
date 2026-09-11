@@ -84,6 +84,23 @@ recognized Swift forms and the upstream raw-ampersand JSX-text grammar issue.
 Additional bounded grammar corrections cover JavaScript/TypeScript import types,
 semicolonless generic interface overloads, keyword export aliases, and Java
 annotated varargs; see [parser compatibility](../guides/parser-compatibility.md).
+The maintained Go grammar accepts Go 1.26 `new(expression)` alongside existing
+`new(type)` and `make(type, ...)` forms. TypeScript/TSX accepts explicit `in`,
+`out`, and `in out` variance annotations. Swift accepts parenthesized expression
+range patterns such as `case (n / 2 + 1)...:`. These grammar changes preserve
+original source locations and keep nearby malformed syntax visible.
+
+C compatibility includes the named libgit2 `GIT_FORMAT_PRINTF` annotation and
+compound bodies for `git_vector_foreach` and
+`git_attr_file__foreach_matching_rule`. Mori parses their arguments and bodies
+without expanding macros or executing a preprocessor. This bounded support does
+not establish coverage of arbitrary C macros or generated functions.
+
+Flow is not a supported JavaScript dialect. For a JavaScript file with a leading
+`@flow` comment and parse errors, the warning names the unsupported dialect and
+retains diagnostic and skipped-fragment counts. Remaining valid JavaScript
+fragments can still be compared, but do not establish complete Flow coverage.
+Use `--fail-on-parse-diagnostic` when partial parsing must fail the scan.
 Other unsupported syntax remains visibly incomplete. The pinned Zsh grammar
 requires `:` for several glob-qualifier forms.
 
@@ -117,6 +134,13 @@ token floors can make them noisy.
 - Rust `#[cfg(test)]` and compound predicates that necessarily require `test`,
   such as `all(test, not(loom))`. Every branch of an `any(...)` must require
   `test` before it is classified as test-only.
+
+- C/C++ functions inside positive `#ifdef REDIS_TEST` or
+  `#if defined(REDIS_TEST)` branches. The alternate branch, negative guard and
+  disjunction with a production condition are not classified as tests.
+
+Explicit classification path overrides take precedence over these conventions.
+See [configuration](../configuration.md#classification-overrides).
 
 `cfg(any(test, feature = "production"))`, `cfg(not(test))`, and a function name
 merely containing `test` do not prove test-only membership. Unclassified units

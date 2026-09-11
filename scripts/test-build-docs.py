@@ -29,7 +29,7 @@ class BuildDocsTest(unittest.TestCase):
             self.assertIn('https://github.com/Cyberlane/mori/blob/main/LICENSE', overview)
             for page in output.rglob("*.html"):
                 self.assertIn("Markdown source", page.read_text())
-                self.assertIn("Mori v0.33.0 documentation", page.read_text())
+                self.assertIn("Mori v0.34.0 documentation", page.read_text())
                 self.assertIn("v0.33.0 or later", page.read_text())
             page = output / "index.html"
             page.write_text(page.read_text() + '<a href="docs/getting-started.html#missing-heading">Broken</a>')

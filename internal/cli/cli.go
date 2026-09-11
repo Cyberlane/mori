@@ -24,6 +24,7 @@ import (
 	"github.com/Cyberlane/mori/internal/language"
 	"github.com/Cyberlane/mori/internal/model"
 	"github.com/Cyberlane/mori/internal/normalize"
+	"github.com/Cyberlane/mori/internal/parser"
 	"github.com/Cyberlane/mori/internal/pathutil"
 	"github.com/Cyberlane/mori/internal/report"
 	"github.com/Cyberlane/mori/internal/reviewreceipt"
@@ -136,6 +137,8 @@ type scanOptions struct {
 	sqlDialect             string
 	embeddedSQL            bool
 	fragmentSelection      string
+	productionPaths        stringList
+	testPaths              stringList
 	statementBlocks        bool
 	blockStatements        int
 	maxBlocksPerFunc       int
@@ -194,6 +197,7 @@ type scanOptions struct {
 	focusedOnly            bool
 	reviewPolicy           string
 	stagedCache            bool
+	parseCache             bool
 }
 
 func defaultScanOptions() scanOptions {
@@ -219,6 +223,9 @@ func defaultScanOptions() scanOptions {
 
 func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string, allowReportOutput bool) {
 	flags.StringVar(&options.profile, "profile", options.profile, "scan profile: review, explore, or sql")
+	flags.Var(&options.productionPaths, "production-path", "classify a file or directory as production (repeatable)")
+	flags.Var(&options.testPaths, "test-path", "classify a file or directory as tests (repeatable)")
+	flags.BoolVar(&options.parseCache, "parse-cache", false, "reuse authenticated local parsing results after checking current source bytes")
 	flags.StringVar(&options.fragmentSelection, "fragment-selection", options.fragmentSelection, "fragment selection: all, production, or tests (conventional test paths and Rust test attributes)")
 	flags.StringVar(&options.scope, "scope", options.scope, "named project scope from .mori.json")
 	flags.Float64Var(&options.threshold, "threshold", options.threshold, "minimum weighted Jaccard score, from 0 to 1")
@@ -860,6 +867,12 @@ func applyConfig(options *scanOptions, settings config.Settings, base string) {
 	if settings.EmbeddedSQL != nil {
 		options.embeddedSQL = *settings.EmbeddedSQL
 	}
+	if settings.ProductionPaths != nil {
+		options.productionPaths = configSelectionPaths(base, settings.ProductionPaths)
+	}
+	if settings.TestPaths != nil {
+		options.testPaths = configSelectionPaths(base, settings.TestPaths)
+	}
 	if settings.FragmentSelection != "" {
 		options.fragmentSelection = settings.FragmentSelection
 	}
@@ -944,6 +957,9 @@ func resolveConfigPath(base string, path string) string {
 }
 
 func validateScanOptions(options scanOptions) error {
+	if _, _, err := resolvedSelectionPaths(options); err != nil {
+		return err
+	}
 	switch options.fragmentSelection {
 	case "", "all", "production", "tests":
 	default:
@@ -2274,6 +2290,8 @@ func baselineScanProfile(
 		SQLDialect:        dialect,
 		EmbeddedSQL:       options.embeddedSQL,
 		FragmentSelection: options.fragmentSelection,
+		ProductionPaths:   selectionPolicyLabels(options.productionPaths),
+		TestPaths:         selectionPolicyLabels(options.testPaths),
 		StatementBlocks:   options.statementBlocks,
 		BlockStatements:   options.blockStatements,
 		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
@@ -2538,7 +2556,18 @@ func executeScan(
 		options.diagnostics.stage = "analysis"
 		timings = &options.diagnostics.timings
 	}
+	productionPaths, testPaths, err := resolvedSelectionPaths(options)
+	if err != nil {
+		return model.Report{}, err
+	}
+	var parseCache parser.Cache
+	if options.parseCache {
+		if cache, cacheErr := openParseCache(paths); cacheErr == nil {
+			parseCache = cache
+		}
+	}
 	result, err := analyzer.Analyze(ctx, discovered.Files, discovered.Warnings, analyzer.Options{
+		ParseCache:        parseCache,
 		EstimateOnly:      options.estimateOnly,
 		Timings:           timings,
 		Threshold:         options.threshold,
@@ -2562,6 +2591,8 @@ func executeScan(
 		EmbeddedSQL:       options.embeddedSQL,
 		SQLDialect:        sqlDialect,
 		FragmentSelection: options.fragmentSelection,
+		ProductionPaths:   productionPaths,
+		TestPaths:         testPaths,
 		StatementBlocks:   options.statementBlocks,
 		BlockStatements:   options.blockStatements,
 		MaxBlocksPerFunc:  options.maxBlocksPerFunc,
@@ -2585,6 +2616,8 @@ func executeScan(
 		SQLDialect:        sqlDialect,
 		EmbeddedSQL:       options.embeddedSQL,
 		FragmentSelection: options.fragmentSelection,
+		ProductionPaths:   append([]string(nil), options.productionPaths...),
+		TestPaths:         append([]string(nil), options.testPaths...),
 		StatementBlocks:   options.statementBlocks,
 		BlockStatements:   options.blockStatements,
 		MaxBlocksPerFunc:  options.maxBlocksPerFunc,

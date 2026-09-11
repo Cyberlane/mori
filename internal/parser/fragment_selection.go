@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -9,7 +11,8 @@ import (
 	ts "github.com/tree-sitter/go-tree-sitter"
 )
 
-// isTestFragment uses explicit conventional paths or positive Rust attributes.
+// isTestFragment uses conventional paths, positive Rust attributes, and
+// explicitly recognized C test guards.
 // Unrecognized constructs remain in production selection; this is not a claim
 // that Mori can infer a function's purpose from its behavior or name.
 func isTestFragment(node *ts.Node, content []byte, file source.File) bool {
@@ -35,6 +38,9 @@ func isTestFragment(node *ts.Node, content []byte, file source.File) bool {
 	}
 	if strings.HasPrefix(base, "test_") && strings.HasSuffix(base, ".py") {
 		return true
+	}
+	if file.Language.ID == "c" || file.Language.ID == "cpp" {
+		return cTestRegion(node, content)
 	}
 	if file.Language.ID != "rust" {
 		return false
@@ -138,11 +144,22 @@ func cfgRequiresTestAtDepth(predicate string, depthLimit int) bool {
 	return any && found
 }
 
-func excludeSelectedFragment(node *ts.Node, content []byte, file source.File, selection string, coverage *Coverage) bool {
+func excludeSelectedFragment(node *ts.Node, content []byte, file source.File, options Options, coverage *Coverage) bool {
+	selection := options.FragmentSelection
 	if selection == "" || selection == "all" {
 		return false
 	}
 	test := isTestFragment(node, content, file)
+	for _, path := range options.ProductionPaths {
+		if selectionPathMatches(file.Path, path) {
+			test = false
+		}
+	}
+	for _, path := range options.TestPaths {
+		if selectionPathMatches(file.Path, path) {
+			test = true
+		}
+	}
 	if selection == "production" && test {
 		coverage.ExcludedTestFragments++
 		return true
@@ -152,4 +169,88 @@ func excludeSelectedFragment(node *ts.Node, content []byte, file source.File, se
 		return true
 	}
 	return false
+}
+
+// selectionPathMatches uses a path boundary, never substring or glob matching.
+func selectionPathMatches(file, rule string) bool {
+	file, rule = filepath.Clean(file), filepath.Clean(rule)
+	return file == rule || strings.HasPrefix(file, strings.TrimSuffix(rule, string(filepath.Separator))+string(filepath.Separator))
+}
+
+// ValidateSelectionPaths rejects ambiguous overrides. Callers resolve rules
+// relative to the configuration directory or command working directory first.
+func ValidateSelectionPaths(production, tests []string) error {
+	for _, rules := range [][]string{production, tests} {
+		for _, rule := range rules {
+			if !filepath.IsAbs(rule) || filepath.Clean(rule) != rule {
+				return fmt.Errorf("selection paths must be clean absolute paths")
+			}
+		}
+	}
+	for _, productionPath := range production {
+		for _, testPath := range tests {
+			productionPath, testPath = CanonicalSelectionPath(productionPath), CanonicalSelectionPath(testPath)
+			if selectionPathMatches(productionPath, testPath) || selectionPathMatches(testPath, productionPath) {
+				return fmt.Errorf("production and test selection paths must not overlap")
+			}
+		}
+	}
+	return nil
+}
+
+// cTestRegion recognizes only positively guarded REDIS_TEST branches. It does
+// not execute a preprocessor or infer meaning from arbitrary *_TEST macros.
+func cTestRegion(node *ts.Node, content []byte) bool {
+	for current := node; current != nil; current = current.Parent() {
+		parent := current.Parent()
+		if parent == nil {
+			break
+		}
+		if current.Kind() == "preproc_else" || current.Kind() == "preproc_elif" {
+			continue
+		}
+		if parent.Kind() == "preproc_ifdef" {
+			name := parent.ChildByFieldName("name")
+			if name != nil && string(content[name.StartByte():name.EndByte()]) == "REDIS_TEST" && parent.Child(0).Kind() == "#ifdef" {
+				return true
+			}
+		}
+		if parent.Kind() == "preproc_if" {
+			condition := parent.ChildByFieldName("condition")
+			if condition != nil {
+				expression := strings.Map(func(r rune) rune {
+					if unicode.IsSpace(r) {
+						return -1
+					}
+					return r
+				}, string(content[condition.StartByte():condition.EndByte()]))
+				if expression == "defined(REDIS_TEST)" || expression == "definedREDIS_TEST" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// CanonicalSelectionPath resolves existing symlink ancestors while retaining
+// missing suffixes, so index-only files use the same rules as working files.
+func CanonicalSelectionPath(path string) string {
+	path = filepath.Clean(path)
+	current := path
+	var suffix []string
+	for {
+		if resolved, err := filepath.EvalSymlinks(current); err == nil {
+			for i := len(suffix) - 1; i >= 0; i-- {
+				resolved = filepath.Join(resolved, suffix[i])
+			}
+			return resolved
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return path
+		}
+		suffix = append(suffix, filepath.Base(current))
+		current = parent
+	}
 }

@@ -20,6 +20,11 @@ func sourceCoverageSummary(w io.Writer, value model.Report) error {
 	); err != nil {
 		return err
 	}
+	if production, tests := len(value.Configuration.ProductionPaths), len(value.Configuration.TestPaths); production+tests > 0 {
+		if _, err := fmt.Fprintf(w, "classification overrides: %d production path(s), %d test path(s); use --format json for exact paths\n", production, tests); err != nil {
+			return err
+		}
+	}
 	languages := map[string]int{}
 	for _, file := range value.FileCoverage {
 		languages[file.Language]++

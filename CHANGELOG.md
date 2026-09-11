@@ -7,6 +7,35 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-09-11
+
+### Added
+
+- Workload planning with `mori plan` and batch baseline identity acceptance.
+- Exact-score optimizations and differential, CLI and resource regression gates.
+- Regression scenarios for modern language syntax, production selection,
+  lower-token-floor ranking and immutable staged classification.
+- Explicit production/test path overrides, bound to baseline and cache policy.
+- Opt-in authenticated parsing reuse between workload planning and scanning,
+  with fresh source reads, bounded private storage and safe cache misses.
+
+### Fixed
+
+- Go expression allocation, TypeScript variance, Swift parenthesized range
+  patterns and narrowly supported libgit2 annotation/iteration macros.
+- Inline positively guarded REDIS_TEST fragment selection and unsupported
+  Flow diagnostic guidance.
+- Repeated small boilerplate crowding in review ranking, with structural
+  scores and identities preserved. Concise reports disclose nested-body
+  exclusions and active classification overrides.
+
+### Changed
+
+- Configuration contract advances to 3. Prior managed contracts remain
+  upgradeable without rewriting user policy. Report 22, baseline 4 and
+  support-session 1 gain optional classification-policy evidence fields.
+
+
 ## [0.33.0] - 2026-09-11
 
 ### Added
@@ -751,7 +780,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.33.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.34.0...HEAD
+[0.34.0]: https://github.com/Cyberlane/mori/compare/v0.33.0...v0.34.0
 [0.33.0]: https://github.com/Cyberlane/mori/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/Cyberlane/mori/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/Cyberlane/mori/compare/v0.30.0...v0.31.0

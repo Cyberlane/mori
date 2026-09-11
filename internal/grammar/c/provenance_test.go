@@ -13,8 +13,8 @@ func TestGeneratedSourceChecksums(t *testing.T) {
 
 	expected := map[string]string{
 		"LICENSE":              "2e0110e07abef7c2548b26ec9d6969775617ca539a0dc8dbeeb14d6452c711d1",
-		"grammar.js":           "3f102dcdfbab76b12b65326610c0fa9c3585bc19566b84d130e5ddaa3a8b2ef2",
-		"parser.c":             "a2d6955f4e875446e43e3c6f00cbd6f26e4517d22bb07c8e9687195973363b92",
+		"grammar.js":           "c67fd24cea0ea4d170c5b16577ad0675c04455a605da7505884f583a01475700",
+		"parser.c":             "db443d113b0c66d0f3ba83ecaa7536fac818a1f49bb60e30ab208f3805fa0ae6",
 		"tree-sitter.json":     "9a823f24385fbb5fa06e52c258c726449c4e417a4476306589b6dcfaf9b831ee",
 		"tree_sitter/alloc.h":  "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea",
 		"tree_sitter/array.h":  "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94",

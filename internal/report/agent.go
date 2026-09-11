@@ -136,7 +136,7 @@ func Agent(writer io.Writer, value model.Report) error {
 			group.Similarity*100,
 			terminalSafe(group.ID),
 			group.LocationPairs,
-			terminalSafe(agentGroupLocations(group, value.Configuration.Focus)),
+			terminalSafe(agentGroupLocations(group, value.Configuration.Focus))+nestedScoringBoundary(group),
 		); err != nil {
 			return err
 		}

@@ -99,6 +99,27 @@ func writeScanPlan(w io.Writer, plan scanPlan) error {
 		plan.Coverage.AnalyzedFiles, plan.Coverage.SupportedFiles, plan.Coverage.WarningCount, plan.Coverage.ParseDiagnosticCount); err != nil {
 		return err
 	}
+	for _, rule := range []struct {
+		kind  string
+		paths []string
+	}{{"production", plan.Configuration.ProductionPaths}, {"tests", plan.Configuration.TestPaths}} {
+		if len(rule.paths) > 0 {
+			if _, err := fmt.Fprintf(w, "Classification overrides (%s): %d path(s)\n", rule.kind, len(rule.paths)); err != nil {
+				return err
+			}
+			for i, path := range rule.paths {
+				if i == 20 {
+					if _, err := fmt.Fprintln(w, "  further paths omitted; use --format json for complete policy"); err != nil {
+						return err
+					}
+					break
+				}
+				if _, err := fmt.Fprintf(w, "  %q\n", path); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	for _, p := range plan.Packages {
 		if _, err := fmt.Fprintf(w, "  %s: %d file(s), %d fragment(s), at most %d within-root pair(s)\n", terminalPlanPath(p.Root), p.Files, p.Fragments, p.PairUpperBound); err != nil {
 			return err

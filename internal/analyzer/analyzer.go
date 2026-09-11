@@ -34,6 +34,7 @@ type PhaseTimings struct {
 
 // Options controls parsing concurrency and pair selection.
 type Options struct {
+	ParseCache parser.Cache
 	// EstimateOnly counts eligible candidate pairs without scoring or applying MaxPairs.
 	EstimateOnly      bool
 	Timings           *PhaseTimings
@@ -61,6 +62,8 @@ type Options struct {
 	EmbeddedSQL       bool
 	SQLDialect        string
 	FragmentSelection string
+	ProductionPaths   []string
+	TestPaths         []string
 	StatementBlocks   bool
 	BlockStatements   int
 	MaxBlocksPerFunc  int
@@ -206,10 +209,13 @@ func Analyze(
 					return
 				}
 				fragments, warnings, parserCoverage := parser.FileWithCoverage(ctx, job.file, parser.Options{
+					Cache:             options.ParseCache,
 					MinTokens:         options.MinTokens,
 					EmbeddedSQL:       options.EmbeddedSQL,
 					SQLDialect:        options.SQLDialect,
 					FragmentSelection: options.FragmentSelection,
+					ProductionPaths:   options.ProductionPaths,
+					TestPaths:         options.TestPaths,
 					StatementBlocks:   options.StatementBlocks,
 					BlockStatements:   options.BlockStatements,
 					MaxBlocksPerFunc:  options.MaxBlocksPerFunc,
@@ -470,6 +476,9 @@ func domainAndFamilyKey(fragment model.Fragment) string {
 }
 
 func validateOptions(options Options) error {
+	if err := parser.ValidateSelectionPaths(options.ProductionPaths, options.TestPaths); err != nil {
+		return err
+	}
 	switch options.FragmentSelection {
 	case "", "all", "production", "tests":
 	default:
@@ -1016,6 +1025,10 @@ func reviewPriority(candidate *groupCandidate, priorityPaths []model.PriorityPat
 		// Keep the group visible and retain structural scores and identities.
 		priority -= 7
 		signals = append(signals, "repeated-small-wrapper(-7)")
+	} else if repeatedSmallBoilerplate(candidate) {
+		penalty := min(priority, 7)
+		priority -= penalty
+		signals = append(signals, fmt.Sprintf("repeated-small-boilerplate(-%d)", penalty))
 	}
 	for _, rule := range priorityPaths {
 		matched := false
