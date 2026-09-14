@@ -1,6 +1,6 @@
 module github.com/Cyberlane/mori
 
-go 1.23.0
+go 1.26.0
 
 toolchain go1.26.6
 
@@ -25,7 +25,7 @@ require (
 	github.com/tree-sitter-grammars/tree-sitter-luau v1.2.0
 	github.com/tree-sitter/tree-sitter-ruby v0.23.1
 	github.com/wharflab/tree-sitter-powershell v0.38.1
-	golang.org/x/sys v0.30.0
+	golang.org/x/sys v0.48.0
 )
 
 require github.com/mattn/go-pointer v0.0.1 // indirect
