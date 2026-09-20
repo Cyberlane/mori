@@ -7,6 +7,21 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.34.1] - 2026-09-20
+
+### Fixed
+
+- Explain canonical staged test inclusion and existing receipt authorization in
+  review output, without changing strict enforcement or evidence validation.
+- Clarify optional standing receipt authorization in the embedded skill and
+  preserve upgrades from the prior official skill package.
+
+### Compatibility
+
+- Scoring, normalization, report and receipt schemas remain unchanged. Upgrade
+  project-managed pins, contracts and skills after installing the new binary;
+  existing projects are not automatically upgraded or granted receipt authority.
+
 ## [0.34.0] - 2026-09-11
 
 ### Added
@@ -780,7 +795,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.34.0...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.34.1...HEAD
+[0.34.1]: https://github.com/Cyberlane/mori/compare/v0.34.0...v0.34.1
 [0.34.0]: https://github.com/Cyberlane/mori/compare/v0.33.0...v0.34.0
 [0.33.0]: https://github.com/Cyberlane/mori/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/Cyberlane/mori/compare/v0.31.0...v0.32.0

@@ -53,14 +53,17 @@ both source locations for the identities you review, state the remaining count,
 and never label the unreviewed remainder accepted. A strict project with more
 findings must follow its acceptance policy; choosing a shortlist does not bypass
 that gate. Explicit standing project authorization can cover routine reviewed
-classifications and receipts without repeated approval requests.
+classifications and receipts without repeated approval requests. Commit permission
+alone does not grant receipt authority. The [embedded receipt guide](../../skills/mori-review-similarity/references/baselines-receipts.md)
+provides a concise optional standing policy; it takes effect only when adopted
+by the owner.
 
 Trust the pinned toolchain. Schedule upgrades separately from source tasks. Do
 not fetch latest releases or rerun the same broad scan on each commit attempt.
 Keep tests and generated-source policies explicit; do not exclude product code
 or lower thresholds merely to clear a finding.
 
-## Compatibility
+## Compatibility introduced in v0.32.0
 
 Report schema advances from 20 to 21. Hook contract advances from v1 to v2 to
 record explicit policy selection with strict default. Project-contract schema

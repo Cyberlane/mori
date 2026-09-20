@@ -70,6 +70,10 @@ func TestKnownPriorPackageDigestIsExact(t *testing.T) {
 	if !IsKnownPriorPackageDigest(v030PackageDigest) {
 		t.Fatal("official v0.30.0 package digest was not recognized")
 	}
+	const v034Digest = "2880aeaf46f4401fa9a5d86ec60abc002e7442242222c4e41803c88db328655f"
+	if !IsKnownPriorPackageDigest(v034Digest) || IsKnownPriorPackageDigest(v034Digest[:63]+"0") {
+		t.Fatal("prior v0.34.0 recognition must require exact official bytes")
+	}
 	if IsKnownPriorPackageDigest(v030PackageDigest[:63]+"0") || IsKnownPriorPackageDigest("") {
 		t.Fatal("unknown package digest was recognized")
 	}

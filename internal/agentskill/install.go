@@ -69,10 +69,18 @@ func PackageDigest() (string, error) {
 }
 
 // IsKnownPriorPackageDigest reports whether a package is an exact official
-// pre-contract Mori skill that can be upgraded without treating it as local
+// Mori skill that can be upgraded without a recorded contract, rather than as local
 // customization.
 func IsKnownPriorPackageDigest(digest string) bool {
-	return digest == "a8a89c5d0e9b6c091f65ae090dbdac46b44ac4fb59065e05553cf438453a6aa5" || digest == v030PackageDigest || digest == "32c52f73c7a1d5bf7a60ff610152a6f2121ecf49392856742092721a0076ebf0"
+	switch digest {
+	case v030PackageDigest,
+		"a8a89c5d0e9b6c091f65ae090dbdac46b44ac4fb59065e05553cf438453a6aa5",
+		"32c52f73c7a1d5bf7a60ff610152a6f2121ecf49392856742092721a0076ebf0",
+		"2880aeaf46f4401fa9a5d86ec60abc002e7442242222c4e41803c88db328655f": // v0.34.0
+		return true
+	default:
+		return false
+	}
 }
 
 // Inspect compares a project skill with the embedded package without writing.
