@@ -95,10 +95,11 @@ an ordinary code review into a full audit merely because a JSON report exists.
 
 For implementation work, do one final scan after the implementation and one
 canonical staged check at commit. Save/query one report rather than rerunning.
-Direct commit authorization need not be re-requested. Honor explicit standing
-project authorization for reviewed classifications and receipts; do not ask
-again for the same authorized action. Otherwise ask only when an unresolved
-finding requires an owner decision or receipt authorization is absent.
+Before asking about a receipt, check the request and standing project policy
+for existing authorization. Commit permission alone is not receipt permission.
+With receipt authority, finish the source review and record each classification
+and reason in the work summary; ask only for unresolved owner decisions.
+Otherwise request receipt authority after presenting the reviewed findings.
 
 For new integrations, propose advisory staged review (`--policy advisory`)
 first. Existing hooks default to strict; never change their enforcement

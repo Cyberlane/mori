@@ -20,6 +20,11 @@ func sourceCoverageSummary(w io.Writer, value model.Report) error {
 	); err != nil {
 		return err
 	}
+	if input := value.Configuration.Input; value.Review != nil && input != nil && input.Mode == "git-index" {
+		if _, err := fmt.Fprintln(w, "staged scope: changed files (including tests) bypass ordinary ignore rules; explicit selection, generated policy and resource limits still apply"); err != nil {
+			return err
+		}
+	}
 	if production, tests := len(value.Configuration.ProductionPaths), len(value.Configuration.TestPaths); production+tests > 0 {
 		if _, err := fmt.Fprintf(w, "classification overrides: %d production path(s), %d test path(s); use --format json for exact paths\n", production, tests); err != nil {
 			return err

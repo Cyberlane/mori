@@ -112,6 +112,13 @@ func Agent(writer io.Writer, value model.Report) error {
 			return err
 		}
 	}
+	if review := value.Review; review != nil && review.Policy == "strict" && review.Status == "blocked" &&
+		review.CoveragePolicyMet && review.Findings > 0 && !review.Acknowledged &&
+		len(value.Warnings) == 0 && !value.Truncated && value.Coverage.ParseDiagnosticCount == 0 {
+		if _, err := fmt.Fprintln(writer, "next: review focused findings; check existing owner/project receipt authorization before asking; commit permission alone does not authorize acceptance"); err != nil {
+			return err
+		}
+	}
 	if err := agentCoverageDetails(writer, value); err != nil {
 		return err
 	}

@@ -13,6 +13,10 @@ pin, contract, and a missing/current/recorded-official Agent Skill. Unknown
 skill content is never overwritten. Existing managed files receive recoverable
 sibling backups before replacement.
 
+Publishing a release does not update consumers. Install the chosen binary, then
+preview and apply the project upgrade; reload the installed skill afterward.
+Instructions to check compatibility are not standing permission to upgrade.
+
 Apply does not stage or commit. When the Mori update itself will be committed,
 inspect and include the updated pin, project contract, and managed skill
 package together so a fresh checkout receives the same contract. Keep backup

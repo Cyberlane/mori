@@ -113,17 +113,20 @@ Confirm `configuration.input.mode` is `git-index`, retain HEAD and index
 digest, and require both working-tree inclusion flags to be false. Staged mode
 reads tracked source, ignore rules, `.mori.json`, and a baseline from that
 same snapshot; a baseline must be a tracked regular file inside the worktree.
-It excludes unstaged, external, and untracked content. `--include-focused`
-bypasses ordinary ignore rules for focused files, but not explicit excludes,
-generated policy, unsupported syntax, or resource limits.
+It excludes unstaged, external, and untracked content. Canonical staged review
+includes changed tests even when ordinary scans ignore them; expect additional
+findings. Explicit excludes, fragment selection, generated policy, unsupported
+syntax, and resource limits still apply. Do not narrow scope to remove findings.
 
 Canonical staged review records exact changed-line intervals, parses the full
 repository, and scores only pairs containing a hunk-intersecting fragment.
 Unsupported staged assets remain explicit path evidence but do not create a
 warning solely because they were staged.
 
-If the owner authorizes a one-commit receipt, read the routed baseline/receipt
-reference before running `mori review staged acknowledge --accept-focused`.
+If findings remain, check existing request or standing receipt authority before
+asking the owner. Before `mori review staged acknowledge --accept-focused`,
+read the [receipt reference](baselines-receipts.md); commit permission alone
+does not authorize acceptance.
 
 One revision cannot safely describe multiple worktree histories. For nested
 worktrees or submodules, provide each locally available revision explicitly:

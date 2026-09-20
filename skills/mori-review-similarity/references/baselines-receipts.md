@@ -49,8 +49,8 @@ profile digest, warnings, and source review before accepting.
 
 ## Staged receipts
 
-When the owner explicitly accepts focused findings for exactly one staged
-commit and durable suppression would mislead, use:
+With explicit one-commit or standing receipt authorization, after reviewing
+every focused identity and resolving all findings, use:
 
 ```sh
 mori review staged acknowledge --accept-focused .
@@ -69,9 +69,17 @@ by construction. A receipt changes only focused-match policy exit status: it
 never hides findings. Any HEAD, index, staged-review contract, profile, tool,
 normalization, or focused-identity change invalidates it.
 
-Receipt creation/use requires owner authorization. Direct commit
-authorization need not be re-requested, but honor standing project authorization for this action. Ask again only
-for unresolved owner decisions or when receipt authorization is absent.
+Receipt creation/use requires owner authorization, separate from commit permission.
+An owner may adopt this concise standing policy in project instructions:
+
+> During authorized commits, agents may create and use one-commit Mori receipts
+> for fully reviewed intentional similarities or false positives, recording each
+> identity and reason in the work summary. Escalate unresolved findings.
+
+This example grants no authority until adopted by the owner. It does not authorize
+baselines, warning acceptance, or changes to scope, thresholds, or enforcement.
+Keep reports and receipts in private Git metadata; do not append review histories
+to project instructions.
 
 ### Accept several reviewed identities in one scan
 

@@ -95,3 +95,35 @@ func BenchmarkAgentBoundedSummary(b *testing.B) {
 		}
 	}
 }
+
+func TestReceiptGuidanceDoesNotSuggestAcceptingIncompleteEvidence(t *testing.T) {
+	for _, scenario := range []string{"findings", "coverage", "warning", "parse", "truncated", "advisory", "accepted", "no-findings"} {
+		t.Run(scenario, func(t *testing.T) {
+			value := model.Report{Review: &model.ReviewOutcome{Policy: "strict", Status: "blocked", CoveragePolicyMet: true, Findings: 1}}
+			switch scenario {
+			case "coverage":
+				value.Review.CoveragePolicyMet = false
+			case "warning":
+				value.Warnings = []model.Warning{{Kind: "focus"}}
+			case "parse":
+				value.Coverage.ParseDiagnosticCount = 1
+			case "truncated":
+				value.Truncated = true
+			case "advisory":
+				value.Review.Policy = "advisory"
+			case "accepted":
+				value.Review.Acknowledged = true
+				value.Review.Status = "passed"
+			case "no-findings":
+				value.Review.Findings = 0
+			}
+			var out bytes.Buffer
+			if err := Agent(&out, value); err != nil {
+				t.Fatal(err)
+			}
+			if got := strings.Contains(out.String(), "next: review focused findings"); got != (scenario == "findings") {
+				t.Fatalf("misleading receipt guidance: %s", &out)
+			}
+		})
+	}
+}

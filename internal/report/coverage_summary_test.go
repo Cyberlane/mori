@@ -45,3 +45,27 @@ func TestHumanReportsShareAggregateCoverage(t *testing.T) {
 		})
 	}
 }
+
+func TestStagedScopeExplanationRequiresCanonicalIndexEvidence(t *testing.T) {
+	for name, render := range map[string]func(io.Writer, model.Report) error{"agent": Agent, "compact": Compact, "text": Text} {
+		t.Run(name, func(t *testing.T) {
+			for _, mode := range []string{"git-index", "working-tree", "missing", "scan"} {
+				value := model.Report{Review: &model.ReviewOutcome{}, Configuration: model.EffectiveConfig{Input: &model.InputSnapshot{Mode: mode}}}
+				if mode == "missing" {
+					value.Configuration.Input = nil
+				}
+				if mode == "scan" {
+					value.Configuration.Input.Mode = "git-index"
+					value.Review = nil
+				}
+				var out bytes.Buffer
+				if err := render(&out, value); err != nil {
+					t.Fatal(err)
+				}
+				if got := strings.Contains(out.String(), "staged scope:"); got != (mode == "git-index") {
+					t.Fatalf("%s: misleading scope: %s", mode, &out)
+				}
+			}
+		})
+	}
+}
