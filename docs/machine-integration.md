@@ -9,6 +9,13 @@ different consumers:
   an owner-only local file and emits a bounded context summary with at most 25
   relevant identities. Prefer a private temporary or Git-metadata path outside
   the tracked checkout unless the report is intentionally retained.
+- `--format agent --output auto` selects that path for you inside a Git
+  repository: `mori/reports/<command>-<UTC timestamp>.json` in the Git common
+  directory (shared by linked worktrees), created owner-only. After each write
+  Mori keeps the newest 20 files matching its own naming pattern and never
+  touches other files there or any explicit `--output` path. Outside Git,
+  `auto` fails with a usage error; pass an explicit path. Use `./auto` to write
+  a file literally named `auto`.
 - `--format sarif` is a SARIF 2.1.0 projection for editors and code-scanning
   systems. It preserves review locations and bounded explanations but is not a
   replacement for the complete JSON report.
@@ -34,12 +41,21 @@ presentation only, not scores, fingerprints, counts, or schema version.
 
 ## Versioned JSON contract
 
-Schema 22 is described by the Draft 2020-12 artifact at
-[`schemas/mori-report-v22.schema.json`](../schemas/mori-report-v22.schema.json).
+Schema 23 is described by the Draft 2020-12 artifact at
+[`schemas/mori-report-v23.schema.json`](../schemas/mori-report-v23.schema.json).
 Official releases include the same file and its SHA-256 checksum.
 Consumers should select a validator that supports Draft 2020-12, require
-`schema_version` to equal `22`, and reject or explicitly handle unknown report
+`schema_version` to equal `23`, and reject or explicitly handle unknown report
 versions.
+
+Schema 23 adds `review.analysis_reasons`, the sorted evidence-gap codes behind
+an `incomplete` staged analysis: `coverage_policy_unmet`, `parse_diagnostics`,
+`truncated`, `unanalyzed_files` and `warnings`. Analysis is no longer
+incomplete merely because analyzed files contain no comparable fragments or
+because generated source was deliberately excluded; those counts remain in
+`coverage` and per-file `zero_fragment_reason`. Enforce them with
+`max_zero_fragment_files` or `min_file_coverage`, which report
+`coverage_policy_unmet`.
 
 Schema 22 adds fragment-selection policy and per-file excluded test/production
 fragment counts. Older schema artifacts remain available for historical
@@ -71,7 +87,7 @@ A candidate-pair-limit failure exits `1`. JSON mode, or an explicitly requested
 `--format agent --output PATH` artifact, writes a separate `artifact: "mori-scan-failure"` document
 with `failure_schema_version: 1` and `complete: false`. It records the reason,
 limit, compared count, tool/configuration provenance, available coverage and
-warnings, and recovery guidance. It is **not** a schema-22 report and contains
+warnings, and recovery guidance. It is **not** a schema-23 report and contains
 no complete ranking or acceptance surface. Consumers must distinguish it before
 validating a normal report; it cannot authorize a receipt or baseline update.
 Other operational errors may still produce no machine artifact.

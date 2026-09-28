@@ -4,8 +4,8 @@ Read this reference for deliberate cross-language exploration or when parser
 boundaries affect the review. Start at threshold `0.65` and
 `--min-tokens 40`; lower the floor toward 12 only for explicitly broad
 exploration, accepting more callbacks, wrappers, and boilerplate.
-Set `MORI_REPORT` to the owner-private report path selected under the shared
-review contract before using these examples.
+These examples use `--output auto` as selected under the shared review
+contract; outside Git, pass an explicit owner-private path instead.
 
 Choose exactly one filtering mode. Broad family selection:
 
@@ -17,7 +17,7 @@ mori scan \
   --threshold 0.65 \
   --min-tokens 40 \
   --format agent \
-  --output "$MORI_REPORT" \
+  --output auto \
   .
 ```
 
@@ -31,7 +31,7 @@ mori scan \
   --threshold 0.65 \
   --min-tokens 40 \
   --format agent \
-  --output "$MORI_REPORT" \
+  --output auto \
   .
 ```
 

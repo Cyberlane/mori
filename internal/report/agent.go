@@ -107,7 +107,7 @@ func Agent(writer io.Writer, value model.Report) error {
 	if review := value.Review; review != nil {
 		if _, err := fmt.Fprintf(writer,
 			"review: policy %s; status %s; analysis %s; coverage policy met %t; %d finding(s); acknowledged %t\n",
-			terminalSafe(review.Policy), terminalSafe(review.Status), terminalSafe(review.Analysis),
+			terminalSafe(review.Policy), terminalSafe(review.Status), terminalSafe(ReviewAnalysisLabel(*review)),
 			review.CoveragePolicyMet, review.Findings, review.Acknowledged); err != nil {
 			return err
 		}
@@ -380,4 +380,13 @@ func agentPrioritySignals(signals []string) string {
 		result += fmt.Sprintf("; %d more in complete JSON", len(signals)-limit)
 	}
 	return result
+}
+
+// ReviewAnalysisLabel renders staged analysis completeness with any sorted
+// evidence-gap reasons, for example "incomplete (truncated, warnings)".
+func ReviewAnalysisLabel(review model.ReviewOutcome) string {
+	if len(review.AnalysisReasons) == 0 {
+		return review.Analysis
+	}
+	return review.Analysis + " (" + strings.Join(review.AnalysisReasons, ", ") + ")"
 }

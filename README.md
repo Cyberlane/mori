@@ -124,7 +124,7 @@ effects, types, external calls, permissions, transactions, or error behavior.
 | Review one language pair | `mori scan --language-pair go,typescript .` |
 | Review SQL queries | `mori scan --profile sql path/to/sql` |
 | Produce CI evidence | `mori scan --profile review --format json .` |
-| Keep JSON while bounding agent context | `mori scan --profile review --format agent --output /tmp/mori-review.json .` |
+| Keep JSON while bounding agent context | `mori scan --profile review --format agent --output auto .` |
 | Enforce the canonical staged review | `mori review staged check .` |
 | Acknowledge one exact staged review | `mori review staged acknowledge --accept-focused .` |
 | Produce a concise terminal shortlist | `mori scan --profile review --format compact .` |

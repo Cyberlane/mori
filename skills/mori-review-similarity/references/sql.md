@@ -2,8 +2,8 @@
 
 Read this reference only when SQL files or SQL embedded in source are in the
 requested scope. SQL findings are separate from ordinary code-function review.
-Set `MORI_REPORT` to the owner-private report path selected under the shared
-review contract before using these examples.
+These examples use `--output auto` as selected under the shared review
+contract; outside Git, pass an explicit owner-private path instead.
 
 ## SQL files
 
@@ -13,7 +13,7 @@ Use a deliberate SQL profile:
 mori scan \
   --profile sql \
   --format agent \
-  --output "$MORI_REPORT" \
+  --output auto \
   --max-occurrences 10 \
   path/to/queries
 ```

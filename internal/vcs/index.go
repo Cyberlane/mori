@@ -263,3 +263,18 @@ func RelativeIndexPath(snapshot IndexSnapshot, path string) (string, error) {
 	}
 	return filepath.ToSlash(relative), nil
 }
+
+// CommonMetadataDir resolves the Git common directory shared by all linked
+// worktrees of the repository containing start. It never writes Git state.
+func CommonMetadataDir(ctx context.Context, start string) (string, error) {
+	options := resolverOptions{executable: "git", timeout: commandTimeout, maxOutput: maxOutputBytes, maxPaths: maxPaths}
+	output, err := run(ctx, options, start, "rev-parse", "--git-common-dir")
+	if err != nil {
+		return "", fmt.Errorf("resolve Git common directory: %w", err)
+	}
+	path := filepath.Clean(strings.TrimSpace(string(output)))
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(start, path)
+	}
+	return filepath.Abs(path)
+}

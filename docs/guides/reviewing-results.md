@@ -6,7 +6,7 @@ feature multisets overlap strongly; it does not establish equivalent behavior.
 Keep a complete report while showing a bounded review summary:
 
 ```sh
-mori scan --profile review --format agent --output /private/report.json .
+mori scan --profile review --format agent --output auto .
 ```
 
 Choose a private report path outside tracked source. Inspect retained JSON

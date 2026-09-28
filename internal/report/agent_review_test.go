@@ -127,3 +127,23 @@ func TestReceiptGuidanceDoesNotSuggestAcceptingIncompleteEvidence(t *testing.T) 
 		})
 	}
 }
+
+func TestAgentReviewAnalysisIncludesSortedReasons(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		review model.ReviewOutcome
+		want   string
+	}{
+		{model.ReviewOutcome{Policy: "strict", Status: "passed", Analysis: "complete", CoveragePolicyMet: true}, "analysis complete; coverage"},
+		{model.ReviewOutcome{Policy: "strict", Status: "passed", Analysis: "incomplete", AnalysisReasons: []string{"truncated", "warnings"}, CoveragePolicyMet: true}, "analysis incomplete (truncated, warnings); coverage"},
+	} {
+		review := test.review
+		var output bytes.Buffer
+		if err := Agent(&output, model.Report{Review: &review}); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(output.String(), test.want) {
+			t.Fatalf("missing %q:\n%s", test.want, &output)
+		}
+	}
+}

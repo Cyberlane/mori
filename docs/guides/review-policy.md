@@ -4,7 +4,7 @@ A structural match is a review lead, not a defect. New integrations can start
 with an advisory check of the immutable Git index:
 
 ```sh
-mori review staged check --policy advisory --format agent --output /tmp/review.json .
+mori review staged check --policy advisory --format agent --output auto .
 ```
 
 The advisory policy reports focused matches without failing solely because they
@@ -31,14 +31,24 @@ Report schema 21 adds an optional `review` object for canonical staged checks:
 - `policy`: `strict` or `advisory`.
 - `status`: `passed` or `blocked` by that policy.
 - `analysis`: `complete`, `incomplete`, or `no-comparable-source`.
+- `analysis_reasons` (schema 23): sorted evidence-gap codes for an
+  `incomplete` analysis — `coverage_policy_unmet`, `parse_diagnostics`,
+  `truncated`, `unanalyzed_files` and `warnings`.
 - `coverage_policy_met`: whether configured coverage requirements passed.
 - `findings`: the number of unsuppressed focused groups.
 - `acknowledged`: whether a compatible exact staged receipt was validated.
 
 `passed` does not mean findings were inspected, the program is correct, or all
-files contributed comparison fragments. Diagnostics, zero-fragment files,
-missing analyzed files and report truncation make the analysis incomplete even
-when the selected policy permits proceeding. `complete` describes the bounded
+files contributed comparison fragments. Warnings, parse diagnostics, unmet
+coverage policy, supported files that were neither analyzed nor deliberately
+excluded as generated, and report truncation make the analysis incomplete even
+when the selected policy permits proceeding. Since schema 23, analyzed files
+with no comparable fragments (for example type-only modules or SQL files that
+only define tables) and deliberate generated exclusions do not by themselves
+make analysis incomplete: invalid, opaque, or resource-limited input always
+carries a warning. Their counts and per-file `zero_fragment_reason` remain in
+the report; set `max_zero_fragment_files` or `min_file_coverage` to enforce
+them, which reports `coverage_policy_unmet`. `complete` describes the bounded
 configured comparison universe, not every language or all possible duplication.
 Operational errors may prevent a report from being produced at all.
 
