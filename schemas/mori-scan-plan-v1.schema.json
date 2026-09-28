@@ -36,7 +36,7 @@
       }
     },
     "configuration": {
-      "$ref": "mori-report-v22.schema.json#/$defs/configuration"
+      "$ref": "mori-report-v23.schema.json#/$defs/configuration"
     },
     "files": {
       "type": "integer",
@@ -54,12 +54,12 @@
       "type": "boolean"
     },
     "coverage": {
-      "$ref": "mori-report-v22.schema.json#/$defs/coverage"
+      "$ref": "mori-report-v23.schema.json#/$defs/coverage"
     },
     "warnings": {
       "type": "array",
       "items": {
-        "$ref": "mori-report-v22.schema.json#/$defs/warning"
+        "$ref": "mori-report-v23.schema.json#/$defs/warning"
       }
     },
     "packages": {

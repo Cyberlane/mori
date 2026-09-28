@@ -2,6 +2,7 @@ package schemas_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
 	"sort"
@@ -39,7 +40,7 @@ func TestFeedbackSchemaAllowlistMatchesModel(t *testing.T) {
 
 func TestReviewOutcomeSchemaMatchesModel(t *testing.T) {
 	t.Parallel()
-	raw, err := os.ReadFile("mori-report-v21.schema.json")
+	raw, err := os.ReadFile(fmt.Sprintf("mori-report-v%d.schema.json", model.SchemaVersion))
 	if err != nil {
 		t.Fatal(err)
 	}

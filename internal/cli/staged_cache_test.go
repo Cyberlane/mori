@@ -214,6 +214,7 @@ func TestStagedAnalysisCacheOpenUsesPrivateWorktreeMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	options.outputPath = "another-report.json"
+	options.managedReportDir = "managed-reports"
 	options.format = "agent"
 	options.redactPaths = true
 	again, err := openStagedAnalysisCache(context.Background(), []string{root}, options, "", nil)

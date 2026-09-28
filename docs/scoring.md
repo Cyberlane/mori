@@ -533,5 +533,5 @@ The report records `configuration.fragment_selection` and per-file
 Default selection remains `all`; opt-in test/production selection changes the
 comparison universe and its compatibility evidence, not the meaning of a
 similarity score. Current normalization is 14; prior accepted identities need
-review before migration. See [the current schema](../schemas/mori-report-v22.schema.json)
+review before migration. See [the current schema](../schemas/mori-report-v23.schema.json)
 and [parser compatibility](guides/parser-compatibility.md).

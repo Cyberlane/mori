@@ -76,7 +76,8 @@ func IsKnownPriorPackageDigest(digest string) bool {
 	case v030PackageDigest,
 		"a8a89c5d0e9b6c091f65ae090dbdac46b44ac4fb59065e05553cf438453a6aa5",
 		"32c52f73c7a1d5bf7a60ff610152a6f2121ecf49392856742092721a0076ebf0",
-		"2880aeaf46f4401fa9a5d86ec60abc002e7442242222c4e41803c88db328655f": // v0.34.0
+		"2880aeaf46f4401fa9a5d86ec60abc002e7442242222c4e41803c88db328655f", // v0.34.0
+		"4c5e2c96c620ea3ceb1e8a411c6725c34fafac0468ed185c3d0322db46deb73c": // v0.34.1
 		return true
 	default:
 		return false

@@ -7,6 +7,32 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-09-28
+
+### Added
+
+- `--format agent --output auto` writes complete JSON evidence to
+  `mori/reports/` in the Git common directory, prints the path and keeps the
+  newest 20 Mori-named reports. Explicit output paths are never pruned.
+- Staged review outcomes list sorted `analysis_reasons` for incomplete
+  analysis, shown in agent and text summaries.
+
+### Fixed
+
+- Staged analysis is no longer `incomplete` solely because analyzed files have
+  no comparable fragments (for example type-only modules or table-definition
+  SQL) or because generated source was deliberately excluded. Counts and
+  per-file reasons stay visible; `max_zero_fragment_files` and
+  `min_file_coverage` still enforce them.
+
+### Compatibility
+
+- Report schema advances to 23 (`review.analysis_reasons`, and the revised
+  `analysis` meaning). Receipt 2, baseline 4, configuration 3 and
+  normalization 14 are unchanged. Projects on the v0.34.x contract upgrade
+  through the normal managed `mori project upgrade` path; the embedded skill
+  now directs agents to `--output auto`.
+
 ## [0.34.1] - 2026-09-20
 
 ### Fixed
@@ -795,7 +821,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bounded source discovery, size-pruned comparisons, and CI failure mode.
 - Native, immutable-release-compatible GitHub build pipeline.
 
-[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.34.1...HEAD
+[Unreleased]: https://github.com/Cyberlane/mori/compare/v0.35.0...HEAD
+[0.35.0]: https://github.com/Cyberlane/mori/compare/v0.34.1...v0.35.0
 [0.34.1]: https://github.com/Cyberlane/mori/compare/v0.34.0...v0.34.1
 [0.34.0]: https://github.com/Cyberlane/mori/compare/v0.33.0...v0.34.0
 [0.33.0]: https://github.com/Cyberlane/mori/compare/v0.32.0...v0.33.0

@@ -4,7 +4,7 @@ package model
 import "github.com/Cyberlane/mori/internal/buildinfo"
 
 // SchemaVersion is the current machine-readable report contract.
-const SchemaVersion = 22
+const SchemaVersion = 23
 
 // FeatureBag is a multiset of normalized AST features.
 type FeatureBag map[string]int
@@ -333,12 +333,15 @@ type IgnoreFileEvidence struct {
 // ReviewOutcome separates a staged gate decision from analysis coverage.
 // It never asserts that findings have been reviewed by a person.
 type ReviewOutcome struct {
-	Policy            string `json:"policy"`
-	Status            string `json:"status"`
-	Analysis          string `json:"analysis"`
-	CoveragePolicyMet bool   `json:"coverage_policy_met"`
-	Findings          int    `json:"findings"`
-	Acknowledged      bool   `json:"acknowledged"`
+	Policy   string `json:"policy"`
+	Status   string `json:"status"`
+	Analysis string `json:"analysis"`
+	// AnalysisReasons lists sorted evidence-gap codes when Analysis is
+	// "incomplete"; it is omitted otherwise.
+	AnalysisReasons   []string `json:"analysis_reasons,omitempty"`
+	CoveragePolicyMet bool     `json:"coverage_policy_met"`
+	Findings          int      `json:"findings"`
+	Acknowledged      bool     `json:"acknowledged"`
 }
 
 type Report struct {

@@ -156,6 +156,7 @@ type scanOptions struct {
 	workers                int
 	format                 string
 	outputPath             string
+	managedReportDir       string
 	color                  string
 	redactPaths            bool
 	sameLanguageOnly       bool
@@ -238,7 +239,7 @@ func (options *scanOptions) bindFlags(flags *flag.FlagSet, baselineAction string
 	flags.IntVar(&options.workers, "workers", options.workers, "parallel parser workers")
 	flags.StringVar(&options.format, "format", options.format, "output format: text, compact, agent, json, sarif, or html")
 	if allowReportOutput {
-		flags.StringVar(&options.outputPath, "output", options.outputPath, "write the complete bounded JSON evidence when --format agent is selected")
+		flags.StringVar(&options.outputPath, "output", options.outputPath, "write the complete bounded JSON evidence when --format agent is selected; auto writes to rotated Git metadata (newest 20 kept)")
 	}
 	flags.StringVar(&options.color, "color", options.color, "terminal color: auto, always, or never")
 	flags.BoolVar(&options.redactPaths, "redact-paths", options.redactPaths, "replace source and configuration paths with stable placeholders in output")
@@ -1119,6 +1120,13 @@ func runScanCommand(
 	if !ok {
 		return code
 	}
+	if options.outputPath == managedOutputAuto {
+		path, directory, err := resolveManagedReportPath(ctx, managedReportLabel(mode), paths, time.Now())
+		if err != nil {
+			return usageError(stderr, err.Error())
+		}
+		options.outputPath, options.managedReportDir = path, directory
+	}
 	if mode == "hook-pre-commit" {
 		receiptRequest := os.Getenv("MORI_STAGED_REVIEW_RECEIPT")
 		if receiptRequest == "1" {
@@ -1260,6 +1268,12 @@ func runScanCommand(
 		if err := writeCompleteJSONReport(options.outputPath, result); err != nil {
 			fmt.Fprintf(stderr, "mori: write complete JSON report: %v\n", err)
 			return exitError
+		}
+		if options.managedReportDir != "" {
+			// The current report is written; pruning failure only leaves extra files.
+			if err := pruneManagedReports(options.managedReportDir, managedReportsKept); err != nil {
+				fmt.Fprintf(stderr, "mori: prune managed reports: %v\n", err)
+			}
 		}
 		outputLabel := displayCLIPath(options.outputPath)
 		if redacted {
@@ -1538,7 +1552,7 @@ func renderScanReport(stdout io.Writer, result model.Report, options scanOptions
 		redactReportPaths(&result)
 	}
 	if result.Review != nil && (options.format == "text" || options.format == "compact") {
-		if _, err := fmt.Fprintf(stdout, "review: %s; policy %s; analysis %s; coverage policy met %t; %d focused group(s)\n", result.Review.Status, result.Review.Policy, result.Review.Analysis, result.Review.CoveragePolicyMet, result.Review.Findings); err != nil {
+		if _, err := fmt.Fprintf(stdout, "review: %s; policy %s; analysis %s; coverage policy met %t; %d focused group(s)\n", result.Review.Status, result.Review.Policy, report.ReviewAnalysisLabel(*result.Review), result.Review.CoveragePolicyMet, result.Review.Findings); err != nil {
 			return err
 		}
 	}

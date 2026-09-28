@@ -36,14 +36,14 @@ silently use an unverified executable from a project `bin/` or `dist/` folder.
 
 Read project instructions first. Use roots broad enough to include changed
 code and plausible existing implementations. Keep one bounded JSON report
-outside agent context while emitting a small summary. Set `MORI_REPORT` to an
-owner-private temporary or Git-metadata path outside the tracked checkout:
+outside agent context while emitting a small summary. `--output auto` writes it
+to rotated private Git metadata and prints the path:
 
 ```sh
 mori scan \
   --profile review \
   --format agent \
-  --output "$MORI_REPORT" \
+  --output auto \
   --max-occurrences 10 \
   .
 ```
@@ -54,7 +54,7 @@ When a locally available comparison base exists, prefer native focus ordering:
 mori scan \
   --profile review \
   --format agent \
-  --output "$MORI_REPORT" \
+  --output auto \
   --max-occurrences 10 \
   --changed-since origin/main \
   .
@@ -106,7 +106,7 @@ preserve configured coverage failures and immutable input checks. The report
 Strict invocation:
 
 ```sh
-mori review staged check --format agent --output "$MORI_REPORT" .
+mori review staged check --format agent --output auto .
 ```
 
 Confirm `configuration.input.mode` is `git-index`, retain HEAD and index
@@ -134,7 +134,7 @@ worktrees or submodules, provide each locally available revision explicitly:
 ```sh
 mori scan \
   --format agent \
-  --output "$MORI_REPORT" \
+  --output auto \
   --require-coverage \
   --changed-since origin/main \
   --changed-worktree nested=origin/main \
