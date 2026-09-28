@@ -5,6 +5,10 @@
 *.yml text
 *.yaml text
 
+# Generated Tree-sitter parse tables are vendored for reproducible builds.
+# Keep them as text while suppressing unhelpful diffs and language statistics.
+internal/grammar/**/parser.c -diff linguist-generated=true
+
 *.exe binary
 *.gz binary
 *.zip binary
