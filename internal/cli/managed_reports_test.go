@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -65,8 +66,11 @@ func TestManagedOutputWritesUnderGitCommonDirectory(t *testing.T) {
 		t.Fatalf("managed report %v: %s", names, out)
 	}
 	info, err := os.Stat(reports)
-	if err != nil || info.Mode().Perm() != 0o700 {
-		t.Fatalf("managed directory mode: %v %v", info, err)
+	if err != nil || !info.IsDir() {
+		t.Fatalf("managed directory: %v %v", info, err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o700 {
+		t.Fatalf("managed directory mode: %v", info.Mode())
 	}
 
 	linked := filepath.Join(t.TempDir(), "linked")
